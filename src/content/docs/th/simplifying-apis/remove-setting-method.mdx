@@ -1,0 +1,194 @@
+---
+title: Remove Setting Method
+description: ทิ้ง setter ของ field ที่ควรถูกกำหนดตายตัวตอนสร้าง เพื่อให้ค่าถูกตั้งครั้งเดียวและอ็อบเจกต์กลายเป็นไม่เปลี่ยนแปลง
+sidebar:
+  order: 10
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+export const removeSetterDiagram = `flowchart LR
+  subgraph Before["Before"]
+    A["new Account()<br/>then setId(...)<br/>setId callable anytime"]
+  end
+  subgraph After["After"]
+    B["new Account(id)<br/>id fixed forever<br/>no setId"]
+  end
+  Before -.->|"Remove Setting Method"| After`;
+
+## Intent
+
+บาง field เป็นส่วนหนึ่งของ identity ของอ็อบเจกต์: เลขบัญชี, timestamp การสร้าง, สกุลเงิน พวกมันควรถูกเลือกตอนอ็อบเจกต์เกิดและไม่ถูกแตะอีกเลย ถ้า field แบบนั้นมี setter ใครก็ตามสามารถ mutate มันเงียบ ๆ ภายหลังได้ ย้ายการกำหนดค่าเข้าไปใน constructor และ **ลบ setter ทิ้ง** เพื่อให้ field ถูกตั้งเพียงครั้งเดียวและอ็อบเจกต์ไม่เปลี่ยนแปลงในแง่นั้น
+
+## The smell
+
+คุณสร้างอ็อบเจกต์ แล้วเรียก setter ทันทีเพื่อให้ค่าที่จะไม่มีวันเปลี่ยนอย่างถูกต้อง — `new Account(); account.setId(42)` การเกิดสองขั้นชวนให้บุคคลที่สามเรียก setter อีกครั้ง ห่างไกลจากการสร้าง และทำลาย identity ของอ็อบเจกต์ setter ที่มีอยู่เพียงเพื่อให้ถูกเรียกครั้งเดียวตอนเริ่มคือ setter ที่ไม่ควรมีอยู่
+
+## Before → After
+
+`Account` เปิดเผย `id` ที่ตั้งค่าได้ เรารับ id ใน constructor และลบ `setId` ทำให้ identity ถาวร ใน Go และ Rust ไม่มี setter ตั้งแต่แรก — ประเด็นคือกำหนดค่าตอนสร้างและไม่เปิดเผยตัว mutate
+
+<Tabs syncKey="lang">
+  <TabItem label="TypeScript">
+    ```ts
+    // Before
+    class Account {
+      private _id = 0;
+      setId(id: number): void { this._id = id; }
+      get id(): number { return this._id; }
+    }
+
+    const account = new Account();
+    account.setId(42);
+
+    // After
+    class Account {
+      constructor(private readonly _id: number) {}
+      get id(): number { return this._id; }
+    }
+
+    const account = new Account(42);
+    ```
+  </TabItem>
+  <TabItem label="Python">
+    ```python
+    # Before
+    class Account:
+        def __init__(self):
+            self._id = 0
+        def set_id(self, value):
+            self._id = value
+        @property
+        def id(self):
+            return self._id
+
+    account = Account()
+    account.set_id(42)
+
+    # After
+    class Account:
+        def __init__(self, id):
+            self._id = id
+        @property
+        def id(self):
+            return self._id
+
+    account = Account(42)
+    ```
+  </TabItem>
+  <TabItem label="Go">
+    ```go
+    // Set at construction, no setter exposed.
+    type Account struct {
+        id int // unexported, fixed at construction
+    }
+
+    func NewAccount(id int) Account {
+        return Account{id: id}
+    }
+
+    func (a Account) ID() int {
+        return a.id
+    }
+
+    account := NewAccount(42)
+    ```
+  </TabItem>
+  <TabItem label="Rust">
+    ```rust
+    // Set at construction, no setter exposed.
+    pub struct Account {
+        id: u64, // private, no mutator
+    }
+
+    impl Account {
+        pub fn new(id: u64) -> Self {
+            Account { id }
+        }
+
+        pub fn id(&self) -> u64 {
+            self.id
+        }
+    }
+
+    let account = Account::new(42);
+    ```
+  </TabItem>
+</Tabs>
+
+<Mermaid code={removeSetterDiagram} title="การสร้างสองขั้นที่มี setter กลายเป็นการสร้างครั้งเดียวที่ไม่เปลี่ยนแปลง" />
+
+## Mechanics
+
+1. ถ้า constructor ยังรับ field ไม่ได้ ให้เพิ่มมันเป็น parameter และกำหนดค่ามันข้างใน constructor
+2. อัปเดตผู้เรียกทุกรายที่สร้างอ็อบเจกต์ให้ส่งค่าผ่าน constructor แทนที่จะผ่าน setter **รันเทสต์ของคุณ** หลังแต่ละราย
+3. ค้นหาการเรียก setter ที่ยังเหลืออยู่ ถ้าผู้เรียกยัง mutate field หลังการสร้าง ให้ตัดสินว่านั่นเป็นความต้องการจริงไหม — ถ้าใช่ field นี้ไม่ใช่ตัวเลือก; ถ้าไม่ ให้นำมันผ่าน constructor
+4. เมื่อไม่มีผู้เรียกใช้ setter แล้ว ก็ลบมันทิ้ง
+5. ที่ภาษาอนุญาต ให้ทำเครื่องหมาย field เป็น `readonly`/`final`/private-ที่ไม่มีตัว mutate เพื่อให้ compiler บังคับความไม่เปลี่ยนแปลง
+
+## When to use / trade-offs
+
+ใช้สิ่งนี้กับ field ที่นิยาม identity หรือตายตัวตลอดอายุของอ็อบเจกต์ และกับ value object ที่คุณต้องการปฏิบัติว่าไม่เปลี่ยนแปลง เพื่อให้แชร์และ cache ได้อย่างอิสระ การลบ setter หดพื้นที่ผิวสำหรับ bug: ค่าที่เปลี่ยนไม่ได้ก็เปลี่ยนในเวลาที่ผิดไม่ได้
+
+ข้อแลกเปลี่ยนคือแรงกดดันที่ constructor ถ้ามี field แบบนี้หลายตัว รายการ parameter ของ constructor อาจยาวขึ้น — นั่นเป็นสัญญาณให้ทำ **Introduce Parameter Object** หรือ builder ไม่ใช่เหตุผลที่จะคง setter ไว้ และ state ที่เปลี่ยนได้จริง ๆ — ยอดเงิน, สถานะ — ยังต้องมีวิธีเปลี่ยนที่ควบคุมได้; อย่าถอด setter ที่จำลองการเปลี่ยนแปลงจริงที่ดำเนินอยู่ เฟรมเวิร์กที่ต้องการ constructor ไม่มี argument และ field injection ก็อาจบังคับให้ต้องประนีประนอมตรงนี้
+
+## Related
+
+- [Replace Constructor with Factory Function](/refactoring-from-zero-to-hero/th/simplifying-apis/replace-constructor-with-factory/)
+- [Introduce Parameter Object](/refactoring-from-zero-to-hero/th/simplifying-apis/introduce-parameter-object/)
+- [Separate Query from Modifier](/refactoring-from-zero-to-hero/th/simplifying-apis/separate-query-from-modifier/)
+
+<Callout title="ความไม่เปลี่ยนแปลงคือฟีเจอร์">
+ทุก setter ที่คุณลบคือคลาสของ bug ที่คุณเลิกกังวลได้ field ที่ไม่เปลี่ยนแปลงไม่ต้องมี defensive copy, ไม่ต้อง synchronisation และไม่ต้องตรวจสอบว่าใครอาจเปลี่ยนมัน ตั้ง identity ครั้งเดียวตอนสร้าง แล้วส่วนที่เหลือของโปรแกรมก็ไว้ใจมันได้ตลอดไป
+</Callout>
+
+export const quizRemoveSetter = [
+  {
+    q: 'field แบบใดเป็นเป้าหมายที่ถูกต้องสำหรับ Remove Setting Method?',
+    options: [
+      'field ที่เปลี่ยนตลอดเวลาในชีวิตของอ็อบเจกต์',
+      'field ที่ควรถูกตั้งครั้งเดียวตอนสร้างและไม่เปลี่ยน',
+      'field ที่ใช้เฉพาะในเทสต์',
+      'field ที่ private ใด ๆ',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'ค่าของ field ถูกกำหนดที่ไหนหลังการ refactor?',
+    options: [
+      'ใน method อัปเดตเฉพาะ',
+      'ใน constructor ส่งเข้ามาตอนสร้าง',
+      'ใน global initializer',
+      'ปล่อยไว้ที่ค่า default',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'ประโยชน์หลักของการลบ setter คืออะไร?',
+    options: [
+      'compile เร็วขึ้น',
+      'field กลายเป็นไม่เปลี่ยนแปลง จึงเปลี่ยนในเวลาที่ผิดไม่ได้',
+      'ขนาด binary เล็กลง',
+      'parameter ของ constructor น้อยลง',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'ถ้าการลบ setter ทำให้ constructor มี parameter มากเกินไป อะไรคือการตอบสนองที่ถูกต้อง?',
+    options: [
+      'ใส่ setter กลับเข้าไป',
+      'นำ Parameter Object หรือ builder เข้ามา',
+      'ทำให้ field เป็น public',
+      'ใช้ global variable',
+    ],
+    answer: 1,
+  },
+];
+
+<Quiz client:visible id="simplifying-apis/remove-setting-method" questions={quizRemoveSetter} />
+
+<ProgressTracker client:visible id="simplifying-apis/remove-setting-method" />

@@ -1,0 +1,202 @@
+---
+title: Replace Error Code with Exception
+description: ค่า sentinel ที่ผู้เรียกต้องจำว่าจะตรวจสอบนั้นถูกมองข้ามได้ง่าย — ทำให้ความล้มเหลวถูกมองข้ามไม่ได้ด้วยการ raise exception หรือใน Go และ Rust ด้วยการคืน error หรือ Result ที่ชัดเจน
+sidebar:
+  order: 9
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+export const errorDiagram = `flowchart TD
+  A["Function fails"] --> B{"How is failure reported?"}
+  B -->|"Sentinel: -1 / null / false"| C["Caller must remember to check<br/>silent corruption if they forget"]
+  B -->|"Exception (TS, Python)"| D["Failure cannot be ignored<br/>unwinds to a handler"]
+  B -->|"error / Result (Go, Rust)"| E["Failure is explicit in the type<br/>compiler nudges you to handle it"]`;
+
+## Intent
+
+**error code** คือค่าคืนพิเศษ — `-1`, `null`, `false`, string ว่าง — ที่ฟังก์ชันใช้เพื่อบอกว่า *"อันนั้นไม่สำเร็จ"* ปัญหาคือมันดูเหมือนค่าปกติเป๊ะ ผู้เรียกจึงต้อง *จำ* ว่าจะตรวจสอบมัน ลืมครั้งเดียว sentinel ก็ไหลลงไปข้างล่างราวกับเป็นข้อมูลจริง
+
+**Replace Error Code with Exception** แยกสองช่องทางออกจากกัน ค่าคืนถือเฉพาะผลสำเร็จ; ความล้มเหลวเดินทางอีกเส้นที่ไม่อาจถูกเข้าใจผิดเงียบ ๆ ว่าเป็นความสำเร็จ ในภาษาที่มี exception (TypeScript, Python) คุณ `throw`/`raise` ใน Go และ Rust ไม่มี exception สำหรับความล้มเหลวธรรมดา — การย้ายที่เป็นสไตล์คือทำให้ error *ชัดเจนใน type*: คืน `error` ควบคู่กับค่าใน Go หรือ `Result` ใน Rust เราแสดงทั้งสอง และบอกว่าอันไหนเป็นอันไหน
+
+## The smell
+
+ฟังก์ชันคืน `-1` สำหรับ "ไม่พบ", `null` สำหรับ "parse ไม่ได้" หรือ `false` สำหรับ "บันทึกไม่สำเร็จ" ผู้เรียกทุกคนตอนนี้มีภาระต้องเขียนการตรวจสอบที่ละเลยได้ง่าย ๆ และการละเลยนั้นมองไม่เห็นจนกว่าค่าที่ผิดจะระเบิดที่ไหนสักแห่งไกลออกไป แย่กว่านั้น sentinel ตัวเดียวกันมักหมายถึงสิ่งต่างกันในฟังก์ชันต่างกัน — `-1` เป็น index ที่หายไปตรงนี้และเป็นจำนวน error ตรงนั้น — ผู้อ่านจึงไว้ใจมันแบบมองแวบเดียวไม่ได้ ความล้มเหลวถูกลักลอบเข้ามาในช่องทางของค่า ที่ที่มันไม่ควรอยู่
+
+## Before → After
+
+ถอนเงินจากบัญชี ก่อนหน้านี้ฟังก์ชันคืน `-1` เมื่อเงินไม่พอ หลังจากนั้นมันส่งสัญญาณความล้มเหลวบนช่องทางของมันเอง — exception ใน TS/Python, `error`/`Result` ที่ชัดเจนใน Go/Rust
+
+<Tabs syncKey="lang">
+  <TabItem label="TypeScript">
+    ```ts
+    // Before — caller must remember that -1 means failure
+    function withdraw(balance: number, amount: number): number {
+      if (amount > balance) {
+        return -1;
+      }
+      return balance - amount;
+    }
+
+    // After — failure cannot be confused with a balance
+    class InsufficientFundsError extends Error {}
+
+    function withdraw(balance: number, amount: number): number {
+      if (amount > balance) {
+        throw new InsufficientFundsError(`need ${amount}, have ${balance}`);
+      }
+      return balance - amount;
+    }
+    ```
+  </TabItem>
+  <TabItem label="Python">
+    ```python
+    # Before — caller must remember that -1 means failure
+    def withdraw(balance, amount):
+        if amount > balance:
+            return -1
+        return balance - amount
+
+    # After — raising makes failure impossible to ignore
+    class InsufficientFundsError(Exception):
+        pass
+
+    def withdraw(balance, amount):
+        if amount > balance:
+            raise InsufficientFundsError(f"need {amount}, have {balance}")
+        return balance - amount
+    ```
+  </TabItem>
+  <TabItem label="Go">
+    ```go
+    // Go has no exceptions for ordinary failures. The idiomatic
+    // "Replace Error Code" is to return an explicit error value, so
+    // the failure is part of the signature and callers must handle it.
+    //
+    // Before — -1 sentinel
+    func Withdraw(balance, amount int) int {
+        if amount > balance {
+            return -1
+        }
+        return balance - amount
+    }
+
+    // After — explicit error
+    var ErrInsufficientFunds = errors.New("insufficient funds")
+
+    func Withdraw(balance, amount int) (int, error) {
+        if amount > balance {
+            return 0, fmt.Errorf("%w: need %d, have %d", ErrInsufficientFunds, amount, balance)
+        }
+        return balance - amount, nil
+    }
+    ```
+  </TabItem>
+  <TabItem label="Rust">
+    ```rust
+    // Rust likewise avoids exceptions for recoverable errors. The
+    // idiomatic move is to return a Result, making failure explicit in
+    // the type — the compiler then nudges every caller to handle it.
+    //
+    // Before — -1 sentinel
+    fn withdraw(balance: i64, amount: i64) -> i64 {
+        if amount > balance {
+            return -1;
+        }
+        balance - amount
+    }
+
+    // After — explicit Result
+    #[derive(Debug)]
+    struct InsufficientFunds {
+        need: i64,
+        have: i64,
+    }
+
+    fn withdraw(balance: i64, amount: i64) -> Result<i64, InsufficientFunds> {
+        if amount > balance {
+            return Err(InsufficientFunds { need: amount, have: balance });
+        }
+        Ok(balance - amount)
+    }
+    ```
+  </TabItem>
+</Tabs>
+
+<Mermaid code={errorDiagram} title="ความล้มเหลวออกจากช่องทางของค่า — exception ใน TS/Python, error หรือ Result ใน Go/Rust" />
+
+## Mechanics
+
+1. ระบุ sentinel และเงื่อนไขที่มันแทน ปักหมุดความล้มเหลวที่แน่ชัดที่มันรายงาน
+2. เลือกช่องทางความล้มเหลวสำหรับภาษาของคุณ ใน TypeScript หรือ Python ให้นิยาม exception type เฉพาะ — คลาสที่มีชื่อดีกว่า `Error`/`Exception` เปล่า ๆ เพราะผู้เรียก catch ความล้มเหลว *นี้* ได้โดยไม่กลืนความล้มเหลวที่ไม่เกี่ยวกันไปด้วย ใน Go ให้คืน `error`; ใน Rust ให้คืน `Result` ที่มี error แบบมี type
+3. ที่จุดความล้มเหลว แทนที่ `return sentinel` ด้วยสัญญาณใหม่: `throw`/`raise` หรือ `return 0, err` / `return Err(...)`
+4. อัปเดตเส้นทางสำเร็จให้คืนเฉพาะผลลัพธ์จริง — และใน Go/Rust ให้จับคู่กับ `nil`/`Ok(...)`
+5. เดินไปทุกผู้เรียก แทนที่การตรวจสอบ "มันคืน sentinel ไหม?" แต่ละจุดด้วยการจัดการที่เข้าคู่กัน: `try`/`catch` (หรือปล่อยให้มันแพร่ไป) สำหรับ exception; `if err != nil` หรือ `?`/`match` สำหรับ Go และ Rust
+6. **รันเทสต์ของคุณ** หลังย้ายผู้เรียกแต่ละราย เพื่อให้จุดที่พลาดโผล่ขึ้นมาทันทีแทนที่จะหลังจากเปลี่ยนทั้งหมดแล้ว
+
+## When to use / trade-offs
+
+หยิบสิ่งนี้มาใช้เมื่อฟังก์ชันรายงานความล้มเหลวด้วย sentinel ในแถบเดียวกัน และ sentinel นั้นมองข้ามได้ง่ายหรือกำกวม การย้ายความล้มเหลวขึ้นช่องทางของมันเองทำให้จัดการผิดได้ยากขึ้นมาก: exception ที่ไม่ถูกจัดการคลายตัวออกมาดังลั่น และ `error`/`Result` ที่ไม่ถูกจัดการอย่างน้อยก็มองเห็นได้ — และใน Rust compiler จะไม่ยอมให้คุณลืมเคส `Err`
+
+ข้อแลกเปลี่ยนต่างกันไปตามภาษา exception เหมาะกับเงื่อนไขที่ *เป็นข้อยกเว้น* ไม่ใช่ผลลัพธ์ที่คุณคาดว่าจะเจอเป็นกิจวัตร; การใช้มันสำหรับ control flow ธรรมดาทำให้ code ช้าและตามยาก ถ้าผลลัพธ์ "ที่หายไป" เป็นเคสปกติที่คาดไว้ ให้เลือก type ว่างที่ชัดเจนแทน — ดู **Introduce Special Case** ใน Go และ Rust สไตล์ `error`/`Result` ที่ชัดเจนเป็นสไตล์อยู่แล้ว การ refactor ที่นั่นจึงไม่ใช่ "นำ exception เข้ามา" เท่าไรนัก แต่เป็น "เลิกเข้ารหัส error เป็นเลขวิเศษ" มากกว่า ไม่ว่าคุณเลือกช่องทางใด อย่าผสมทั้งสองสำหรับฟังก์ชันเดียวกัน — นั่นแค่เพิ่มวิธีที่ผู้เรียกจะทำผิดเป็นสองเท่า
+
+## Related
+
+- [Introduce Special Case](/refactoring-from-zero-to-hero/th/simplifying-conditionals/introduce-special-case/)
+- [Introduce Assertion](/refactoring-from-zero-to-hero/th/simplifying-conditionals/introduce-assertion/)
+- [Replace Nested Conditional with Guard Clauses](/refactoring-from-zero-to-hero/th/simplifying-conditionals/replace-nested-conditional-with-guard-clauses/)
+
+<Callout title="exception ในบางภาษา, error ที่ชัดเจนในภาษาอื่น">
+"Replace Error Code with Exception" ถูกตั้งชื่อตามภาษาที่มี exception Go และ Rust จงใจไม่ใช้ exception สำหรับความล้มเหลวธรรมดา — ที่นั่นแนวคิดเดียวกันหมายถึงการคืน error หรือ Result ที่ชัดเจน เพื่อให้ความล้มเหลวอยู่ใน type signature หลักการคงที่เสมอ: sentinel ที่ผู้เรียกมองข้ามได้เงียบ ๆ ควรถูกแทนที่ด้วยช่องทางความล้มเหลวที่พวกเขามองข้ามไม่ได้
+</Callout>
+
+export const quizError = [
+  {
+    q: 'ทำไม error code (เช่นการคืน -1) จึงเสี่ยง?',
+    options: [
+      'มันช้ากว่า exception',
+      'มันดูเหมือนค่าปกติ ผู้เรียกจึงลืมตรวจสอบมันและปล่อยให้ไหลลงไปข้างล่างได้',
+      'มันคืนจากฟังก์ชันไม่ได้',
+      'มันทำให้โปรแกรมพังเสมอ',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'สำหรับ Go และ Rust บทเรียนนำเสนออะไรเป็น "Replace Error Code" ที่เป็นสไตล์แทน exception?',
+    options: [
+      'โยน panic ทุกครั้งที่ล้มเหลว',
+      'คืน error ที่ชัดเจน (Go) หรือ Result (Rust) เพื่อให้ความล้มเหลวเป็นส่วนหนึ่งของ type',
+      'log error แล้วคืน sentinel อยู่ดี',
+      'ใช้ตัวแปร error แบบ global',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'เมื่อผลลัพธ์ "ที่หายไป" เป็นเคสปกติที่คาดไว้มากกว่าความล้มเหลวจริง บทเรียนแนะนำอะไรแทน?',
+    options: [
+      'โยน exception อยู่ดี',
+      'เลือก type ว่างที่ชัดเจน — ดู Introduce Special Case',
+      'คืน -1',
+      'คืน Result ที่เป็น Err เสมอ',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'ทำไมจึงเลือก exception type เฉพาะมากกว่า Error/Exception เปล่า ๆ ใน TypeScript หรือ Python?',
+    options: [
+      'มันทำงานเร็วกว่า',
+      'ผู้เรียก catch ความล้มเหลวนี้ได้โดยไม่กลืนความล้มเหลวที่ไม่เกี่ยวกันไปด้วย',
+      'exception เปล่า ๆ ไม่ได้รับอนุญาต',
+      'มันใช้ memory น้อยกว่า',
+    ],
+    answer: 1,
+  },
+];
+
+<Quiz client:visible id="simplifying-conditionals/replace-error-code-with-exception" questions={quizError} />
+
+<ProgressTracker client:visible id="simplifying-conditionals/replace-error-code-with-exception" />

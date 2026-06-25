@@ -1,0 +1,279 @@
+---
+title: Replace Type Code with State/Strategy
+description: เมื่อ type code ขับเคลื่อนพฤติกรรมที่แตกต่างและเปลี่ยนได้ตอน runtime ให้ถืออ็อบเจกต์ State หรือ Strategy ที่ host สลับได้ แทนที่จะอบ variant ลงในซับคลาสที่ตายตัว
+sidebar:
+  order: 11
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+export const stateDiagram = `flowchart TD
+  subgraph Before["Before — a type code with switching"]
+    A["Order<br/>status: 'pending' | 'shipped' | 'delivered'"]
+    A --> B{"switch status"}
+    B --> C["pending behaviour"]
+    B --> D["shipped behaviour"]
+    B --> E["delivered behaviour"]
+  end
+  subgraph After["After — a swappable state object"]
+    F["Order<br/>holds a State"]
+    F --> G["OrderState (interface)<br/>label() / canCancel()"]
+    G --> H["Pending"]
+    G --> I["Shipped"]
+    G --> J["Delivered"]
+  end
+  Before -.->|"Replace Type Code with State/Strategy"| After`;
+
+## Intent
+
+นำ type code ที่ทั้ง *ขับเคลื่อนพฤติกรรมที่แตกต่าง* และ *เปลี่ยนไปตลอดอายุของอ็อบเจกต์* — `status` ของ order, mode ของ connection — มาแทนที่ด้วยอ็อบเจกต์ State (หรือ Strategy) ที่ host ถือไว้และสลับได้ host มอบหมายพฤติกรรมที่แตกต่างให้อ็อบเจกต์นั้น การเปลี่ยนสถานะก็แค่กำหนด state ตัวใหม่ เพราะคลาสของ host ไม่เคยเปลี่ยน วิธีนี้จึงใช้ได้พอดีตรงที่ Replace Type Code with Subclasses ทำไม่ได้
+
+## The smell
+
+smell คือ `switch` ที่กระจัดกระจายบน type code แบบเดียวกับใน refactoring ของซับคลาส แต่มีคุณสมบัติเพิ่มมาหนึ่งอย่าง: **code เปลี่ยนได้ตอน runtime** order เลื่อน `pending → shipped → delivered`; document ไป `draft → published → archived` คุณไม่สามารถจำลอง identity ที่เปลี่ยนได้ด้วยการเปลี่ยนคลาสของอ็อบเจกต์ — ภาษาส่วนใหญ่ไม่ยอมให้อ็อบเจกต์กลายเป็นคลาสอื่นกลางอายุ ดังนั้นการแตกกิ่งจึงทวีคูณไปทั่ว method และทุกการเปลี่ยนสถานะคือการกำหนดค่า field ดิบโดยไม่มีหลักประกันว่าค่าใหม่นั้นถูกต้องด้วยซ้ำ
+
+## Before → After
+
+`Order` ที่ string `status` ของมันถูกตรวจด้วย `switch` ในสอง method หลังจากนั้น order ถือ `OrderState` ที่มันมอบหมายให้และสลับเมื่อมีการเปลี่ยนสถานะ
+
+<Tabs syncKey="lang">
+  <TabItem label="TypeScript">
+    ```ts
+    // Before
+    class Order {
+      constructor(public status: string) {}
+      label(): string {
+        switch (this.status) {
+          case 'pending': return 'Awaiting payment';
+          case 'shipped': return 'On the way';
+          case 'delivered': return 'Complete';
+          default: throw new Error(`unknown ${this.status}`);
+        }
+      }
+      canCancel(): boolean {
+        return this.status === 'pending';
+      }
+    }
+
+    // After
+    interface OrderState {
+      label(): string;
+      canCancel(): boolean;
+    }
+    const Pending: OrderState = { label: () => 'Awaiting payment', canCancel: () => true };
+    const Shipped: OrderState = { label: () => 'On the way', canCancel: () => false };
+    const Delivered: OrderState = { label: () => 'Complete', canCancel: () => false };
+
+    class Order {
+      constructor(private state: OrderState = Pending) {}
+      label(): string { return this.state.label(); }
+      canCancel(): boolean { return this.state.canCancel(); }
+      ship(): void { this.state = Shipped; } // a transition is a swap
+    }
+    ```
+  </TabItem>
+  <TabItem label="Python">
+    ```python
+    # Before
+    class Order:
+        def __init__(self, status):
+            self.status = status
+        def label(self):
+            if self.status == "pending":
+                return "Awaiting payment"
+            elif self.status == "shipped":
+                return "On the way"
+            elif self.status == "delivered":
+                return "Complete"
+            raise ValueError(self.status)
+        def can_cancel(self):
+            return self.status == "pending"
+
+    # After
+    from typing import Protocol
+
+    class OrderState(Protocol):
+        def label(self) -> str: ...
+        def can_cancel(self) -> bool: ...
+
+    class Pending:
+        def label(self): return "Awaiting payment"
+        def can_cancel(self): return True
+
+    class Shipped:
+        def label(self): return "On the way"
+        def can_cancel(self): return False
+
+    class Delivered:
+        def label(self): return "Complete"
+        def can_cancel(self): return False
+
+    class Order:
+        def __init__(self, state=None):
+            self.state = state or Pending()
+        def label(self):
+            return self.state.label()
+        def can_cancel(self):
+            return self.state.can_cancel()
+        def ship(self):
+            self.state = Shipped()  # a transition is a swap
+    ```
+  </TabItem>
+  <TabItem label="Go">
+    ```go
+    // Before
+    type Order struct{ Status string }
+    func (o Order) Label() string {
+        switch o.Status {
+        case "pending":
+            return "Awaiting payment"
+        case "shipped":
+            return "On the way"
+        case "delivered":
+            return "Complete"
+        default:
+            panic("unknown " + o.Status)
+        }
+    }
+    func (o Order) CanCancel() bool { return o.Status == "pending" }
+
+    // After
+    type OrderState interface {
+        Label() string
+        CanCancel() bool
+    }
+    type pending struct{}
+    func (pending) Label() string   { return "Awaiting payment" }
+    func (pending) CanCancel() bool { return true }
+
+    type shipped struct{}
+    func (shipped) Label() string   { return "On the way" }
+    func (shipped) CanCancel() bool { return false }
+
+    type Order struct{ state OrderState }
+    func NewOrder() *Order          { return &Order{state: pending{}} }
+    func (o *Order) Label() string  { return o.state.Label() }
+    func (o *Order) CanCancel() bool { return o.state.CanCancel() }
+    func (o *Order) Ship()          { o.state = shipped{} } // swap
+    ```
+  </TabItem>
+  <TabItem label="Rust">
+    ```rust
+    // Before
+    struct Order { status: String }
+    impl Order {
+        fn label(&self) -> &str {
+            match self.status.as_str() {
+                "pending" => "Awaiting payment",
+                "shipped" => "On the way",
+                "delivered" => "Complete",
+                other => panic!("unknown {other}"),
+            }
+        }
+        fn can_cancel(&self) -> bool { self.status == "pending" }
+    }
+
+    // After
+    trait OrderState {
+        fn label(&self) -> &str;
+        fn can_cancel(&self) -> bool;
+    }
+    struct Pending;
+    impl OrderState for Pending {
+        fn label(&self) -> &str { "Awaiting payment" }
+        fn can_cancel(&self) -> bool { true }
+    }
+    struct Shipped;
+    impl OrderState for Shipped {
+        fn label(&self) -> &str { "On the way" }
+        fn can_cancel(&self) -> bool { false }
+    }
+
+    struct Order { state: Box<dyn OrderState> }
+    impl Order {
+        fn new() -> Self { Order { state: Box::new(Pending) } }
+        fn label(&self) -> &str { self.state.label() }
+        fn can_cancel(&self) -> bool { self.state.can_cancel() }
+        fn ship(&mut self) { self.state = Box::new(Shipped); } // swap
+    }
+    ```
+  </TabItem>
+</Tabs>
+
+<Mermaid code={stateDiagram} title="type code ที่เปลี่ยนตอน runtime กลายเป็นอ็อบเจกต์ State ที่สลับได้ซึ่ง host มอบหมายให้" />
+
+## Mechanics
+
+1. Encapsulate field ของ type code ไว้หลัง accessor เพื่อให้ผู้เรียกพึ่งพา getter/setter แทนค่าดิบ
+2. นำ interface ของ state เข้ามา ประกาศ operation ที่แตกต่างไปตาม code
+3. สร้างคลาส state หนึ่งตัวต่อหนึ่งค่าของ type code ย้ายแต่ละกิ่งของ method ที่แตกต่างเข้าไปยัง state ที่สอดคล้องกัน
+4. ให้ host มี field ที่ถือ state ปัจจุบัน และให้ method ของมันมอบหมายไปยัง state นั้น **รันเทสต์ของคุณ** หลังต่อสาย method แต่ละตัว
+5. แทนที่การกำหนดค่า type code แต่ละครั้งด้วยการสลับอ็อบเจกต์ state — ในอุดมคติผ่าน method อย่าง `ship()` ที่ตั้งชื่อให้การเปลี่ยนสถานะและคอยกั้นว่าการเปลี่ยนแบบไหนถูกกฎ
+6. เมื่อไม่มีอะไรอ่านค่า code ดิบแล้ว ก็ลบมันทิ้ง ตอนนี้ host เปลี่ยนพฤติกรรมล้วน ๆ ด้วยว่ามันถือ state ตัวไหน
+
+## When to use / trade-offs
+
+เลือก State/Strategy เมื่อ variant **เปลี่ยนได้หลังการสร้าง** เพราะ host คงคลาสของมันไว้และเพียงสลับอ็อบเจกต์ที่ถือ มันจึงจำลอง lifecycle ที่ซับคลาสทำไม่ได้ **State** เหมาะกับชุดของเงื่อนไขที่มีชื่อจำนวนน้อยพร้อมการเปลี่ยนระหว่างกัน (สถานะของ order); **Strategy** เหมาะกับการฉีด algorithm ที่ใช้แทนกันได้หนึ่งตัว (นโยบายการตั้งราคา) ทั้งคู่ยังให้คุณกั้นการเปลี่ยนสถานะและกระทั่งเพิ่มข้อมูลต่อ state ที่ host ไม่ต้องแบกไว้
+
+เปรียบเทียบกับ **[Replace Type Code with Subclasses](/refactoring-from-zero-to-hero/th/organizing-data/replace-type-code-with-subclasses/)**: การย้ายนั้นอบ variant ลงใน *type* ของอ็อบเจกต์ ซึ่งเหมาะที่สุดเมื่อ type **ตายตัวตลอดชีวิต** (บทบาทของพนักงาน) แต่เป็นไปไม่ได้เมื่อมันต้องเปลี่ยน ต้นทุนของ State/Strategy คืออ็อบเจกต์เพิ่มอีกหนึ่งและชั้นของการมอบหมาย คุณจ่ายมันเพื่อให้ได้ lifecycle ที่สลับได้ตอน runtime และกั้นได้ ถ้า type ไม่เคยเปลี่ยน ซับคลาสก็ง่ายกว่า
+
+## Related
+
+- [Replace Type Code with Subclasses](/refactoring-from-zero-to-hero/th/organizing-data/replace-type-code-with-subclasses/)
+- [Encapsulate Variable](/refactoring-from-zero-to-hero/th/organizing-data/encapsulate-variable/)
+- [Replace Primitive with Object](/refactoring-from-zero-to-hero/th/organizing-data/replace-primitive-with-object/)
+
+<Callout title="type ตายตัว → ซับคลาส; type เปลี่ยน → State/Strategy">
+switch ที่กระจัดกระจายแบบเดียวกันแก้ได้สองทาง ถ้า variant ลงตัวตั้งแต่อ็อบเจกต์เกิด ให้ทำเป็นซับคลาส ถ้า variant เคลื่อนผ่าน lifecycle ให้ถืออ็อบเจกต์ State ที่ host สลับ — host คงเป็นคลาสเดียวขณะที่พฤติกรรมของมันเปลี่ยนอยู่ข้างใต้
+</Callout>
+
+export const quizStateStrategy = [
+  {
+    q: 'คุณสมบัติเพิ่มเติมใดที่ผลักคุณไปทาง State/Strategy แทนซับคลาส?',
+    options: [
+      'อ็อบเจกต์มีหลาย field',
+      'type code เปลี่ยนได้ตอน runtime ตลอดอายุของอ็อบเจกต์',
+      'type code ไม่เคยถูกตรวจสอบ',
+      'มีค่า type code เพียงค่าเดียว',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'หลังการ refactor นี้ การเปลี่ยนสถานะระหว่าง variant ถูกแสดงออกอย่างไร?',
+    options: [
+      'ด้วยการกำหนดค่า string ของ type code ดิบใหม่',
+      'ด้วยการสลับอ็อบเจกต์ State ที่ถืออยู่เป็นตัวอื่น',
+      'ด้วยการเปลี่ยนคลาสของอ็อบเจกต์ host ตอน runtime',
+      'ด้วยการ recompile โปรแกรม',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'เมื่อไรที่ Replace Type Code with Subclasses เป็นทางเลือกที่ดีกว่า?',
+    options: [
+      'เมื่อ type ตายตัวตลอดอายุของอ็อบเจกต์',
+      'เมื่อ type เปลี่ยนผ่าน lifecycle',
+      'เมื่อคุณต้องการกั้นการเปลี่ยนสถานะ',
+      'เมื่ออ็อบเจกต์ควรถือข้อมูลต่อ state',
+    ],
+    answer: 0,
+  },
+  {
+    q: 'ต้นทุนตามปกติของการเลือก State/Strategy คืออะไร?',
+    options: [
+      'โปรแกรมไม่สามารถถูกเทสต์ได้อีกต่อไป',
+      'อ็อบเจกต์เพิ่มอีกหนึ่งตัวและชั้นของการมอบหมาย',
+      'การแตกกิ่งทั้งหมดต้องคงอยู่ที่เดิม',
+      'host ต้องกลายเป็นไม่เปลี่ยนแปลง',
+    ],
+    answer: 1,
+  },
+];
+
+<Quiz client:visible id="organizing-data/replace-type-code-with-state-strategy" questions={quizStateStrategy} />
+
+<ProgressTracker client:visible id="organizing-data/replace-type-code-with-state-strategy" />

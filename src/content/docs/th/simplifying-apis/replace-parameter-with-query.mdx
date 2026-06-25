@@ -1,0 +1,207 @@
+---
+title: Replace Parameter with Query
+description: ทิ้ง parameter ที่ฟังก์ชันคำนวณเองได้ แล้วคำนวณมันข้างใน — พร้อมหมายเหตุเรื่องการย้ายทางกลับเมื่อคุณต้องการตัด dependency ที่ซ่อนอยู่
+sidebar:
+  order: 9
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+export const queryDiagram = `flowchart LR
+  subgraph Before["Before"]
+    A["finalPrice(qty, discount)"] --> B["caller computes discount<br/>from qty first"]
+  end
+  subgraph After["After"]
+    C["finalPrice(qty)"] --> D["derives discount<br/>internally"]
+  end
+  Before -.->|"Replace Parameter with Query"| After`;
+
+## Intent
+
+ถ้าฟังก์ชันสามารถคำนวณค่าของ parameter หนึ่งจากข้อมูลที่มันรับมาอยู่แล้ว parameter นั้นก็เป็นน้ำหนักที่ตายแล้ว ผู้เรียกทุกคนต้องคำนวณและส่งมัน และพวกเขาขัดแย้งกันได้ ลบมันออก แล้วให้ฟังก์ชันถามหาค่านั้นเอง — **query** — เพื่อให้มีแหล่งความจริงเดียว และมีสิ่งให้ทำผิดที่ call site น้อยลงหนึ่งอย่าง
+
+## The smell
+
+parameter หนึ่งถูกส่งในแบบเดียวกันเสมอ คำนวณจาก argument อีกตัวที่ฟังก์ชันมีอยู่แล้ว คุณเห็นผู้เรียกรันการคำนวณเล็ก ๆ แบบเดียวกันก่อนทุกการเรียก แล้วยื่นผลลัพธ์เข้าไป แย่กว่านั้น ผู้เรียกสองรายคำนวณมันต่างกันเล็กน้อย ฟังก์ชันจึงทำงานไม่สม่ำเสมอขึ้นกับว่าใครเรียก parameter เสนอความยืดหยุ่นที่ไม่มีใครต้องการจริง ๆ
+
+## Before → After
+
+`finalPrice` รับ `quantity` และ `discount` แต่ discount ถูกกำหนดทั้งหมดโดย quantity ผู้เรียกคอยคำนวณมัน เราลบ parameter ออกและคำนวณ discount ข้างใน
+
+<Tabs syncKey="lang">
+  <TabItem label="TypeScript">
+    ```ts
+    // Before
+    function finalPrice(quantity: number, discount: number): number {
+      const base = quantity * 5;
+      return base - base * discount;
+    }
+
+    const d = quantity > 100 ? 0.1 : 0;
+    const price = finalPrice(quantity, d);
+
+    // After
+    function finalPrice(quantity: number): number {
+      const base = quantity * 5;
+      return base - base * discountFor(quantity);
+    }
+
+    function discountFor(quantity: number): number {
+      return quantity > 100 ? 0.1 : 0;
+    }
+
+    const price = finalPrice(quantity);
+    ```
+  </TabItem>
+  <TabItem label="Python">
+    ```python
+    # Before
+    def final_price(quantity, discount):
+        base = quantity * 5
+        return base - base * discount
+
+    d = 0.1 if quantity > 100 else 0
+    price = final_price(quantity, d)
+
+    # After
+    def final_price(quantity):
+        base = quantity * 5
+        return base - base * discount_for(quantity)
+
+    def discount_for(quantity):
+        return 0.1 if quantity > 100 else 0
+
+    price = final_price(quantity)
+    ```
+  </TabItem>
+  <TabItem label="Go">
+    ```go
+    // Before
+    func FinalPrice(quantity int, discount float64) float64 {
+        base := float64(quantity) * 5
+        return base - base*discount
+    }
+
+    d := 0.0
+    if quantity > 100 {
+        d = 0.1
+    }
+    price := FinalPrice(quantity, d)
+
+    // After
+    func FinalPrice(quantity int) float64 {
+        base := float64(quantity) * 5
+        return base - base*discountFor(quantity)
+    }
+
+    func discountFor(quantity int) float64 {
+        if quantity > 100 {
+            return 0.1
+        }
+        return 0
+    }
+
+    price := FinalPrice(quantity)
+    ```
+  </TabItem>
+  <TabItem label="Rust">
+    ```rust
+    // Before
+    fn final_price(quantity: i32, discount: f64) -> f64 {
+        let base = quantity as f64 * 5.0;
+        base - base * discount
+    }
+
+    let d = if quantity > 100 { 0.1 } else { 0.0 };
+    let price = final_price(quantity, d);
+
+    // After
+    fn final_price(quantity: i32) -> f64 {
+        let base = quantity as f64 * 5.0;
+        base - base * discount_for(quantity)
+    }
+
+    fn discount_for(quantity: i32) -> f64 {
+        if quantity > 100 { 0.1 } else { 0.0 }
+    }
+
+    let price = final_price(quantity);
+    ```
+  </TabItem>
+</Tabs>
+
+<Mermaid code={queryDiagram} title="parameter ที่คำนวณได้ถูกลบออกและคำนวณข้างใน" />
+
+## Mechanics
+
+1. ยืนยันว่า parameter คำนวณได้ทั้งหมดจากข้อมูลที่ฟังก์ชันมีอยู่แล้ว — parameter อื่น, field หรือ query ที่เข้าถึงได้ ถ้ามันขึ้นกับอะไรภายนอก ให้หยุด: การลบมันจะลักลอบนำ dependency ที่ซ่อนอยู่เข้ามา
+2. แยกการคำนวณออกเป็น query ถ้ามันยังไม่ใช่
+3. ข้างในฟังก์ชัน แทนที่การใช้ parameter แต่ละจุดด้วยการเรียก query นั้น
+4. ลบ parameter ออกจาก signature แล้วลบการคำนวณที่ตอนนี้ตายแล้วออกจากผู้เรียกทุกราย **รันเทสต์ของคุณ** หลังแต่ละผู้เรียก
+
+## When to use / trade-offs
+
+ใช้สิ่งนี้เมื่อผู้เรียกคำนวณ argument ในแบบเดียวกันทั้งหมด, เมื่อค่าถูกกำหนดทั้งหมดโดยข้อมูลที่ฟังก์ชันเข้าถึงได้ หรือเมื่อคุณต้องการลบความเสี่ยงที่ผู้เรียกจะส่งค่าที่ไม่สอดคล้องกัน parameter ที่น้อยลงหมายถึง interface ที่เรียบง่ายและใช้ผิดได้ยากขึ้น
+
+ทางกลับคือ **Replace Query with Parameter** บางครั้งการคำนวณค่า *ข้างใน* ฟังก์ชันสร้าง dependency ที่ซ่อนอยู่ — ฟังก์ชันเอื้อมไปหา global state, นาฬิกา หรือ singleton — ทำให้ทดสอบและใช้เหตุผลกับมันยากขึ้น ที่นั่นคุณทำตรงกันข้าม: ยกการคำนวณออกมา รับค่าเป็น parameter และให้ผู้เรียกจัดหามัน นั่นแลก signature ที่เพรียวกับ dependency ที่ชัดเจนและฉีดเข้าได้ เลือกจากสิ่งที่คุณให้คุณค่ามากกว่าตรงนี้: interface ที่เล็ก หรือฟังก์ชันที่ไม่มีการเอื้อมที่ซ่อนอยู่
+
+## Related
+
+- [Separate Query from Modifier](/refactoring-from-zero-to-hero/th/simplifying-apis/separate-query-from-modifier/)
+- [Preserve Whole Object](/refactoring-from-zero-to-hero/th/simplifying-apis/preserve-whole-object/)
+- [Introduce Parameter Object](/refactoring-from-zero-to-hero/th/simplifying-apis/introduce-parameter-object/)
+
+<Callout title="สองทิศทาง หนึ่งการตัดสินใจ">
+Replace Parameter with Query หด interface ให้เล็กลง; Replace Query with Parameter เปิดเผย dependency ไม่มีอันไหนถูกต้องเสมอ เลือก query เมื่อค่าคำนวณได้ล้วน ๆ จากข้อมูลที่มีอยู่แล้ว; เลือก parameter เมื่อการคำนวณเอื้อมเข้าไปใน state ที่แชร์หรือเปลี่ยนได้ ซึ่งคุณอยากทดสอบผ่านประตูหน้ามากกว่า
+</Callout>
+
+export const quizQuery = [
+  {
+    q: 'เมื่อไรที่ parameter เป็นตัวเลือกที่ดีสำหรับ Replace Parameter with Query?',
+    options: [
+      'เมื่อมันเป็น string',
+      'เมื่อฟังก์ชันสามารถคำนวณค่าของมันจากข้อมูลที่มีอยู่แล้ว',
+      'เมื่อมันถูกส่งโดยผู้เรียกมากกว่าสามราย',
+      'เมื่อมันเป็น optional',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'การลบ parameter แบบนั้นออกกำจัดความเสี่ยงอะไร?',
+    options: [
+      'การ compile ที่ช้า',
+      'ผู้เรียกต่างรายส่งค่าที่ไม่สอดคล้องกันสำหรับมัน',
+      'memory leak',
+      'ชื่อชนกัน',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'refactoring ทางกลับคืออะไรและใช้มันทำไม?',
+    options: [
+      'Inline Function — เพื่อลบ helper',
+      'Replace Query with Parameter — เพื่อลบ dependency ที่ซ่อนอยู่ด้วยการส่งค่าเข้าไป',
+      'Rename Function — เพื่อทำให้เจตนาชัด',
+      'Remove Flag Argument — เพื่อแยกพฤติกรรม',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'เมื่อไรที่คุณไม่ควรแทนที่ parameter ด้วย query?',
+    options: [
+      'เมื่อการคำนวณจะเอื้อมเข้าไปใน state ภายนอกหรือที่เปลี่ยนได้ สร้าง dependency ที่ซ่อนอยู่',
+      'เมื่อฟังก์ชันสั้น',
+      'เมื่อมีผู้เรียกเพียงรายเดียว',
+      'เมื่อ parameter เป็นตัวเลข',
+    ],
+    answer: 0,
+  },
+];
+
+<Quiz client:visible id="simplifying-apis/replace-parameter-with-query" questions={quizQuery} />
+
+<ProgressTracker client:visible id="simplifying-apis/replace-parameter-with-query" />

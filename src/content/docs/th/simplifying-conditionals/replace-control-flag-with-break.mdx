@@ -1,0 +1,202 @@
+---
+title: Replace Control Flag with Break/Return
+description: ตัวแปร boolean ที่มีอยู่เพียงเพื่อบังคับทิศทาง loop ซ่อนเงื่อนไขออกที่แท้จริงไว้ — ลบมันแล้วให้ break, return หรือ continue บอกว่ากำลังเกิดอะไรขึ้น
+sidebar:
+  order: 8
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+export const flagDiagram = `flowchart LR
+  subgraph Before["Before"]
+    A["found = false"] --> B["loop while !found"]
+    B --> C["set found = true"]
+    C --> B
+  end
+  subgraph After["After"]
+    D["loop"] --> E["break / return"]
+  end
+  Before -.->|"Replace Control Flag"| After`;
+
+## Intent
+
+**control flag** คือตัวแปรที่มีจุดประสงค์เดียวคือตัดสินว่า loop จะวนต่อหรือไม่ คุณตั้งค่ามัน คุณทดสอบมันที่หัวของ loop คุณพลิกค่ามันที่ไหนสักแห่งตรงกลาง และ loop ก็สังเกตเห็นในรอบถัดไป **Replace Control Flag with Break/Return** ลบตัวแปรนั้นออกทั้งหมด แล้วให้การออกจาก loop ถูกแสดงออกโดยตรงด้วย `break`, `return` หรือ `continue` ณ ขณะที่การตัดสินใจเกิดขึ้นพอดี
+
+โครงสร้างควบคุมของภาษารู้วิธีหยุดและข้ามอยู่แล้ว flag คือเวอร์ชันทำมือที่ล่าช้าของสิ่งนั้น — ดังนั้นการใช้ construct ของภาษาโดยตรงจึงทั้งสั้นกว่าและชัดกว่า
+
+## The smell
+
+คุณเห็น boolean ชื่อ `found`, `done` หรือ `finished` ประกาศไว้ก่อน loop และถูกอ่านในเงื่อนไขของ loop เพื่อจะเข้าใจว่า loop จบเมื่อไรคุณต้องกวาดทั้ง body เพื่อตามหาทุกจุดที่ flag ถูกพลิก แล้วคิดต่อว่า *เมื่อไร* เงื่อนไขจะถูกทดสอบครั้งถัดไป การออกถูกป้ายไว้กระจายหลายบรรทัดแทนที่จะระบุไว้ตรงที่มันเกิด flag ที่ถูกใช้ *หลัง* loop ด้วยเป็นสัญญาณที่หนักแน่นยิ่งกว่า: จริง ๆ แล้วมันคือสองแนวคิด — "หยุดวน" และ "รายงานผล" — ที่ใช้ตัวแปรเดียวร่วมกัน
+
+## Before → After
+
+ค้นหาในรายการเพื่อหาลูกค้าที่ติดหนี้ ก่อนหน้านี้ flag `found` ขับเคลื่อน `while` หลังจากนั้นฟังก์ชัน return ทันทีที่เจอ
+
+<Tabs syncKey="lang">
+  <TabItem label="TypeScript">
+    ```ts
+    // Before
+    function hasDebtor(customers: Customer[]): boolean {
+      let found = false;
+      let i = 0;
+      while (!found && i < customers.length) {
+        if (customers[i].balance < 0) {
+          found = true;
+        }
+        i++;
+      }
+      return found;
+    }
+
+    // After
+    function hasDebtor(customers: Customer[]): boolean {
+      for (const customer of customers) {
+        if (customer.balance < 0) {
+          return true;
+        }
+      }
+      return false;
+    }
+    ```
+  </TabItem>
+  <TabItem label="Python">
+    ```python
+    # Before
+    def has_debtor(customers):
+        found = False
+        i = 0
+        while not found and i < len(customers):
+            if customers[i].balance < 0:
+                found = True
+            i += 1
+        return found
+
+    # After
+    def has_debtor(customers):
+        for customer in customers:
+            if customer.balance < 0:
+                return True
+        return False
+    ```
+  </TabItem>
+  <TabItem label="Go">
+    ```go
+    // Before
+    func HasDebtor(customers []Customer) bool {
+        found := false
+        i := 0
+        for !found && i < len(customers) {
+            if customers[i].Balance < 0 {
+                found = true
+            }
+            i++
+        }
+        return found
+    }
+
+    // After
+    func HasDebtor(customers []Customer) bool {
+        for _, c := range customers {
+            if c.Balance < 0 {
+                return true
+            }
+        }
+        return false
+    }
+    ```
+  </TabItem>
+  <TabItem label="Rust">
+    ```rust
+    // Before
+    fn has_debtor(customers: &[Customer]) -> bool {
+        let mut found = false;
+        let mut i = 0;
+        while !found && i < customers.len() {
+            if customers[i].balance < 0.0 {
+                found = true;
+            }
+            i += 1;
+        }
+        found
+    }
+
+    // After
+    fn has_debtor(customers: &[Customer]) -> bool {
+        customers.iter().any(|c| c.balance < 0.0)
+    }
+    ```
+  </TabItem>
+</Tabs>
+
+<Mermaid code={flagDiagram} title="loop ที่ขับเคลื่อนด้วย flag กลายเป็น break หรือ return โดยตรง" />
+
+## Mechanics
+
+1. หา loop และ flag ที่ควบคุมมัน ยืนยันว่า flag มีอยู่เพียงเพื่อควบคุม loop — ว่ามันไม่ได้แบกผลลัพธ์ที่ code ต้องใช้ภายหลังด้วย
+2. ตัดสินใจเรื่องตัวที่จะมาแทน ถ้า loop ไม่ทำงานเพิ่มหลังจาก flag ถูกตั้ง ให้ `return` คำตอบตรงนั้นเลย ถ้า *มี* งานหลัง loop ให้ใช้ `break` เพื่อออกจากมัน ถ้าจะข้ามแค่ส่วนที่เหลือของรอบเดียว ให้ใช้ `continue`
+3. แทนที่บรรทัดที่ตั้ง flag ด้วยการกระโดดที่เลือก
+4. ลบ flag ออกจากเงื่อนไขของ loop ทำให้เงื่อนไขเรียบง่ายเหลือเท่าที่เหลือจริง ๆ (มักเป็นขอบเขตการวน หรือไม่มีอะไรเลย — `for…of` ธรรมดา)
+5. ลบการประกาศ flag และ `return flag` ตอนท้ายใด ๆ แทนที่ด้วยค่าที่ loop ตอนนี้ตกผ่านมาถึง
+6. **รันเทสต์ของคุณ** หลังการลบแต่ละครั้ง เพื่อให้ regression ชี้ไปที่บรรทัดเดียวที่คุณเพิ่งเปลี่ยน
+
+## When to use / trade-offs
+
+ใช้สิ่งนี้เมื่อใดก็ตามที่ boolean มีอยู่ล้วน ๆ เพื่อจบหรือข้าม loop ผลตอบแทนคือเงื่อนไขออกปรากฏตรงที่การตัดสินใจถูกทำพอดี ผู้อ่านจึงเห็น *ทำไม* loop จึงหยุดโดยไม่ต้องจำลองมันในหัว มันยังมักปลดล็อกการทำความสะอาดต่อ: เมื่อ flag หายไป body ของ loop มักเป็นตัวเลือกสำหรับ built-in อย่าง `any`, `find` หรือ `filter`
+
+ข้อควรระวังคือการใช้การกระโดดมากเกินไป การออกด้วย `break`/`return` ไม่กี่จุดอ่านชัดเจน แต่ loop ที่มี `continue` ห้าตัวและ `break` สามตัวฝังในเงื่อนไขซ้อนกันอาจตามยากกว่าตอนที่มี flag เสียอีก ถ้าการลบ flag จะทำให้การออกหลายจุดกระจายไปทั่วการซ้อนที่ลึก ให้ใช้ **Replace Nested Conditional with Guard Clauses** ก่อนเพื่อทำให้ body แบนลง หรือ extract loop เป็นฟังก์ชันของมันเองเพื่อให้การออกก่อนแต่ละจุดเป็นคำตอบที่สะอาด ทางกลับแทบไม่คุ้มที่จะทำ: การนำ flag กลับมาแทบไม่เคยทำให้อ่านง่ายขึ้น
+
+## Related
+
+- [Replace Nested Conditional with Guard Clauses](/refactoring-from-zero-to-hero/th/simplifying-conditionals/replace-nested-conditional-with-guard-clauses/)
+- [Decompose Conditional](/refactoring-from-zero-to-hero/th/simplifying-conditionals/decompose-conditional/)
+- [Consolidate Conditional Expression](/refactoring-from-zero-to-hero/th/simplifying-conditionals/consolidate-conditional/)
+
+<Callout title="หนึ่ง flag หนึ่งงาน">
+control flag ที่ถูกอ่านหลัง loop ด้วยกำลังทำสองงานพร้อมกัน: จบ loop และรายงานผล แยกพวกมันออก ให้ loop ออกด้วย break หรือ return และคำนวณค่าที่รายงานจากผลของ loop — ไม่ใช่จากตัวแปรที่คุณคอย mutate ในที่
+</Callout>
+
+export const quizFlag = [
+  {
+    q: '"control flag" คืออะไร?',
+    options: [
+      'การตั้งค่า optimization ของ compiler',
+      'ตัวแปร boolean ที่มีงานเดียวคือตัดสินว่า loop จะวนต่อหรือไม่',
+      'feature toggle ที่อ่านจาก configuration',
+      'flag ที่ส่งมาทาง command line',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'เมื่อ loop ไม่ทำงานเพิ่มหลังจากที่ flag จะถูกตั้ง อะไรคือตัวแทนที่สะอาดที่สุด?',
+    options: [
+      'เพิ่ม flag อีกตัว',
+      'return คำตอบตรงนั้นเลย',
+      'continue ไปยังรอบถัดไป',
+      'ห่อ body ไว้ใน try/catch',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'การกระโดดแบบใดออกจาก loop แต่ยังให้ code หลัง loop ทำงานต่อ?',
+    options: ['continue', 'return', 'break', 'throw'],
+    answer: 2,
+  },
+  {
+    q: 'บทเรียนแนะนำอะไรถ้าการลบ flag จะทำให้การออกหลายจุดกระจายไปทั่วการซ้อนที่ลึก?',
+    options: [
+      'คง flag ไว้ — มันชัดกว่าเสมอ',
+      'ทำให้ body แบนลงด้วย guard clauses ก่อน หรือ extract loop เป็นฟังก์ชันของมันเอง',
+      'แปลง loop เป็น recursion',
+      'เพิ่ม comment ข้างการออกแต่ละจุด',
+    ],
+    answer: 1,
+  },
+];
+
+<Quiz client:visible id="simplifying-conditionals/replace-control-flag-with-break" questions={quizFlag} />
+
+<ProgressTracker client:visible id="simplifying-conditionals/replace-control-flag-with-break" />
