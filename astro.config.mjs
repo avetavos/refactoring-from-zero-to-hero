@@ -9,10 +9,10 @@ export default defineConfig({
   // GitHub Pages project site. Update `site` to your GitHub username and `base`
   // to your repo name if they differ.
   site: 'https://avetavos.github.io',
-  base: '/design-patterns-from-zero-to-hero',
+  base: '/refactoring-from-zero-to-hero',
   output: 'static',
   integrations: [starlight({
-      title: 'Design Patterns — From Zero to Hero',
+      title: 'Refactoring — From Zero to Hero',
       defaultLocale: 'en',
       locales: {
         en: { label: 'English', lang: 'en' },
@@ -20,15 +20,17 @@ export default defineConfig({
       },
       customCss: ['./src/styles/custom.css'],
       head: [
-        { tag: 'script', attrs: { type: 'module', src: '/design-patterns-from-zero-to-hero/enhance.js' } },
+        { tag: 'script', attrs: { type: 'module', src: '/refactoring-from-zero-to-hero/enhance.js' } },
       ],
-      social: [{ icon: 'github', label: 'GitHub', href: 'https://github.com/avetavos/design-patterns-from-zero-to-hero' }],
+      social: [{ icon: 'github', label: 'GitHub', href: 'https://github.com/avetavos/refactoring-from-zero-to-hero' }],
       sidebar: [
         { label: 'Intro & Principles', items: [{ autogenerate: { directory: 'intro-and-principles' } }] },
-        { label: 'Creational Patterns', items: [{ autogenerate: { directory: 'creational' } }] },
-        { label: 'Structural Patterns', items: [{ autogenerate: { directory: 'structural' } }] },
-        { label: 'Behavioral Patterns I', items: [{ autogenerate: { directory: 'behavioral-essentials' } }] },
-        { label: 'Behavioral Patterns II', items: [{ autogenerate: { directory: 'behavioral-advanced' } }] },
+        { label: 'Composing Methods', items: [{ autogenerate: { directory: 'composing-methods' } }] },
+        { label: 'Moving Features', items: [{ autogenerate: { directory: 'moving-features' } }] },
+        { label: 'Organizing Data', items: [{ autogenerate: { directory: 'organizing-data' } }] },
+        { label: 'Simplifying Conditionals', items: [{ autogenerate: { directory: 'simplifying-conditionals' } }] },
+        { label: 'Simplifying APIs', items: [{ autogenerate: { directory: 'simplifying-apis' } }] },
+        { label: 'Generalization & Inheritance', items: [{ autogenerate: { directory: 'generalization-and-inheritance' } }] },
       ],
       }), preact()],
 });
