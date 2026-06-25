@@ -1,0 +1,155 @@
+---
+title: Inline Variable
+description: Delete a variable that just echoes an expression and adds no clarity, putting the expression back where it is used.
+sidebar:
+  order: 7
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+## Intent
+
+Sometimes a local variable is just a second name for an expression you already understand. It does not clarify anything and it does not get reused — it only stands between you and the code that matters. Inline Variable removes that middleman: substitute the expression for the variable and delete the declaration. The result is one fewer name to track.
+
+## The smell
+
+You meet a variable whose name says no more than the expression it holds. `let basePrice = order.basePrice;` followed by a single use of `basePrice` is noise — the reader has to scroll up to confirm that `basePrice` really is `order.basePrice` and nothing more. The variable promised an explanation and delivered a synonym.
+
+This is the exact inverse of **Extract Variable**. There you add a name because a sub-expression is cryptic; here you remove a name because it never earned its keep. The judgement is the same in both directions: does the name make the code clearer than the raw expression? If not, inline it.
+
+## Before → After
+
+A shipping check that binds two variables which simply mirror fields, then uses each once.
+
+<Tabs syncKey="lang">
+  <TabItem label="TypeScript">
+    ```ts
+    // Before
+    function canShipFree(order: Order): boolean {
+      const basePrice = order.basePrice;
+      const overThreshold = basePrice > 100;
+      return overThreshold;
+    }
+
+    // After
+    function canShipFree(order: Order): boolean {
+      return order.basePrice > 100;
+    }
+    ```
+  </TabItem>
+  <TabItem label="Python">
+    ```python
+    # Before
+    def can_ship_free(order):
+        base_price = order.base_price
+        over_threshold = base_price > 100
+        return over_threshold
+
+    # After
+    def can_ship_free(order):
+        return order.base_price > 100
+    ```
+  </TabItem>
+  <TabItem label="Go">
+    ```go
+    // Before
+    func CanShipFree(order Order) bool {
+        basePrice := order.BasePrice
+        overThreshold := basePrice > 100
+        return overThreshold
+    }
+
+    // After
+    func CanShipFree(order Order) bool {
+        return order.BasePrice > 100
+    }
+    ```
+  </TabItem>
+  <TabItem label="Rust">
+    ```rust
+    // Before
+    fn can_ship_free(order: &Order) -> bool {
+        let base_price = order.base_price;
+        let over_threshold = base_price > 100.0;
+        over_threshold
+    }
+
+    // After
+    fn can_ship_free(order: &Order) -> bool {
+        order.base_price > 100.0
+    }
+    ```
+  </TabItem>
+</Tabs>
+
+## Mechanics
+
+1. Check that the expression assigned to the variable has no side effects — inlining must not change *when* or *how often* that expression runs.
+2. If the variable is not already read-only, make it so (a `const`, `final`, or single-assignment binding). If the compiler complains, the variable is reassigned and you should stop: it is doing more than mirroring.
+3. Find the first place the variable is read and replace that read with the expression.
+4. **Run your tests.**
+5. Repeat for each remaining read, one at a time, testing as you go.
+6. When no reads remain, delete the declaration.
+7. **Run your tests** once more.
+
+## When to use / trade-offs
+
+Inline a variable when its name carries no information the expression does not already carry, and when it is used in only one or two nearby places. Stripping it out shortens the function and removes a hop for the reader.
+
+Do not inline when the variable's name documents a non-obvious meaning, when the expression is repeated many times (a name then avoids both duplication and recomputation), or when the expression is expensive and the variable caches its result. In those cases the inverse — **Extract Variable** — is the move you want instead.
+
+## Related
+
+- [Extract Variable](/refactoring-from-zero-to-hero/en/composing-methods/extract-variable/)
+- [Inline Function](/refactoring-from-zero-to-hero/en/composing-methods/inline-function/)
+- [Replace Temp with Query](/refactoring-from-zero-to-hero/en/composing-methods/replace-temp-with-query/)
+
+<Callout title="A synonym is not an explanation">
+A variable earns its place by telling you something the expression does not. If `total` just means `a + b` on the very next line, the name adds a lookup, not an insight. Keep the names that explain; inline the ones that merely repeat.
+</Callout>
+
+export const quizInlineVariable = [
+  {
+    q: 'When is a variable a good candidate to inline?',
+    options: [
+      'When its name says no more than the expression it holds and it is used once or twice',
+      'When it is read in many distant places',
+      'When the expression it holds is expensive to compute',
+      'When it is reassigned several times',
+    ],
+    answer: 0,
+  },
+  {
+    q: 'Inline Variable is the inverse of which refactoring?',
+    options: ['Inline Function', 'Extract Variable', 'Split Phase', 'Slide Statements'],
+    answer: 1,
+  },
+  {
+    q: 'What must you confirm about the expression before inlining it?',
+    options: [
+      'That it returns a number',
+      'That it has no side effects, so running it inline does not change behaviour',
+      'That it is at least three lines long',
+      'That it is used by another module',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'When should you NOT inline a variable?',
+    options: [
+      'When its name documents a non-obvious meaning or it caches an expensive result',
+      'When it is read exactly once',
+      'When the expression is a simple field access',
+      'When the function is short',
+    ],
+    answer: 0,
+  },
+];
+
+<Quiz client:visible id="composing-methods/inline-variable" questions={quizInlineVariable} />
+
+<ProgressTracker client:visible id="composing-methods/inline-variable" />

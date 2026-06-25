@@ -1,0 +1,181 @@
+---
+title: Substitute Algorithm
+description: Replace a tangled way of doing something with a clearer one that produces exactly the same result.
+sidebar:
+  order: 9
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+## Intent
+
+Some functions are hard to read not because they are long, but because the *approach* is convoluted — a hand-rolled loop where a lookup would do, a chain of conditionals that re-implements something the standard library already offers. Substitute Algorithm swaps the whole body for a simpler one that yields identical results. Unlike the smaller composing moves, this one replaces the *strategy*, not just the wording, so it leans hard on your tests to prove the two approaches agree.
+
+## The smell
+
+The function works, but reading it you find yourself simulating it in your head to be sure it is correct. The logic feels heavier than the problem deserves: a manual search through a list when a set membership check would answer it, or a sequence of `if` branches that boil down to "is this value one of these few?". When you can describe the function's job in one plain sentence yet the code takes a paragraph, a clearer algorithm is probably available.
+
+## Before → After
+
+A function decides whether a country code is supported by looping and flipping a flag. The substitute uses a direct membership check against a fixed set — same answer, far less to read.
+
+<Tabs syncKey="lang">
+  <TabItem label="TypeScript">
+    ```ts
+    // Before
+    function isSupported(code: string): boolean {
+      const supported = ['US', 'CA', 'GB', 'DE'];
+      let found = false;
+      for (const c of supported) {
+        if (c === code) {
+          found = true;
+        }
+      }
+      return found;
+    }
+
+    // After
+    const SUPPORTED = new Set(['US', 'CA', 'GB', 'DE']);
+
+    function isSupported(code: string): boolean {
+      return SUPPORTED.has(code);
+    }
+    ```
+  </TabItem>
+  <TabItem label="Python">
+    ```python
+    # Before
+    def is_supported(code):
+        supported = ["US", "CA", "GB", "DE"]
+        found = False
+        for c in supported:
+            if c == code:
+                found = True
+        return found
+
+    # After
+    SUPPORTED = {"US", "CA", "GB", "DE"}
+
+    def is_supported(code):
+        return code in SUPPORTED
+    ```
+  </TabItem>
+  <TabItem label="Go">
+    ```go
+    // Before
+    func IsSupported(code string) bool {
+        supported := []string{"US", "CA", "GB", "DE"}
+        found := false
+        for _, c := range supported {
+            if c == code {
+                found = true
+            }
+        }
+        return found
+    }
+
+    // After
+    var supported = map[string]bool{"US": true, "CA": true, "GB": true, "DE": true}
+
+    func IsSupported(code string) bool {
+        return supported[code]
+    }
+    ```
+  </TabItem>
+  <TabItem label="Rust">
+    ```rust
+    // Before
+    fn is_supported(code: &str) -> bool {
+        let supported = ["US", "CA", "GB", "DE"];
+        let mut found = false;
+        for c in supported {
+            if c == code {
+                found = true;
+            }
+        }
+        found
+    }
+
+    // After
+    fn is_supported(code: &str) -> bool {
+        matches!(code, "US" | "CA" | "GB" | "DE")
+    }
+    ```
+  </TabItem>
+</Tabs>
+
+## Mechanics
+
+1. Make sure the function you are about to replace is fully covered by tests, including its edge cases — empty input, no match, the boundary values. If coverage is thin, add tests *first* and confirm they pass against the existing code.
+2. Work out the replacement algorithm completely and write it, ideally as a separate function beside the original.
+3. Compare the two behaviours. For a function with a small, enumerable input space, run both over every input and assert they agree. Otherwise rely on your test suite plus a few targeted cases.
+4. Swap the old body for the new one.
+5. **Run your tests.** Every case must still pass.
+6. Remove the old algorithm and any helpers it needed once nothing references them.
+
+## When to use / trade-offs
+
+Substitute Algorithm pays off when a clearer or standard approach exists that produces the same result — replacing a bespoke loop with a library call, or a sprawling conditional with a table lookup. The new version is easier to read and usually easier to extend.
+
+The risk is higher than the smaller moves because you are changing the strategy wholesale, so subtle behaviours can differ — a different tie-breaking order, a changed handling of duplicates or empty input. Only attempt it with solid tests, and prefer to break a giant convoluted function into smaller pieces *before* substituting, so each replacement stays small and verifiable.
+
+## Related
+
+- [Extract Function](/refactoring-from-zero-to-hero/en/composing-methods/extract-function/)
+- [Replace Loop with Pipeline](/refactoring-from-zero-to-hero/en/composing-methods/replace-loop-with-pipeline/)
+- [Replace Temp with Query](/refactoring-from-zero-to-hero/en/composing-methods/replace-temp-with-query/)
+
+<Callout title="Same result, or it is a bug">
+A substitution is only a refactoring if the new algorithm returns exactly what the old one did for every input that matters — including the awkward ones. The moment the outputs diverge, you have changed behaviour. Tests over the edge cases are what let you make this trade safely.
+</Callout>
+
+export const quizSubstituteAlgorithm = [
+  {
+    q: 'What does Substitute Algorithm replace?',
+    options: [
+      'A few variable names',
+      'The entire approach inside a function, while keeping the same result',
+      'The function\'s public name',
+      'The order of two adjacent statements',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'Why does this refactoring rely especially heavily on tests?',
+    options: [
+      'Because it makes the code longer',
+      'Because it changes the strategy wholesale, so subtle behaviour differences can creep in',
+      'Because the compiler cannot run it',
+      'Because it always changes the return type',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'What is a good preparatory step before substituting an algorithm?',
+    options: [
+      'Delete the existing tests',
+      'Ensure the function is covered by tests, including edge cases, adding them first if needed',
+      'Rename every variable',
+      'Inline all of its callers',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'How should you handle a giant, convoluted function you want to simplify?',
+    options: [
+      'Substitute the whole thing in one risky step',
+      'Break it into smaller pieces first, then substitute each small part verifiably',
+      'Leave it alone permanently',
+      'Convert it to a comment',
+    ],
+    answer: 1,
+  },
+];
+
+<Quiz client:visible id="composing-methods/substitute-algorithm" questions={quizSubstituteAlgorithm} />
+
+<ProgressTracker client:visible id="composing-methods/substitute-algorithm" />

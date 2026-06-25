@@ -1,0 +1,167 @@
+---
+title: Split Variable
+description: When one variable is assigned more than once to mean two different things, give each purpose its own single-assignment variable so the reader never has to ask which meaning is live.
+sidebar:
+  order: 8
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+## Intent
+
+A variable should stand for one thing. When a single name is reassigned partway through so that it first holds a perimeter and later holds an area, it is really two variables wearing one coat. Split Variable gives each distinct meaning its own name, assigned exactly once. The reader can then trust that a name means the same thing everywhere it appears, and the second assignment that used to mutate it disappears.
+
+## The smell
+
+The smell is a **variable assigned more than once for unrelated purposes** — not a true accumulator like a loop counter or a running total, but a name reused as a convenient scratch slot. The two clues: the variable is not a collecting variable (it is not summing or building something across iterations), and its meaning shifts between assignments. Whenever you have to scroll up and ask "which value does this hold right now?", the variable is overloaded and wants splitting.
+
+## Before → After
+
+A physics calculation reuses one `temp` variable, first for perimeter then for area. After, each result gets its own clearly named, single-assignment variable.
+
+<Tabs syncKey="lang">
+  <TabItem label="TypeScript">
+    ```ts
+    // Before
+    function describe(height: number, width: number): string {
+      let temp = 2 * (height + width);
+      const out: string[] = [`Perimeter: ${temp}`];
+      temp = height * width;
+      out.push(`Area: ${temp}`);
+      return out.join('\n');
+    }
+
+    // After
+    function describe(height: number, width: number): string {
+      const perimeter = 2 * (height + width);
+      const area = height * width;
+      return [`Perimeter: ${perimeter}`, `Area: ${area}`].join('\n');
+    }
+    ```
+  </TabItem>
+  <TabItem label="Python">
+    ```python
+    # Before
+    def describe(height, width):
+        temp = 2 * (height + width)
+        out = [f"Perimeter: {temp}"]
+        temp = height * width
+        out.append(f"Area: {temp}")
+        return "\n".join(out)
+
+    # After
+    def describe(height, width):
+        perimeter = 2 * (height + width)
+        area = height * width
+        return "\n".join([f"Perimeter: {perimeter}", f"Area: {area}"])
+    ```
+  </TabItem>
+  <TabItem label="Go">
+    ```go
+    // Before
+    func Describe(height, width float64) string {
+        temp := 2 * (height + width)
+        out := fmt.Sprintf("Perimeter: %g", temp)
+        temp = height * width
+        out += fmt.Sprintf("\nArea: %g", temp)
+        return out
+    }
+
+    // After
+    func Describe(height, width float64) string {
+        perimeter := 2 * (height + width)
+        area := height * width
+        return fmt.Sprintf("Perimeter: %g\nArea: %g", perimeter, area)
+    }
+    ```
+  </TabItem>
+  <TabItem label="Rust">
+    ```rust
+    // Before
+    fn describe(height: f64, width: f64) -> String {
+        let mut temp = 2.0 * (height + width);
+        let mut out = format!("Perimeter: {temp}");
+        temp = height * width;
+        out.push_str(&format!("\nArea: {temp}"));
+        out
+    }
+
+    // After
+    fn describe(height: f64, width: f64) -> String {
+        let perimeter = 2.0 * (height + width);
+        let area = height * width;
+        format!("Perimeter: {perimeter}\nArea: {area}")
+    }
+    ```
+  </TabItem>
+</Tabs>
+
+## Mechanics
+
+1. Find the first assignment to the variable and rename it to a name that describes *only that first meaning*. Where the language allows, make it a constant (`const`, an immutable `let`, a `:=` you never reassign).
+2. Change every reference between the first and second assignment to use the new name.
+3. **Run your tests.**
+4. Repeat at the second assignment: declare a fresh variable with a name for the second meaning, and point the references after it at the new name.
+5. Continue until each distinct purpose owns a separate, single-assignment variable.
+6. Once the original mutable variable has no readers left, delete it. In Rust, you can usually drop the `mut` entirely.
+
+## When to use / trade-offs
+
+Apply Split Variable whenever a name is reassigned to mean something new — it removes a whole class of "which value is this now?" bugs and makes each line independently understandable. It is a frequent precursor to **Extract Function**: once each value lives in its own single-assignment variable, the fragment that computes it lifts out cleanly.
+
+Be careful not to split a genuine accumulator. A loop counter, a running sum, or a builder that grows across iterations is *meant* to be reassigned, and giving each step its own name would be nonsense. Split only when the successive values mean *different things*. The cost of splitting is one extra named variable, which is almost always cheaper than the confusion of an overloaded one.
+
+## Related
+
+- [Encapsulate Variable](/refactoring-from-zero-to-hero/en/organizing-data/encapsulate-variable/)
+- [Replace Magic Literal](/refactoring-from-zero-to-hero/en/organizing-data/replace-magic-literal/)
+- [Rename Field](/refactoring-from-zero-to-hero/en/organizing-data/rename-field/)
+
+<Callout title="One name, one meaning, one assignment">
+The cleanest local variables are assigned once and never touched again. When you find yourself reassigning a variable to hold a different kind of value, that is the signal: it is two variables, and they each deserve their own name.
+</Callout>
+
+export const quizSplitVariable = [
+  {
+    q: 'When should you split a variable into two?',
+    options: [
+      'Whenever a variable appears more than once',
+      'When one variable is assigned more than once for two different purposes',
+      'Only inside loops',
+      'When the variable name is too short',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'Which kind of repeated assignment should you NOT split?',
+    options: [
+      'A name reused as a scratch slot for unrelated values',
+      'A genuine accumulator such as a loop counter or a running total',
+      'A variable holding first a perimeter then an area',
+      'A variable reassigned to a different concept',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'After splitting, what property should each resulting variable have?',
+    options: [
+      'It should be global',
+      'It should be assigned exactly once and carry a single meaning',
+      'It should be mutable for flexibility',
+      'It should keep the original generic name',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'Split Variable is often a precursor to which refactoring?',
+    options: ['Extract Function', 'Encapsulate Collection', 'Replace Type Code with Subclasses', 'Inline Variable'],
+    answer: 0,
+  },
+];
+
+<Quiz client:visible id="organizing-data/split-variable" questions={quizSplitVariable} />
+
+<ProgressTracker client:visible id="organizing-data/split-variable" />

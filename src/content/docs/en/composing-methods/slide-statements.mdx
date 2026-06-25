@@ -1,0 +1,210 @@
+---
+title: Slide Statements
+description: Move related statements next to each other so a coherent fragment sits together, ready to be read or extracted.
+sidebar:
+  order: 8
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+## Intent
+
+Code reads best when things that belong together sit together. Slide Statements moves a statement up or down so that related lines become neighbours — a variable declared right where it is first used, a setup line beside the call it prepares. The behaviour does not change; only the order does. Often this is the quiet first step before an Extract Function: you slide the scattered pieces into one contiguous block, then lift the block out in a single clean move.
+
+## The smell
+
+A variable is declared at the top of a function but not touched until thirty lines later. Two lines that clearly work as a pair are separated by unrelated code. When you try to extract a fragment, you find its ingredients spread across the function, so the extraction would need awkward parameters or would drag along lines that do not belong.
+
+The cure is to slide the related statements together first. Once they are adjacent, the structure of the function becomes obvious and the next refactoring becomes trivial.
+
+## Before → After
+
+Two declarations sit at the top, but each is only used much later. Slide each declaration down to just above its first use, putting each value beside the work that needs it.
+
+<Tabs syncKey="lang">
+  <TabItem label="TypeScript">
+    ```ts
+    // Before
+    function summarize(order: Order): string {
+      const discount = order.basePrice * 0.1;
+      const tax = order.basePrice * 0.07;
+
+      logAccess(order.customerId);
+      const net = order.basePrice - discount;
+
+      recordAudit(order.id);
+      const gross = net + tax;
+      return `Net ${net}, Gross ${gross}`;
+    }
+
+    // After
+    function summarize(order: Order): string {
+      logAccess(order.customerId);
+      const discount = order.basePrice * 0.1;
+      const net = order.basePrice - discount;
+
+      recordAudit(order.id);
+      const tax = order.basePrice * 0.07;
+      const gross = net + tax;
+      return `Net ${net}, Gross ${gross}`;
+    }
+    ```
+  </TabItem>
+  <TabItem label="Python">
+    ```python
+    # Before
+    def summarize(order):
+        discount = order.base_price * 0.1
+        tax = order.base_price * 0.07
+
+        log_access(order.customer_id)
+        net = order.base_price - discount
+
+        record_audit(order.id)
+        gross = net + tax
+        return f"Net {net}, Gross {gross}"
+
+    # After
+    def summarize(order):
+        log_access(order.customer_id)
+        discount = order.base_price * 0.1
+        net = order.base_price - discount
+
+        record_audit(order.id)
+        tax = order.base_price * 0.07
+        gross = net + tax
+        return f"Net {net}, Gross {gross}"
+    ```
+  </TabItem>
+  <TabItem label="Go">
+    ```go
+    // Before
+    func Summarize(order Order) string {
+        discount := order.BasePrice * 0.1
+        tax := order.BasePrice * 0.07
+
+        logAccess(order.CustomerID)
+        net := order.BasePrice - discount
+
+        recordAudit(order.ID)
+        gross := net + tax
+        return fmt.Sprintf("Net %.2f, Gross %.2f", net, gross)
+    }
+
+    // After
+    func Summarize(order Order) string {
+        logAccess(order.CustomerID)
+        discount := order.BasePrice * 0.1
+        net := order.BasePrice - discount
+
+        recordAudit(order.ID)
+        tax := order.BasePrice * 0.07
+        gross := net + tax
+        return fmt.Sprintf("Net %.2f, Gross %.2f", net, gross)
+    }
+    ```
+  </TabItem>
+  <TabItem label="Rust">
+    ```rust
+    // Before
+    fn summarize(order: &Order) -> String {
+        let discount = order.base_price * 0.1;
+        let tax = order.base_price * 0.07;
+
+        log_access(order.customer_id);
+        let net = order.base_price - discount;
+
+        record_audit(order.id);
+        let gross = net + tax;
+        format!("Net {:.2}, Gross {:.2}", net, gross)
+    }
+
+    // After
+    fn summarize(order: &Order) -> String {
+        log_access(order.customer_id);
+        let discount = order.base_price * 0.1;
+        let net = order.base_price - discount;
+
+        record_audit(order.id);
+        let tax = order.base_price * 0.07;
+        let gross = net + tax;
+        format!("Net {:.2}, Gross {:.2}", net, gross)
+    }
+    ```
+  </TabItem>
+</Tabs>
+
+## Mechanics
+
+1. Pick the statement you want to move and the destination slot.
+2. Check the code it slides over for interference. A slide is safe only if order does not matter between them: the moving statement and every statement it passes must not read a value the other writes, and neither may have a side effect the other depends on.
+3. Move the statement to its new position.
+4. **Run your tests.** If anything fails, the slide crossed a real dependency — put it back and reconsider.
+5. Repeat for the next statement, sliding one at a time so a failure points at a single move.
+
+## When to use / trade-offs
+
+Slide statements to put a declaration next to its first use, to group the pieces of a soon-to-be-extracted fragment, or simply to make a paired setup-and-action read together. It is a low-risk, high-clarity move and an ideal warm-up before Extract Function.
+
+The one real hazard is a hidden dependency: an apparently independent line that secretly relies on an earlier side effect (a global flag, shared mutable state, ordering through I/O). Your tests are the guard. When in doubt, slide in tiny steps and run them after each move.
+
+## Related
+
+- [Extract Function](/refactoring-from-zero-to-hero/en/composing-methods/extract-function/)
+- [Extract Variable](/refactoring-from-zero-to-hero/en/composing-methods/extract-variable/)
+- [Split Phase](/refactoring-from-zero-to-hero/en/composing-methods/split-phase/)
+
+<Callout title="A slide is only safe if order does not matter">
+Two statements can swap places only when neither depends on the other's effect. If the line you move reads something a passed line wrote — or writes something a passed line reads — the slide changes behaviour. Let the tests catch what your eyes miss.
+</Callout>
+
+export const quizSlideStatements = [
+  {
+    q: 'What does Slide Statements change about the code?',
+    options: [
+      'The order of statements, while preserving behaviour',
+      'The names of the functions involved',
+      'The data types of variables',
+      'The observable output of the program',
+    ],
+    answer: 0,
+  },
+  {
+    q: 'Why is Slide Statements often done before Extract Function?',
+    options: [
+      'It renames variables to match the new function',
+      'It gathers the related statements into one contiguous block, making them easy to lift out',
+      'It deletes the statements that will not be extracted',
+      'It adds parameters automatically',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'When is sliding a statement past another safe?',
+    options: [
+      'Always, since order never matters',
+      'Only when neither statement reads a value the other writes and neither relies on the other\'s side effect',
+      'Only when both statements are declarations',
+      'Only when the function has no return value',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'What is your main safeguard against an unsafe slide?',
+    options: [
+      'The compiler\'s type checker alone',
+      'Running your test suite after each small move',
+      'Adding more comments',
+      'Increasing the function length',
+    ],
+    answer: 1,
+  },
+];
+
+<Quiz client:visible id="composing-methods/slide-statements" questions={quizSlideStatements} />
+
+<ProgressTracker client:visible id="composing-methods/slide-statements" />

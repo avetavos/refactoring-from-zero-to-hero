@@ -1,0 +1,207 @@
+---
+title: Replace Parameter with Query
+description: Drop a parameter the function could work out for itself, and compute it inside — with a note on the inverse move when you want to break a hidden dependency.
+sidebar:
+  order: 9
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+export const queryDiagram = `flowchart LR
+  subgraph Before["Before"]
+    A["finalPrice(qty, discount)"] --> B["caller computes discount<br/>from qty first"]
+  end
+  subgraph After["After"]
+    C["finalPrice(qty)"] --> D["derives discount<br/>internally"]
+  end
+  Before -.->|"Replace Parameter with Query"| After`;
+
+## Intent
+
+If a function can derive a parameter's value from the data it already receives, that parameter is dead weight. Every caller has to compute and pass it, and they can disagree. Remove it, and let the function ask for the value itself — a **query** — so there is one source of truth and one fewer thing to get wrong at the call site.
+
+## The smell
+
+A parameter is always passed the same way, computed from another argument the function already has. You see callers run the same little calculation before every call, then hand the result in. Worse, two callers compute it slightly differently, so the function behaves inconsistently depending on who calls it. The parameter offers flexibility nobody actually wants.
+
+## Before → After
+
+`finalPrice` takes a `quantity` and a `discount`, but the discount is wholly determined by the quantity. Callers keep computing it. We remove the parameter and derive the discount inside.
+
+<Tabs syncKey="lang">
+  <TabItem label="TypeScript">
+    ```ts
+    // Before
+    function finalPrice(quantity: number, discount: number): number {
+      const base = quantity * 5;
+      return base - base * discount;
+    }
+
+    const d = quantity > 100 ? 0.1 : 0;
+    const price = finalPrice(quantity, d);
+
+    // After
+    function finalPrice(quantity: number): number {
+      const base = quantity * 5;
+      return base - base * discountFor(quantity);
+    }
+
+    function discountFor(quantity: number): number {
+      return quantity > 100 ? 0.1 : 0;
+    }
+
+    const price = finalPrice(quantity);
+    ```
+  </TabItem>
+  <TabItem label="Python">
+    ```python
+    # Before
+    def final_price(quantity, discount):
+        base = quantity * 5
+        return base - base * discount
+
+    d = 0.1 if quantity > 100 else 0
+    price = final_price(quantity, d)
+
+    # After
+    def final_price(quantity):
+        base = quantity * 5
+        return base - base * discount_for(quantity)
+
+    def discount_for(quantity):
+        return 0.1 if quantity > 100 else 0
+
+    price = final_price(quantity)
+    ```
+  </TabItem>
+  <TabItem label="Go">
+    ```go
+    // Before
+    func FinalPrice(quantity int, discount float64) float64 {
+        base := float64(quantity) * 5
+        return base - base*discount
+    }
+
+    d := 0.0
+    if quantity > 100 {
+        d = 0.1
+    }
+    price := FinalPrice(quantity, d)
+
+    // After
+    func FinalPrice(quantity int) float64 {
+        base := float64(quantity) * 5
+        return base - base*discountFor(quantity)
+    }
+
+    func discountFor(quantity int) float64 {
+        if quantity > 100 {
+            return 0.1
+        }
+        return 0
+    }
+
+    price := FinalPrice(quantity)
+    ```
+  </TabItem>
+  <TabItem label="Rust">
+    ```rust
+    // Before
+    fn final_price(quantity: i32, discount: f64) -> f64 {
+        let base = quantity as f64 * 5.0;
+        base - base * discount
+    }
+
+    let d = if quantity > 100 { 0.1 } else { 0.0 };
+    let price = final_price(quantity, d);
+
+    // After
+    fn final_price(quantity: i32) -> f64 {
+        let base = quantity as f64 * 5.0;
+        base - base * discount_for(quantity)
+    }
+
+    fn discount_for(quantity: i32) -> f64 {
+        if quantity > 100 { 0.1 } else { 0.0 }
+    }
+
+    let price = final_price(quantity);
+    ```
+  </TabItem>
+</Tabs>
+
+<Mermaid code={queryDiagram} title="A derivable parameter is removed and computed inside" />
+
+## Mechanics
+
+1. Confirm the parameter can be computed entirely from data the function already has — other parameters, fields, or a reachable query. If it depends on anything external, stop: removing it would smuggle in a hidden dependency.
+2. Extract the derivation into a query, if it is not already one.
+3. Inside the function, replace each use of the parameter with a call to that query.
+4. Remove the parameter from the signature, then delete the now-dead computation from every caller. **Run your tests** after each caller.
+
+## When to use / trade-offs
+
+Use this when callers all compute the argument the same way, when the value is fully determined by data the function can reach, or when you want to remove the risk of a caller passing an inconsistent value. Fewer parameters means a simpler, harder-to-misuse interface.
+
+The inverse is **Replace Query with Parameter**. Sometimes deriving a value *inside* the function creates a hidden dependency — the function reaches out to global state, a clock, or a singleton — making it harder to test and reason about. There you do the opposite: lift the derivation out, accept the value as a parameter, and let the caller supply it. That trades a leaner signature for an explicit, injectable dependency. Choose by what you value more here: a small interface, or a function with no hidden reach.
+
+## Related
+
+- [Separate Query from Modifier](/refactoring-from-zero-to-hero/en/simplifying-apis/separate-query-from-modifier/)
+- [Preserve Whole Object](/refactoring-from-zero-to-hero/en/simplifying-apis/preserve-whole-object/)
+- [Introduce Parameter Object](/refactoring-from-zero-to-hero/en/simplifying-apis/introduce-parameter-object/)
+
+<Callout title="Two directions, one judgement call">
+Replace Parameter with Query shrinks the interface; Replace Query with Parameter exposes a dependency. Neither is always right. Prefer the query when the value is purely derived from data already on hand; prefer the parameter when the derivation reaches into shared or mutable state you would rather test through the front door.
+</Callout>
+
+export const quizQuery = [
+  {
+    q: 'When is a parameter a good candidate for Replace Parameter with Query?',
+    options: [
+      'When it is a string',
+      'When the function can derive its value from data it already has',
+      'When it is passed by more than three callers',
+      'When it is optional',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'What risk does removing such a parameter eliminate?',
+    options: [
+      'Slow compilation',
+      'Different callers passing inconsistent values for it',
+      'Memory leaks',
+      'Name collisions',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'What is the inverse refactoring and why use it?',
+    options: [
+      'Inline Function — to remove a helper',
+      'Replace Query with Parameter — to remove a hidden dependency by passing the value in',
+      'Rename Function — to clarify intent',
+      'Remove Flag Argument — to split behaviour',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'When should you NOT replace a parameter with a query?',
+    options: [
+      'When the derivation would reach into external or mutable state, creating a hidden dependency',
+      'When the function is short',
+      'When there is only one caller',
+      'When the parameter is a number',
+    ],
+    answer: 0,
+  },
+];
+
+<Quiz client:visible id="simplifying-apis/replace-parameter-with-query" questions={quizQuery} />
+
+<ProgressTracker client:visible id="simplifying-apis/replace-parameter-with-query" />

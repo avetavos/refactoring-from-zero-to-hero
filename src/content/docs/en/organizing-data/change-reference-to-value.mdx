@@ -1,0 +1,195 @@
+---
+title: Change Reference to Value (and back)
+description: Treat a small object as an immutable value — compared by content and freely copied — when sharing buys you nothing, and reverse the move when you genuinely need one shared, updatable instance.
+sidebar:
+  order: 10
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+## Intent
+
+A small object can be modelled two ways. As a **reference**, one shared instance is held by many owners; updating it updates everyone's view, and identity (which object) matters. As a **value**, the object is immutable, equal to any other with the same contents, and copied freely. Change Reference to Value turns a shared, mutable object into an immutable value compared by its fields. The reverse — Change Value to Reference — applies when many places really must share and observe a single, updatable entity.
+
+## The smell
+
+The reference-when-it-should-be-value smell shows up as **aliasing bugs**: two parts of the program hold the same little object, one mutates it, and the other is surprised by the change it never asked for. A `Money`, a `Coordinate`, a `DateRange` — these have no meaningful identity, so sharing them only invites action at a distance. The opposite smell is **divergent copies**: you have many separate instances of something that is conceptually one entity (a single Customer record), and an update to one copy fails to reach the others.
+
+## Before → After
+
+A `Money` object shared by reference, where mutating it leaks into every alias. After, it is an immutable value: operations return new instances and equality compares contents.
+
+<Tabs syncKey="lang">
+  <TabItem label="TypeScript">
+    ```ts
+    // Before — mutable, shared by reference
+    class Money {
+      constructor(public amount: number, public currency: string) {}
+      add(other: Money): void {
+        this.amount += other.amount; // mutates in place, surprising aliases
+      }
+    }
+
+    // After — immutable value: operations return new instances
+    class Money {
+      constructor(
+        readonly amount: number,
+        readonly currency: string,
+      ) {}
+      add(other: Money): Money {
+        return new Money(this.amount + other.amount, this.currency);
+      }
+      equals(other: Money): boolean {
+        return this.amount === other.amount && this.currency === other.currency;
+      }
+    }
+    ```
+  </TabItem>
+  <TabItem label="Python">
+    ```python
+    # Before — mutable, shared by reference
+    class Money:
+        def __init__(self, amount, currency):
+            self.amount = amount
+            self.currency = currency
+        def add(self, other):
+            self.amount += other.amount  # mutates in place
+
+    # After — frozen value: equality and hashing come from contents
+    from dataclasses import dataclass
+
+    @dataclass(frozen=True)
+    class Money:
+        amount: int
+        currency: str
+        def add(self, other):
+            return Money(self.amount + other.amount, self.currency)
+    ```
+  </TabItem>
+  <TabItem label="Go">
+    ```go
+    // Before — pointer methods mutate a shared instance
+    type Money struct {
+        Amount   int
+        Currency string
+    }
+    func (m *Money) Add(other Money) {
+        m.Amount += other.Amount // mutates through the pointer
+    }
+
+    // After — value semantics: pass and return by value, never mutate
+    type Money struct {
+        Amount   int
+        Currency string
+    }
+    func (m Money) Add(other Money) Money {
+        return Money{Amount: m.Amount + other.Amount, Currency: m.Currency}
+    }
+    // Comparable structs compare by content with ==.
+    ```
+  </TabItem>
+  <TabItem label="Rust">
+    ```rust
+    // Before — shared and mutated through a reference
+    struct Money {
+        amount: i64,
+        currency: String,
+    }
+    impl Money {
+        fn add(&mut self, other: &Money) {
+            self.amount += other.amount; // mutates in place
+        }
+    }
+
+    // After — a Copy/Clone value compared by contents
+    #[derive(Clone, PartialEq, Eq)]
+    struct Money {
+        amount: i64,
+        currency: String,
+    }
+    impl Money {
+        fn add(&self, other: &Money) -> Money {
+            Money { amount: self.amount + other.amount, currency: self.currency.clone() }
+        }
+    }
+    ```
+  </TabItem>
+</Tabs>
+
+## Mechanics
+
+To change a reference into a value:
+
+1. Make the object's fields immutable — `readonly`, `frozen`, value receivers, no `&mut`.
+2. Replace any mutating method with one that returns a new instance carrying the changed contents.
+3. Provide content-based equality (`equals`, `__eq__`/`frozen`, `==` on a comparable struct, `PartialEq`), so two objects with the same fields are equal.
+4. Remove sharing: let each owner hold its own copy, since copies are now indistinguishable.
+5. **Run your tests** after each step.
+
+To change a value into a reference (the reverse), introduce a single source — a repository or registry that hands out *the* instance for a given identity — so every caller fetches the same object and an update is seen by all.
+
+## When to use / trade-offs
+
+Prefer a value for small, self-contained concepts — money, dates, points, ranges — where two equal contents should be interchangeable and nobody needs to observe in-place changes. Immutable values are safe to share across threads, easy to reason about, and free of aliasing surprises; their cost is allocating a new instance per "change," which is negligible for small objects.
+
+Choose a reference when the object models a single real-world entity that several parts of the system must share and watch as it updates — a logged-in user, an account whose balance many views reflect. Here, divergent copies would be a correctness bug. The decisive question: if I change this object, should everyone holding it see the change? Yes means reference; no — and equal-contents-are-the-same — means value.
+
+## Related
+
+- [Replace Primitive with Object](/refactoring-from-zero-to-hero/en/organizing-data/replace-primitive-with-object/)
+- [Encapsulate Variable](/refactoring-from-zero-to-hero/en/organizing-data/encapsulate-variable/)
+- [Replace Magic Literal](/refactoring-from-zero-to-hero/en/organizing-data/replace-magic-literal/)
+
+<Callout title="Ask: should a change be seen by everyone?">
+That single question decides the direction. If an update to the object must propagate to every holder, it is one shared entity — a reference. If equal contents mean the same thing and nobody should observe a mutation, make it an immutable value and stop sharing.
+</Callout>
+
+export const quizChangeRefToValue = [
+  {
+    q: 'What characterises a value object as opposed to a reference?',
+    options: [
+      'It is shared by many owners and mutated in place',
+      'It is immutable, compared by its contents, and freely copied',
+      'It always lives in a database',
+      'It has a unique identity that must be preserved',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'Which bug typically signals that a shared reference should become a value?',
+    options: [
+      'Divergent copies that fail to stay in sync',
+      'Aliasing — one holder mutates the object and surprises another holder',
+      'Slow startup',
+      'A missing constructor',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'When you turn a mutable reference into a value, what replaces an in-place mutating method?',
+    options: [
+      'A global setter',
+      'A method that returns a new instance with the changed contents',
+      'A method that throws an error',
+      'Deleting the method',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'What single question best decides between reference and value?',
+    options: [
+      'Is the object large?',
+      'If I change this object, should everyone holding it see the change?',
+      'Does the object have many fields?',
+      'Is the object used in a loop?',
+    ],
+    answer: 1,
+  },
+];
+
+<Quiz client:visible id="organizing-data/change-reference-to-value" questions={quizChangeRefToValue} />
+
+<ProgressTracker client:visible id="organizing-data/change-reference-to-value" />

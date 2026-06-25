@@ -35,13 +35,16 @@ Complex conditional logic is one of the loudest signals that a function is hard 
 
 ## What this module covers
 
-Five refactorings, each small and reversible:
+Eight refactorings, each small and reversible:
 
-- **Decompose Conditional** — extract the test, the then-branch, and the else-branch into well-named functions so the structure reads like a sentence: *if it is a peak day, charge the peak rate, otherwise the regular rate.*
-- **Consolidate Conditional Expression** — when several separate checks all lead to the same result, combine them into one condition and name it, so the reader learns *why* rather than *how many ways*.
-- **Replace Nested Conditional with Guard Clauses** — flatten deep `if/else` by returning early for the special cases, leaving the main path unindented and obvious.
-- **Replace Conditional with Polymorphism** — when a `switch` or `if` on a type recurs, push each branch into a subclass method so the language dispatches for you.
-- **Introduce Special Case** — replace a repeated null-or-special check with an object that responds with sensible defaults, so callers stop asking "is it missing?".
+- **[Decompose Conditional](/refactoring-from-zero-to-hero/en/simplifying-conditionals/decompose-conditional/)** — extract the test, the then-branch, and the else-branch into well-named functions so the structure reads like a sentence: *if it is a peak day, charge the peak rate, otherwise the regular rate.*
+- **[Consolidate Conditional Expression](/refactoring-from-zero-to-hero/en/simplifying-conditionals/consolidate-conditional/)** — when several separate checks all lead to the same result, combine them into one condition and name it, so the reader learns *why* rather than *how many ways*.
+- **[Replace Nested Conditional with Guard Clauses](/refactoring-from-zero-to-hero/en/simplifying-conditionals/replace-nested-conditional-with-guard-clauses/)** — flatten deep `if/else` by returning early for the special cases, leaving the main path unindented and obvious.
+- **[Replace Conditional with Polymorphism](/refactoring-from-zero-to-hero/en/simplifying-conditionals/replace-conditional-with-polymorphism/)** — when a `switch` or `if` on a type recurs, push each branch into a subclass method so the language dispatches for you.
+- **[Introduce Special Case](/refactoring-from-zero-to-hero/en/simplifying-conditionals/introduce-special-case/)** — replace a repeated null-or-special check with an object that responds with sensible defaults, so callers stop asking "is it missing?".
+- **[Introduce Assertion](/refactoring-from-zero-to-hero/en/simplifying-conditionals/introduce-assertion/)** — make an assumption a section of code silently relies on explicit, so a violated assumption fails loudly at its source instead of corrupting data downstream.
+- **[Replace Control Flag with Break/Return](/refactoring-from-zero-to-hero/en/simplifying-conditionals/replace-control-flag-with-break/)** — delete a boolean that only exists to steer a loop and let `break`, `return`, or `continue` express the exit where it actually happens.
+- **[Replace Error Code with Exception](/refactoring-from-zero-to-hero/en/simplifying-conditionals/replace-error-code-with-exception/)** — stop reporting failure with an ignorable sentinel; raise an exception, or in Go and Rust return an explicit `error`/`Result`, so failure cannot be mistaken for success.
 
 Each lesson shows the same before-and-after in TypeScript, Python, Go, and Rust, then walks through the safe, ordered mechanics — running your tests between every step.
 

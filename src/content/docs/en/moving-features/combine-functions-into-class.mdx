@@ -1,0 +1,256 @@
+---
+title: Combine Functions into Class
+description: When a clump of functions keeps passing the same data around, gather them into a class that holds that data as fields.
+sidebar:
+  order: 10
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+export const combineDiagram = `flowchart LR
+  subgraph Before["Before"]
+    D["reading data<br/>(customer, quantity, month)"]
+    F1["baseCharge(reading)"]
+    F2["taxableCharge(reading)"]
+    F3["calculateBaseCharge(reading)"]
+    D -.-> F1
+    D -.-> F2
+    D -.-> F3
+  end
+  subgraph After["After"]
+    C["Reading (class)<br/>fields: customer, quantity, month"]
+    C --> M1["baseCharge()"]
+    C --> M2["taxableCharge()"]
+    C --> M3["calculateBaseCharge()"]
+  end
+  Before -.->|"Combine Functions into Class"| After`;
+
+## Intent
+
+When several free functions all operate on the same bundle of data — each taking it as an argument, each deriving values from it — gather them into a class. The shared data becomes the object's fields, the functions become its methods, and the data clump stops being threaded through every call.
+
+## The smell
+
+You see a group of functions that all accept the same record and pull values out of it: `baseCharge(reading)`, `taxableCharge(reading)`, `calculateBaseCharge(reading)`. The record travels from function to function as a parameter, and the functions clearly form a family around it — but nothing names that family. This is a **Data Clump** with behaviour orbiting it. Wrapping the data in a class gives the family a home, lets methods call each other without re-passing the data, and creates an obvious place for the next related function to land.
+
+## Before → After
+
+Three functions that each take a utility `reading` and compute a charge. We combine them into a `Reading` class whose fields are the reading's data.
+
+<Tabs syncKey="lang">
+  <TabItem label="TypeScript">
+    ```ts
+    // Before — data threaded through every function
+    function baseRate(month: number): number {
+      return month >= 6 && month <= 9 ? 0.12 : 0.1;
+    }
+
+    function baseCharge(reading: Reading): number {
+      return baseRate(reading.month) * reading.quantity;
+    }
+
+    function taxableCharge(reading: Reading): number {
+      return Math.max(0, baseCharge(reading) - 30);
+    }
+
+    // After — data and behaviour live together
+    class ReadingCharge {
+      constructor(private reading: Reading) {}
+
+      private get baseRate(): number {
+        return this.reading.month >= 6 && this.reading.month <= 9 ? 0.12 : 0.1;
+      }
+
+      get baseCharge(): number {
+        return this.baseRate * this.reading.quantity;
+      }
+
+      get taxableCharge(): number {
+        return Math.max(0, this.baseCharge - 30);
+      }
+    }
+    ```
+  </TabItem>
+  <TabItem label="Python">
+    ```python
+    # Before — data threaded through every function
+    def base_rate(month):
+        return 0.12 if 6 <= month <= 9 else 0.10
+
+    def base_charge(reading):
+        return base_rate(reading.month) * reading.quantity
+
+    def taxable_charge(reading):
+        return max(0, base_charge(reading) - 30)
+
+    # After — data and behaviour live together
+    class ReadingCharge:
+        def __init__(self, reading):
+            self.reading = reading
+
+        @property
+        def base_rate(self):
+            return 0.12 if 6 <= self.reading.month <= 9 else 0.10
+
+        @property
+        def base_charge(self):
+            return self.base_rate * self.reading.quantity
+
+        @property
+        def taxable_charge(self):
+            return max(0, self.base_charge - 30)
+    ```
+  </TabItem>
+  <TabItem label="Go">
+    ```go
+    // Before — data threaded through every function
+    func baseRate(month int) float64 {
+        if month >= 6 && month <= 9 {
+            return 0.12
+        }
+        return 0.10
+    }
+
+    func baseCharge(r Reading) float64 {
+        return baseRate(r.Month) * r.Quantity
+    }
+
+    func taxableCharge(r Reading) float64 {
+        return math.Max(0, baseCharge(r)-30)
+    }
+
+    // After — struct holds the data, methods hang off it
+    type ReadingCharge struct {
+        reading Reading
+    }
+
+    func (rc ReadingCharge) baseRate() float64 {
+        if rc.reading.Month >= 6 && rc.reading.Month <= 9 {
+            return 0.12
+        }
+        return 0.10
+    }
+
+    func (rc ReadingCharge) BaseCharge() float64 {
+        return rc.baseRate() * rc.reading.Quantity
+    }
+
+    func (rc ReadingCharge) TaxableCharge() float64 {
+        return math.Max(0, rc.BaseCharge()-30)
+    }
+    ```
+  </TabItem>
+  <TabItem label="Rust">
+    ```rust
+    // Before — data threaded through every function
+    fn base_rate(month: u32) -> f64 {
+        if (6..=9).contains(&month) { 0.12 } else { 0.10 }
+    }
+
+    fn base_charge(reading: &Reading) -> f64 {
+        base_rate(reading.month) * reading.quantity
+    }
+
+    fn taxable_charge(reading: &Reading) -> f64 {
+        (base_charge(reading) - 30.0).max(0.0)
+    }
+
+    // After — struct owns the data, impl holds the methods
+    struct ReadingCharge {
+        reading: Reading,
+    }
+
+    impl ReadingCharge {
+        fn base_rate(&self) -> f64 {
+            if (6..=9).contains(&self.reading.month) { 0.12 } else { 0.10 }
+        }
+
+        fn base_charge(&self) -> f64 {
+            self.base_rate() * self.reading.quantity
+        }
+
+        fn taxable_charge(&self) -> f64 {
+            (self.base_charge() - 30.0).max(0.0)
+        }
+    }
+    ```
+  </TabItem>
+</Tabs>
+
+<Mermaid code={combineDiagram} title="A data clump plus its orbiting functions become one class" />
+
+## Mechanics
+
+1. Pick the common record the functions all share and apply **Encapsulate Record** if it is a bare data structure — you want one object to anchor the class.
+2. Create the class (or struct + impl), taking that record in its constructor and storing it as a field.
+3. Move each function into the class one at a time. Turn its data parameter into a reference to the stored field, and run your tests after each move.
+4. Replace each former parameter access (such as `reading.month`) with field access on the object.
+5. As methods come to call one another, drop the now-redundant arguments they used to pass.
+6. **Run your tests** after every step; update each original call site to construct the object and call the method.
+
+## When to use / trade-offs
+
+Use this when a set of functions clearly belongs to one piece of data and you keep passing that data between them. The class gives the cluster a name, removes the repetitive parameter threading, and offers a natural home for related logic you will add later. It also pairs well with **Split Phase** and **Extract Function** — once functions share an object, derived values become clean queries on it.
+
+The trade-off is that you are introducing an object where there were plain functions, which is only worth it when the functions genuinely cohere around shared data. If the functions merely happen to take a similar argument but pursue unrelated goals, a class would group things that do not belong together. The alternative gathering, when the functions produce a value rather than share mutable state, is **Combine Functions into Transform**.
+
+## Related
+
+- [Split Loop](/refactoring-from-zero-to-hero/en/moving-features/split-loop/)
+- [Extract Class](/refactoring-from-zero-to-hero/en/moving-features/extract-class/)
+- [Extract Function](/refactoring-from-zero-to-hero/en/composing-methods/extract-function/)
+
+<Callout title="Group around the data, not the verb">
+The reason to combine these functions is the data they share, not that their names rhyme. If they all take the same record and read from it, the class writes itself. If they merely look similar but touch different data, leave them as separate functions.
+</Callout>
+
+export const quizCombine = [
+  {
+    q: 'What is the trigger for Combine Functions into Class?',
+    options: [
+      'Functions with long names',
+      'Several functions that share and keep passing around the same data clump',
+      'A single function that is too long',
+      'Functions in different files',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'What happens to the shared data when the functions become a class?',
+    options: [
+      'It is deleted',
+      'It becomes the fields of the class, so methods read it directly instead of via parameters',
+      'It is duplicated into each method',
+      'It becomes a global variable',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'In Go and Rust, how is this refactoring expressed?',
+    options: [
+      'Go with inheritance, Rust with macros',
+      'Go with a struct plus methods, Rust with a struct plus an impl block',
+      'Both with free functions only',
+      'Both with global state',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'When should you NOT combine functions into a class?',
+    options: [
+      'When the functions truly cohere around shared data',
+      'When the functions only look similar but operate on unrelated data',
+      'When there are three of them',
+      'When they live in the same module',
+    ],
+    answer: 1,
+  },
+];
+
+<Quiz client:visible id="moving-features/combine-functions-into-class" questions={quizCombine} />
+
+<ProgressTracker client:visible id="moving-features/combine-functions-into-class" />

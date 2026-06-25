@@ -1,0 +1,238 @@
+---
+title: Move Statements into Function
+description: When the same statements always run right before or after a function call, fold them into the function so callers cannot forget them.
+sidebar:
+  order: 7
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+## Intent
+
+When a line of code is always paired with a call to some function — running just before it or just after it, at every single call site — that line belongs *inside* the function. Move it in. The function now owns the complete job, and callers shrink to a single call they cannot get wrong.
+
+## The smell
+
+You find the same preparatory or trailing statement copy-pasted above or below a function call everywhere it appears. Maybe every caller of `renderName` first writes an opening tag, or every caller of `fetchOrder` logs the same line afterwards. That repeated statement is part of the behaviour the callers expect, yet it lives outside the function, where each new caller has to remember to add it. Forget once and you have a quiet bug. The duplication is a sign the statement wants to move in.
+
+## Before → After
+
+A function that emits a person's photo HTML. Every caller writes the same `<p>` heading line right before calling it. That heading is really part of "render the photo block", so we move it in.
+
+<Tabs syncKey="lang">
+  <TabItem label="TypeScript">
+    ```ts
+    // Before
+    function photoData(photo: Photo): string {
+      return [
+        `<p>location: ${photo.location}</p>`,
+        `<p>date: ${photo.date.toDateString()}</p>`,
+      ].join('\n');
+    }
+
+    function renderPerson(person: Person, photo: Photo): string {
+      return [
+        `<p>${person.name}</p>`,
+        `<p>title: ${photo.title}</p>`, // repeated at every call site
+        photoData(photo),
+      ].join('\n');
+    }
+
+    function emitPhoto(photo: Photo): string {
+      return [
+        `<p>title: ${photo.title}</p>`, // repeated here too
+        photoData(photo),
+      ].join('\n');
+    }
+
+    // After
+    function photoData(photo: Photo): string {
+      return [
+        `<p>title: ${photo.title}</p>`, // moved in — now owned by photoData
+        `<p>location: ${photo.location}</p>`,
+        `<p>date: ${photo.date.toDateString()}</p>`,
+      ].join('\n');
+    }
+
+    function renderPerson(person: Person, photo: Photo): string {
+      return [`<p>${person.name}</p>`, photoData(photo)].join('\n');
+    }
+
+    function emitPhoto(photo: Photo): string {
+      return photoData(photo);
+    }
+    ```
+  </TabItem>
+  <TabItem label="Python">
+    ```python
+    # Before
+    def photo_data(photo):
+        return "\n".join([
+            f"<p>location: {photo.location}</p>",
+            f"<p>date: {photo.date:%Y-%m-%d}</p>",
+        ])
+
+    def render_person(person, photo):
+        return "\n".join([
+            f"<p>{person.name}</p>",
+            f"<p>title: {photo.title}</p>",  # repeated at every call site
+            photo_data(photo),
+        ])
+
+    def emit_photo(photo):
+        return "\n".join([
+            f"<p>title: {photo.title}</p>",  # repeated here too
+            photo_data(photo),
+        ])
+
+    # After
+    def photo_data(photo):
+        return "\n".join([
+            f"<p>title: {photo.title}</p>",  # moved in — now owned by photo_data
+            f"<p>location: {photo.location}</p>",
+            f"<p>date: {photo.date:%Y-%m-%d}</p>",
+        ])
+
+    def render_person(person, photo):
+        return "\n".join([f"<p>{person.name}</p>", photo_data(photo)])
+
+    def emit_photo(photo):
+        return photo_data(photo)
+    ```
+  </TabItem>
+  <TabItem label="Go">
+    ```go
+    // Before
+    func photoData(p Photo) string {
+        return fmt.Sprintf("<p>location: %s</p>\n<p>date: %s</p>",
+            p.Location, p.Date.Format("2006-01-02"))
+    }
+
+    func renderPerson(person Person, p Photo) string {
+        return fmt.Sprintf("<p>%s</p>\n<p>title: %s</p>\n%s",
+            person.Name, p.Title, photoData(p)) // title repeated everywhere
+    }
+
+    func emitPhoto(p Photo) string {
+        return fmt.Sprintf("<p>title: %s</p>\n%s", p.Title, photoData(p))
+    }
+
+    // After
+    func photoData(p Photo) string {
+        return fmt.Sprintf("<p>title: %s</p>\n<p>location: %s</p>\n<p>date: %s</p>",
+            p.Title, p.Location, p.Date.Format("2006-01-02")) // moved in
+    }
+
+    func renderPerson(person Person, p Photo) string {
+        return fmt.Sprintf("<p>%s</p>\n%s", person.Name, photoData(p))
+    }
+
+    func emitPhoto(p Photo) string {
+        return photoData(p)
+    }
+    ```
+  </TabItem>
+  <TabItem label="Rust">
+    ```rust
+    // Before
+    fn photo_data(p: &Photo) -> String {
+        format!("<p>location: {}</p>\n<p>date: {}</p>", p.location, p.date)
+    }
+
+    fn render_person(person: &Person, p: &Photo) -> String {
+        // title line repeated at every call site
+        format!("<p>{}</p>\n<p>title: {}</p>\n{}", person.name, p.title, photo_data(p))
+    }
+
+    fn emit_photo(p: &Photo) -> String {
+        format!("<p>title: {}</p>\n{}", p.title, photo_data(p))
+    }
+
+    // After
+    fn photo_data(p: &Photo) -> String {
+        // moved in — now owned by photo_data
+        format!("<p>title: {}</p>\n<p>location: {}</p>\n<p>date: {}</p>",
+            p.title, p.location, p.date)
+    }
+
+    fn render_person(person: &Person, p: &Photo) -> String {
+        format!("<p>{}</p>\n{}", person.name, photo_data(p))
+    }
+
+    fn emit_photo(p: &Photo) -> String {
+        photo_data(p)
+    }
+    ```
+  </TabItem>
+</Tabs>
+
+## Mechanics
+
+1. Confirm the candidate statement runs adjacent to the call at **every** site. If even one caller does it differently, this move is wrong — that variation is real.
+2. If the call site holds other code, first apply **Extract Function** to isolate exactly the call plus the repeated statement into one helper. Now you only have one place to work.
+3. Move the repeated statement into the target function — at the top if it ran before the call, at the bottom if it ran after.
+4. **Run your tests.**
+5. Delete the now-redundant statement from each caller, one at a time, running tests after each deletion.
+6. If you created a temporary helper in step 2, inline it once every caller is clean.
+
+## When to use / trade-offs
+
+Use this when a statement is genuinely part of the function's responsibility but happens to live outside it. Folding it in removes duplication and makes the function a complete, hard-to-misuse unit.
+
+Do not use it when callers differ in whether or how they run the statement — forcing a shared step onto a function that some callers want to skip just trades duplication for a flag parameter, which is worse. The inverse refactoring is **Move Statements to Callers**: when a function bundles a step that only *some* callers want, push it back out.
+
+## Related
+
+- [Move Statements to Callers](/refactoring-from-zero-to-hero/en/moving-features/move-statements-to-callers/)
+- [Move Function](/refactoring-from-zero-to-hero/en/moving-features/move-function/)
+- [Extract Function](/refactoring-from-zero-to-hero/en/composing-methods/extract-function/)
+
+<Callout title="Move only what is truly shared">
+The test is simple: does *every* caller run this statement, identically, right next to the call? If yes, move it in. If you have to add a boolean to satisfy the exceptions, stop — the statement is not shared, and it belongs at the callers.
+</Callout>
+
+export const quizMoveIn = [
+  {
+    q: 'When is a statement a good candidate to move into a function?',
+    options: [
+      'When it appears once, somewhere in the codebase',
+      'When it runs identically right before or after the call at every call site',
+      'When it is longer than the function body',
+      'When only one caller needs it',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'If a call site contains other unrelated code, what should you do first?',
+    options: [
+      'Move all of it in at once',
+      'Extract just the call plus the repeated statement into a helper, then work from there',
+      'Add a flag parameter to the function',
+      'Skip the refactoring entirely',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'What is the inverse of Move Statements into Function?',
+    options: ['Inline Function', 'Move Statements to Callers', 'Extract Class', 'Hide Delegate'],
+    answer: 1,
+  },
+  {
+    q: 'What is a sign you should NOT move a statement in?',
+    options: [
+      'The statement is short',
+      'Every caller runs it the same way',
+      'Some callers want to skip it, forcing you to add a boolean flag',
+      'The function already has a good name',
+    ],
+    answer: 2,
+  },
+];
+
+<Quiz client:visible id="moving-features/move-statements-into-function" questions={quizMoveIn} />
+
+<ProgressTracker client:visible id="moving-features/move-statements-into-function" />

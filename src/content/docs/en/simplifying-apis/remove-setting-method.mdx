@@ -1,0 +1,194 @@
+---
+title: Remove Setting Method
+description: Drop the setter for a field that should be fixed at construction, so the value is set once and the object becomes immutable.
+sidebar:
+  order: 10
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+export const removeSetterDiagram = `flowchart LR
+  subgraph Before["Before"]
+    A["new Account()<br/>then setId(...)<br/>setId callable anytime"]
+  end
+  subgraph After["After"]
+    B["new Account(id)<br/>id fixed forever<br/>no setId"]
+  end
+  Before -.->|"Remove Setting Method"| After`;
+
+## Intent
+
+Some fields are part of an object's identity: an account number, a creation timestamp, a currency. They should be chosen when the object is born and never touched again. If such a field has a setter, anyone can quietly mutate it later. Move the assignment into the constructor and **delete the setter**, so the field is set exactly once and the object is immutable in that respect.
+
+## The smell
+
+You construct an object, then immediately call a setter to give it a value that will never legitimately change — `new Account(); account.setId(42)`. The two-step birth invites a third party to call the setter again, far from construction, and corrupt the object's identity. A setter that exists only to be called once at the start is a setter that should not exist.
+
+## Before → After
+
+An `Account` exposes a settable `id`. We accept the id in the constructor and remove `setId`, making the identity permanent. In Go and Rust there is no setter to begin with — the point is to fix the value at construction and expose no mutator.
+
+<Tabs syncKey="lang">
+  <TabItem label="TypeScript">
+    ```ts
+    // Before
+    class Account {
+      private _id = 0;
+      setId(id: number): void { this._id = id; }
+      get id(): number { return this._id; }
+    }
+
+    const account = new Account();
+    account.setId(42);
+
+    // After
+    class Account {
+      constructor(private readonly _id: number) {}
+      get id(): number { return this._id; }
+    }
+
+    const account = new Account(42);
+    ```
+  </TabItem>
+  <TabItem label="Python">
+    ```python
+    # Before
+    class Account:
+        def __init__(self):
+            self._id = 0
+        def set_id(self, value):
+            self._id = value
+        @property
+        def id(self):
+            return self._id
+
+    account = Account()
+    account.set_id(42)
+
+    # After
+    class Account:
+        def __init__(self, id):
+            self._id = id
+        @property
+        def id(self):
+            return self._id
+
+    account = Account(42)
+    ```
+  </TabItem>
+  <TabItem label="Go">
+    ```go
+    // Set at construction, no setter exposed.
+    type Account struct {
+        id int // unexported, fixed at construction
+    }
+
+    func NewAccount(id int) Account {
+        return Account{id: id}
+    }
+
+    func (a Account) ID() int {
+        return a.id
+    }
+
+    account := NewAccount(42)
+    ```
+  </TabItem>
+  <TabItem label="Rust">
+    ```rust
+    // Set at construction, no setter exposed.
+    pub struct Account {
+        id: u64, // private, no mutator
+    }
+
+    impl Account {
+        pub fn new(id: u64) -> Self {
+            Account { id }
+        }
+
+        pub fn id(&self) -> u64 {
+            self.id
+        }
+    }
+
+    let account = Account::new(42);
+    ```
+  </TabItem>
+</Tabs>
+
+<Mermaid code={removeSetterDiagram} title="A two-step build with a setter becomes a one-shot immutable construction" />
+
+## Mechanics
+
+1. If the constructor cannot yet accept the field, add it as a parameter and assign it inside the constructor.
+2. Update every caller that creates the object to pass the value through the constructor instead of via the setter. **Run your tests** after each.
+3. Search for any remaining calls to the setter. If a caller still mutates the field after construction, decide whether that is a real requirement — if so, this field is not a candidate; if not, route it through the constructor.
+4. Once no caller uses the setter, delete it.
+5. Where the language allows, mark the field `readonly`/`final`/private-with-no-mutator so the compiler enforces the immutability.
+
+## When to use / trade-offs
+
+Apply this to fields that define identity or are fixed for the object's lifetime, and to value objects you want to treat as immutable so they can be shared and cached freely. Removing the setter shrinks the surface area for bugs: a value that cannot change cannot be changed at the wrong time.
+
+The trade-off is constructor pressure. If many such fields exist, the constructor's parameter list can grow long — that is a cue for **Introduce Parameter Object** or a builder, not a reason to keep the setters. And genuinely mutable state — a balance, a status — still needs a controlled way to change; do not strip setters that model real, ongoing change. Frameworks that require a no-arg constructor and field injection may also force a compromise here.
+
+## Related
+
+- [Replace Constructor with Factory Function](/refactoring-from-zero-to-hero/en/simplifying-apis/replace-constructor-with-factory/)
+- [Introduce Parameter Object](/refactoring-from-zero-to-hero/en/simplifying-apis/introduce-parameter-object/)
+- [Separate Query from Modifier](/refactoring-from-zero-to-hero/en/simplifying-apis/separate-query-from-modifier/)
+
+<Callout title="Immutability is a feature">
+Every setter you remove is a class of bug you can stop worrying about. An immutable field needs no defensive copy, no synchronisation, and no audit of who might have changed it. Set identity once at construction and the rest of the program can trust it forever.
+</Callout>
+
+export const quizRemoveSetter = [
+  {
+    q: 'Which kind of field is the right target for Remove Setting Method?',
+    options: [
+      'A field that changes constantly during the object’s life',
+      'A field that should be set once at construction and never change',
+      'A field used only in tests',
+      'Any private field',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'Where does the field’s value get assigned after the refactoring?',
+    options: [
+      'In a dedicated update method',
+      'In the constructor, passed in at creation',
+      'In a global initializer',
+      'It is left at its default',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'What is the main benefit of removing the setter?',
+    options: [
+      'Faster compilation',
+      'The field becomes immutable, so it cannot be changed at the wrong time',
+      'Smaller binary size',
+      'Fewer constructor parameters',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'If removing setters leaves the constructor with too many parameters, what is the right response?',
+    options: [
+      'Put the setters back',
+      'Introduce a Parameter Object or a builder',
+      'Make the fields public',
+      'Use global variables',
+    ],
+    answer: 1,
+  },
+];
+
+<Quiz client:visible id="simplifying-apis/remove-setting-method" questions={quizRemoveSetter} />
+
+<ProgressTracker client:visible id="simplifying-apis/remove-setting-method" />

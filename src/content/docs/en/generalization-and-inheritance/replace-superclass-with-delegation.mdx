@@ -1,0 +1,272 @@
+---
+title: Replace Superclass with Delegation
+description: When a subclass uses only part of its superclass — or inherits an awkward interface — hold the former superclass as a field and delegate to it instead.
+sidebar:
+  order: 8
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+export const delegationDiagram = `classDiagram
+  class List~T~ {
+    +add(item)
+    +remove(item)
+    +size() number
+    +clear()
+  }
+  class Stack~T~
+  List <|-- Stack : before (extends)
+  class StackAfter["Stack"] {
+    -items: List~T~
+    +push(item)
+    +pop() T
+  }
+  StackAfter --> List : after (holds & delegates)`;
+
+## Intent
+
+**Replace Superclass with Delegation** turns an inheritance link into a *has-a* link. Instead of `Stack extends List`, the stack *holds* a list in a private field and calls into it for the handful of operations it actually needs. The subclass keeps the behaviour it relied on but is no longer forced to inherit — and expose — every member of a parent it never wanted in full.
+
+## The smell
+
+A class extends another to reuse a few methods and ends up dragging the whole public interface along with it. `Stack extends List` inherits `add`, `remove`, `get(index)`, `clear` — so callers can now `stack.remove(item)` from the middle, violating the very invariant a stack exists to protect. The "is-a" claim is false: a stack is not a kind of list, it merely *uses* one. The inherited interface is awkward, leaky, or oversized — a textbook case of **Refused Bequest**, where the heir quietly disowns much of what it was left.
+
+## Before → After
+
+A `Stack` that extends `List` to get its storage, leaking list operations. After, it holds a `List` and exposes only `push`/`pop`/`size`.
+
+<Tabs syncKey="lang">
+  <TabItem label="TypeScript">
+    ```ts
+    // Before — Stack inherits the entire List interface
+    class List<T> {
+      private items: T[] = [];
+      add(item: T): void { this.items.push(item); }
+      remove(item: T): void {
+        const i = this.items.indexOf(item);
+        if (i >= 0) this.items.splice(i, 1);
+      }
+      get(index: number): T { return this.items[index]; }
+      size(): number { return this.items.length; }
+    }
+
+    // A Stack should not expose remove(item) or get(index)!
+    class Stack<T> extends List<T> {
+      push(item: T): void { this.add(item); }
+      pop(): T | undefined { return undefined; /* awkward */ }
+    }
+
+    // After — Stack holds a List and delegates only what it needs
+    class Stack<T> {
+      private storage = new List<T>();
+
+      push(item: T): void { this.storage.add(item); }
+
+      pop(): T | undefined {
+        const n = this.storage.size();
+        if (n === 0) return undefined;
+        const top = this.storage.get(n - 1);
+        this.storage.remove(top);
+        return top;
+      }
+
+      size(): number { return this.storage.size(); }
+    }
+    ```
+  </TabItem>
+  <TabItem label="Python">
+    ```python
+    # Before — Stack inherits the entire list interface
+    class CustomList:
+        def __init__(self):
+            self._items = []
+
+        def add(self, item):
+            self._items.append(item)
+
+        def remove(self, item):
+            self._items.remove(item)
+
+        def get(self, index):
+            return self._items[index]
+
+        def size(self):
+            return len(self._items)
+
+    # A Stack should not expose remove(item) or get(index)!
+    class Stack(CustomList):
+        def push(self, item):
+            self.add(item)
+
+    # After — Stack holds a list and delegates only what it needs
+    class Stack:
+        def __init__(self):
+            self._storage = CustomList()
+
+        def push(self, item):
+            self._storage.add(item)
+
+        def pop(self):
+            n = self._storage.size()
+            if n == 0:
+                return None
+            top = self._storage.get(n - 1)
+            self._storage.remove(top)
+            return top
+
+        def size(self):
+            return self._storage.size()
+    ```
+  </TabItem>
+  <TabItem label="Go">
+    ```go
+    // Go has no inheritance. Embedding a List would promote ALL of its methods
+    // onto Stack — the same leaky bequest. So the idiomatic shape is a NAMED
+    // field (not embedding) holding the list, with Stack delegating explicitly.
+
+    type List[T any] struct {
+        items []T
+    }
+
+    func (l *List[T]) Add(item T)         { l.items = append(l.items, item) }
+    func (l *List[T]) Get(i int) T        { return l.items[i] }
+    func (l *List[T]) Size() int          { return len(l.items) }
+    func (l *List[T]) RemoveLast()        { l.items = l.items[:len(l.items)-1] }
+
+    type Stack[T any] struct {
+        storage List[T] // held as a field, not embedded — no leaked methods
+    }
+
+    func (s *Stack[T]) Push(item T) { s.storage.Add(item) }
+
+    func (s *Stack[T]) Pop() (T, bool) {
+        var zero T
+        if s.storage.Size() == 0 {
+            return zero, false
+        }
+        top := s.storage.Get(s.storage.Size() - 1)
+        s.storage.RemoveLast()
+        return top, true
+    }
+
+    func (s *Stack[T]) Size() int { return s.storage.Size() }
+    ```
+  </TabItem>
+  <TabItem label="Rust">
+    ```rust
+    // Rust has no inheritance either. A Stack simply owns a Vec (or a custom
+    // list) as a field and exposes only the stack operations. Delegation by
+    // holding a field is the only option — and the right one.
+
+    struct List<T> {
+        items: Vec<T>,
+    }
+
+    impl<T> List<T> {
+        fn new() -> Self {
+            List { items: Vec::new() }
+        }
+        fn add(&mut self, item: T) {
+            self.items.push(item);
+        }
+        fn remove_last(&mut self) -> Option<T> {
+            self.items.pop()
+        }
+        fn size(&self) -> usize {
+            self.items.len()
+        }
+    }
+
+    struct Stack<T> {
+        storage: List<T>,
+    }
+
+    impl<T> Stack<T> {
+        fn new() -> Self {
+            Stack { storage: List::new() }
+        }
+        fn push(&mut self, item: T) {
+            self.storage.add(item);
+        }
+        fn pop(&mut self) -> Option<T> {
+            self.storage.remove_last()
+        }
+        fn size(&self) -> usize {
+            self.storage.size()
+        }
+    }
+    ```
+  </TabItem>
+</Tabs>
+
+<Mermaid code={delegationDiagram} title="Stack stops extending List and instead holds one, delegating only what it needs" />
+
+## Mechanics
+
+1. Add a field to the subclass that holds an instance of the former superclass; initialise it (often by constructing a fresh one, or by accepting it as a constructor argument).
+2. For each inherited member the subclass genuinely uses, add a small forwarding method that delegates to the field.
+3. Update the subclass's own methods to call the field instead of `super`.
+4. Remove the `extends` / inheritance link so the subclass no longer subtypes the parent. **Run your tests** after each member you migrate.
+5. Trim the delegating surface to only the operations the class should actually expose — the awkward inherited members simply vanish from its interface.
+
+## When to use / trade-offs
+
+Reach for this when a subclass uses only a fragment of its parent, when inheriting the parent leaks operations that break the subclass's invariants, or when the "is-a" relationship is really "uses-a". Delegation lets you expose exactly the right interface and keeps the two classes free to evolve independently.
+
+The cost is the forwarding methods you write by hand for the members you *do* keep — pure inheritance would have given those for free. When a subclass legitimately *is* its parent and wants the full interface, leave the inheritance alone. The inverse is **Replace Delegation with Inheritance**, worth doing only when you find yourself forwarding the *entire* interface verbatim. Go and Rust make the choice for you: with no inheritance, you hold a field and delegate from the start — and Go's `struct embedding` is a deliberate halfway tool you reach for only when you *want* the whole interface promoted.
+
+## Related
+
+- [Replace Inheritance with Delegation](/refactoring-from-zero-to-hero/en/generalization-and-inheritance/replace-inheritance-with-delegation/)
+- [Replace Subclass with Delegation](/refactoring-from-zero-to-hero/en/generalization-and-inheritance/replace-subclass-with-delegation/)
+- [Extract Superclass & Interface](/refactoring-from-zero-to-hero/en/generalization-and-inheritance/extract-superclass-and-interface/)
+
+<Callout title="Inherit the whole interface, or none of it">
+The deciding question is simple: does the subclass want *everything* the parent offers? If yes, inheritance is honest and cheap. If it wants only a slice — and is embarrassed by the rest — hold the parent as a field and forward the slice. Go and Rust bake this in: there is no way to inherit a fragment, so you compose, which is exactly where this refactoring leads.
+</Callout>
+
+export const quizReplaceSuper = [
+  {
+    q: 'What situation calls for Replace Superclass with Delegation?',
+    options: [
+      'A subclass that uses the full interface of its parent',
+      'A subclass that uses only part of its superclass or inherits an awkward interface',
+      'A function that is too long',
+      'Two classes with no relationship at all',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'After the refactoring, how does the former subclass reach the behaviour it needs?',
+    options: [
+      'It calls super on the inherited parent',
+      'It holds the former superclass as a field and delegates to it',
+      'It copies the parent code inline',
+      'It uses a global registry',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'Which code smell does inheriting an oversized interface exemplify?',
+    options: ['Long Parameter List', 'Refused Bequest', 'Primitive Obsession', 'Feature Envy'],
+    answer: 1,
+  },
+  {
+    q: 'Why does Go use a NAMED field rather than struct embedding for this case?',
+    options: [
+      'Embedding is not allowed in Go',
+      'Embedding would promote all of the list methods onto Stack, leaking the same oversized interface',
+      'Named fields are faster',
+      'Embedding cannot hold generic types',
+    ],
+    answer: 1,
+  },
+];
+
+<Quiz client:visible id="generalization-and-inheritance/replace-superclass-with-delegation" questions={quizReplaceSuper} />
+
+<ProgressTracker client:visible id="generalization-and-inheritance/replace-superclass-with-delegation" />

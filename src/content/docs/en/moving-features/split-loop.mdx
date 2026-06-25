@@ -1,0 +1,223 @@
+---
+title: Split Loop
+description: When one loop quietly does two unrelated jobs, split it into two single-purpose loops so each reads as one clear idea.
+sidebar:
+  order: 9
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+## Intent
+
+A single loop is often pressed into doing two different things at once — summing one thing while finding the maximum of another, or collecting names while counting matches. Split it into two loops, each iterating the same collection but doing exactly one job. Each loop now reads as a single idea, and you are free to refactor or move each one independently.
+
+## The smell
+
+You read a loop and find yourself mentally untangling two threads: "this part builds the total… and this part, also in here, tracks the youngest person." Two accumulators that have nothing to do with each other share a loop body only because they happen to walk the same list. That coupling makes the loop hard to name, hard to extract, and hard to change — touch the total logic and you risk the youngest-person logic.
+
+## Before → After
+
+A loop over employees that computes total salary *and*, unrelatedly, finds the youngest age. Two jobs, one loop. We split them.
+
+<Tabs syncKey="lang">
+  <TabItem label="TypeScript">
+    ```ts
+    // Before — one loop, two unrelated jobs
+    function report(people: Person[]): { total: number; youngest: number } {
+      let total = 0;
+      let youngest = people[0]?.age ?? Infinity;
+      for (const p of people) {
+        total += p.salary;
+        if (p.age < youngest) youngest = p.age;
+      }
+      return { total, youngest };
+    }
+
+    // After — each loop has a single purpose
+    function report(people: Person[]): { total: number; youngest: number } {
+      return { total: totalSalary(people), youngest: youngestAge(people) };
+    }
+
+    function totalSalary(people: Person[]): number {
+      let total = 0;
+      for (const p of people) total += p.salary;
+      return total;
+    }
+
+    function youngestAge(people: Person[]): number {
+      let youngest = people[0]?.age ?? Infinity;
+      for (const p of people) {
+        if (p.age < youngest) youngest = p.age;
+      }
+      return youngest;
+    }
+    ```
+  </TabItem>
+  <TabItem label="Python">
+    ```python
+    # Before — one loop, two unrelated jobs
+    def report(people):
+        total = 0
+        youngest = people[0].age if people else float("inf")
+        for p in people:
+            total += p.salary
+            if p.age < youngest:
+                youngest = p.age
+        return {"total": total, "youngest": youngest}
+
+    # After — each loop has a single purpose
+    def report(people):
+        return {"total": total_salary(people), "youngest": youngest_age(people)}
+
+    def total_salary(people):
+        total = 0
+        for p in people:
+            total += p.salary
+        return total
+
+    def youngest_age(people):
+        youngest = people[0].age if people else float("inf")
+        for p in people:
+            if p.age < youngest:
+                youngest = p.age
+        return youngest
+    ```
+  </TabItem>
+  <TabItem label="Go">
+    ```go
+    // Before — one loop, two unrelated jobs
+    func report(people []Person) (total, youngest int) {
+        youngest = math.MaxInt
+        for _, p := range people {
+            total += p.Salary
+            if p.Age < youngest {
+                youngest = p.Age
+            }
+        }
+        return total, youngest
+    }
+
+    // After — each loop has a single purpose
+    func report(people []Person) (int, int) {
+        return totalSalary(people), youngestAge(people)
+    }
+
+    func totalSalary(people []Person) int {
+        total := 0
+        for _, p := range people {
+            total += p.Salary
+        }
+        return total
+    }
+
+    func youngestAge(people []Person) int {
+        youngest := math.MaxInt
+        for _, p := range people {
+            if p.Age < youngest {
+                youngest = p.Age
+            }
+        }
+        return youngest
+    }
+    ```
+  </TabItem>
+  <TabItem label="Rust">
+    ```rust
+    // Before — one loop, two unrelated jobs
+    fn report(people: &[Person]) -> (i64, i64) {
+        let mut total = 0;
+        let mut youngest = i64::MAX;
+        for p in people {
+            total += p.salary;
+            if p.age < youngest {
+                youngest = p.age;
+            }
+        }
+        (total, youngest)
+    }
+
+    // After — each loop has a single purpose
+    fn report(people: &[Person]) -> (i64, i64) {
+        (total_salary(people), youngest_age(people))
+    }
+
+    fn total_salary(people: &[Person]) -> i64 {
+        people.iter().map(|p| p.salary).sum()
+    }
+
+    fn youngest_age(people: &[Person]) -> i64 {
+        people.iter().map(|p| p.age).min().unwrap_or(i64::MAX)
+    }
+    ```
+  </TabItem>
+</Tabs>
+
+## Mechanics
+
+1. Copy the entire loop so you have two identical loops over the same collection.
+2. In the first loop, delete the statements that belong to the *second* job. In the second loop, delete the statements that belong to the *first*. Each loop is now single-purpose.
+3. **Run your tests.** Behaviour must be unchanged.
+4. Apply **Extract Function** to each loop so it becomes a well-named query like `totalSalary` or `youngestAge`.
+5. **Run your tests** again — the caller now reads as two named results instead of one tangled loop.
+
+## When to use / trade-offs
+
+Split a loop whenever its body carries two responsibilities that you would describe with the word "and". The payoff is clarity and reusability: each loop is easy to name, easy to extract, and easy to change in isolation — and Split Loop is usually the first step toward replacing each piece with a clear pipeline operation.
+
+The obvious objection is performance: you now iterate twice. In nearly all real code that cost is negligible compared to the gain in readability, and a single iteration is a premature optimisation. If profiling later proves a hot loop matters, you can merge them back — but optimise from clean, well-named code, not from a tangle.
+
+## Related
+
+- [Move Statements to Callers](/refactoring-from-zero-to-hero/en/moving-features/move-statements-to-callers/)
+- [Combine Functions into Class](/refactoring-from-zero-to-hero/en/moving-features/combine-functions-into-class/)
+- [Extract Function](/refactoring-from-zero-to-hero/en/composing-methods/extract-function/)
+
+<Callout title="Clarity first, then measure">
+Two loops feels wasteful, but the cost is almost always imaginary. Split for clarity, name each loop, and let a profiler — not a hunch — decide if any of them ever needs to be merged again for speed.
+</Callout>
+
+export const quizSplitLoop = [
+  {
+    q: 'What problem does Split Loop solve?',
+    options: [
+      'A loop that runs too few times',
+      'A single loop body doing two unrelated jobs that are hard to untangle',
+      'A loop with no body',
+      'A missing index variable',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'What is the first mechanical step of Split Loop?',
+    options: [
+      'Delete the loop',
+      'Duplicate the loop so you have two identical loops, then strip each to one job',
+      'Add a flag parameter',
+      'Convert it to recursion',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'What is the common objection to Split Loop, and the usual answer?',
+    options: [
+      'It changes behaviour; you must add tests',
+      'It iterates twice; but the cost is almost always negligible versus the clarity gained',
+      'It requires a database; use caching',
+      'It breaks types; add generics',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'Split Loop is typically followed by which refactoring on each resulting loop?',
+    options: ['Inline Class', 'Extract Function', 'Hide Delegate', 'Move Field'],
+    answer: 1,
+  },
+];
+
+<Quiz client:visible id="moving-features/split-loop" questions={quizSplitLoop} />
+
+<ProgressTracker client:visible id="moving-features/split-loop" />

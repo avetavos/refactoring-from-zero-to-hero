@@ -1,0 +1,240 @@
+---
+title: Replace Subclass with Fields
+description: When subclasses differ only by constant data returned from overridden methods, collapse them into one class whose fields hold that data.
+sidebar:
+  order: 7
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+export const fieldsDiagram = `classDiagram
+  class Person {
+    <<abstract>>
+    +isMale() bool
+    +code() string
+  }
+  class Male
+  class Female
+  Person <|-- Male
+  Person <|-- Female
+  class PersonAfter["Person"] {
+    -male: bool
+    -code: string
+    +isMale() bool
+    +code() string
+  }`;
+
+## Intent
+
+**Replace Subclass with Fields** dissolves a small hierarchy whose subclasses carry no behaviour — only different *constant values* returned from their overridden methods. Each such method becomes a field on a single concrete class, and the values that distinguished the subclasses move into that class's constructor. The hierarchy disappears; the data it encoded survives as plain fields.
+
+## The smell
+
+You spot a subclass whose every override is a one-liner returning a literal: `isMale() { return true; }`, `code() { return "M"; }`. The subclass adds no logic, holds no per-instance state, and never varies its answer. A whole type — with its own file, its own constructor, its own slot in the hierarchy — exists only to hard-code two constants. That is a **Lazy Class** dressed up as a subtype, and it makes the differences between variants harder to see than a row of field assignments would.
+
+## Before → After
+
+A `Person` split into `Male` and `Female` subclasses, each overriding methods to return fixed constants. After, one `Person` holds those constants as fields set by a factory.
+
+<Tabs syncKey="lang">
+  <TabItem label="TypeScript">
+    ```ts
+    // Before — subclasses that only return constants
+    abstract class Person {
+      abstract isMale(): boolean;
+      abstract code(): string;
+    }
+
+    class Male extends Person {
+      isMale(): boolean { return true; }
+      code(): string { return "M"; }
+    }
+
+    class Female extends Person {
+      isMale(): boolean { return false; }
+      code(): string { return "F"; }
+    }
+
+    // After — one class, the constants become fields
+    class Person {
+      private constructor(
+        private readonly male: boolean,
+        private readonly genderCode: string,
+      ) {}
+
+      static createMale(): Person { return new Person(true, "M"); }
+      static createFemale(): Person { return new Person(false, "F"); }
+
+      isMale(): boolean { return this.male; }
+      code(): string { return this.genderCode; }
+    }
+    ```
+  </TabItem>
+  <TabItem label="Python">
+    ```python
+    # Before — subclasses that only return constants
+    class Person:
+        def is_male(self):
+            raise NotImplementedError
+
+        def code(self):
+            raise NotImplementedError
+
+    class Male(Person):
+        def is_male(self):
+            return True
+
+        def code(self):
+            return "M"
+
+    class Female(Person):
+        def is_male(self):
+            return False
+
+        def code(self):
+            return "F"
+
+    # After — one class, the constants become fields
+    class Person:
+        def __init__(self, male, code):
+            self._male = male
+            self._code = code
+
+        @classmethod
+        def create_male(cls):
+            return cls(True, "M")
+
+        @classmethod
+        def create_female(cls):
+            return cls(False, "F")
+
+        def is_male(self):
+            return self._male
+
+        def code(self):
+            return self._code
+    ```
+  </TabItem>
+  <TabItem label="Go">
+    ```go
+    // Go has no inheritance, so the "before" would already be modelled with an
+    // interface plus two empty structs whose methods return constants — pure
+    // boilerplate. The idiomatic shape is the "after": one struct with fields,
+    // built by constructor functions.
+
+    type Person struct {
+        male bool
+        code string
+    }
+
+    func NewMale() Person   { return Person{male: true, code: "M"} }
+    func NewFemale() Person { return Person{male: false, code: "F"} }
+
+    func (p Person) IsMale() bool { return p.male }
+    func (p Person) Code() string { return p.code }
+    ```
+  </TabItem>
+  <TabItem label="Rust">
+    ```rust
+    // Rust has no inheritance. The "before" — a trait with two unit structs
+    // whose impls return constants — adds nothing but ceremony. The idiomatic
+    // form holds the data in fields on one struct, with constructor functions.
+
+    struct Person {
+        male: bool,
+        code: char,
+    }
+
+    impl Person {
+        fn new_male() -> Self {
+            Person { male: true, code: 'M' }
+        }
+
+        fn new_female() -> Self {
+            Person { male: false, code: 'F' }
+        }
+
+        fn is_male(&self) -> bool {
+            self.male
+        }
+
+        fn code(&self) -> char {
+            self.code
+        }
+    }
+    ```
+  </TabItem>
+</Tabs>
+
+<Mermaid code={fieldsDiagram} title="Two data-only subclasses collapse into one class with fields" />
+
+## Mechanics
+
+1. Apply **Replace Constructor with Factory Function** to the superclass, so callers create instances through factory methods rather than `new Subclass()` directly.
+2. For each method that the subclasses override to return a constant, add a field on the superclass holding that value.
+3. Make each factory method pass the appropriate constant when constructing the superclass instance.
+4. Change the superclass method to return the new field instead of being abstract.
+5. **Run your tests.** Each call site should now build a superclass instance with the right field values.
+6. Delete the empty subclasses once nothing references them.
+
+## When to use / trade-offs
+
+Reach for this whenever a subclass's only job is to hard-code return values — no extra fields, no real behaviour, no per-call logic. Folding those values into fields removes a type, flattens the hierarchy, and lines the variants up so their differences read as data instead of class definitions.
+
+Do *not* apply it if the subclasses carry genuine behaviour that varies, or if you expect them to grow it: then the hierarchy (or a strategy) is still earning its keep. The inverse is **Replace Fields with Subclass** — promote a discriminating field back into subtypes when behaviour, not just data, starts to diverge along it.
+
+## Related
+
+- [Collapse Hierarchy](/refactoring-from-zero-to-hero/en/generalization-and-inheritance/collapse-hierarchy/)
+- [Replace Subclass with Delegation](/refactoring-from-zero-to-hero/en/generalization-and-inheritance/replace-subclass-with-delegation/)
+- [Pull Up & Push Down](/refactoring-from-zero-to-hero/en/generalization-and-inheritance/pull-up-and-push-down/)
+
+<Callout title="A subclass should add behaviour, not just a constant">
+If you can describe the difference between two subclasses entirely as "this one returns M, that one returns F", you are using the type system to store data. Data belongs in fields. Keep subclasses for the cases where *what the object does* differs — not merely what it answers.
+</Callout>
+
+export const quizReplaceFields = [
+  {
+    q: 'Which subclasses are candidates for Replace Subclass with Fields?',
+    options: [
+      'Subclasses with complex, varying behaviour',
+      'Subclasses whose overrides only return different constant values',
+      'Subclasses that hold lots of mutable state',
+      'Any subclass at all',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'What replaces each constant-returning overridden method after the refactoring?',
+    options: ['A global variable', 'A field on the single remaining class', 'Another subclass', 'A static method on a helper'],
+    answer: 1,
+  },
+  {
+    q: 'What is the typical first step that lets callers stop using new Subclass() directly?',
+    options: [
+      'Replace Constructor with Factory Function',
+      'Inline Function',
+      'Extract Interface',
+      'Pull Up Field',
+    ],
+    answer: 0,
+  },
+  {
+    q: 'How do Go and Rust relate to this refactoring?',
+    options: [
+      'They use class inheritance, so the before/after is identical to TypeScript',
+      'They have no inheritance, so the field-holding struct with constructor functions is already the idiomatic shape',
+      'They cannot express the intent at all',
+      'They forbid constructor functions',
+    ],
+    answer: 1,
+  },
+];
+
+<Quiz client:visible id="generalization-and-inheritance/replace-subclass-with-fields" questions={quizReplaceFields} />
+
+<ProgressTracker client:visible id="generalization-and-inheritance/replace-subclass-with-fields" />

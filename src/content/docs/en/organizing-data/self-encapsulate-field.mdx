@@ -1,0 +1,233 @@
+---
+title: Self-Encapsulate Field
+description: Even inside the class that owns a field, read and write it through its own getter and setter, so subclasses, lazy initialisation, and validation have one place to hook in.
+sidebar:
+  order: 7
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+## Intent
+
+When a class touches its own field directly — `this.low`, `self.low`, `e.low` — every internal method is wired straight to the raw storage. Self-Encapsulate Field routes even those internal reads and writes through the field's own accessor methods. Once every access goes through one getter and one setter, that single pair becomes the place to add validation, lazy initialisation, a default, or behaviour a subclass can override.
+
+## The smell
+
+The smell is **direct field access inside the owning class** in a situation where a hook would help. You want a subclass to compute the value differently, or you want to validate on every assignment, or you want to lazily build the value on first read — but the field is poked from a dozen internal spots, so there is no single seam to insert that logic. Direct access is fine until you need a hook; the moment you do, scattered `this.field` reads stand in your way.
+
+## Before → After
+
+A temperature range that exposes a `width`. Before, the getter reads the fields directly, so a subclass cannot reinterpret the bounds. After, internal code goes through accessors, and a subclass can override `low()` to apply a calibration offset.
+
+<Tabs syncKey="lang">
+  <TabItem label="TypeScript">
+    ```ts
+    // Before
+    class Range {
+      constructor(private _low: number, private _high: number) {}
+      width(): number {
+        return this._high - this._low;
+      }
+    }
+
+    // After
+    class Range {
+      constructor(private _low: number, private _high: number) {}
+      get low(): number { return this._low; }
+      get high(): number { return this._high; }
+      set low(v: number) { this._low = v; }
+      set high(v: number) { this._high = v; }
+      width(): number {
+        return this.high - this.low; // routed through accessors
+      }
+    }
+
+    class CalibratedRange extends Range {
+      constructor(low: number, high: number, private offset: number) {
+        super(low, high);
+      }
+      get low(): number { return super.low + this.offset; }
+    }
+    ```
+  </TabItem>
+  <TabItem label="Python">
+    ```python
+    # Before
+    class Range:
+        def __init__(self, low, high):
+            self._low = low
+            self._high = high
+        def width(self):
+            return self._high - self._low
+
+    # After
+    class Range:
+        def __init__(self, low, high):
+            self._low = low
+            self._high = high
+        @property
+        def low(self):
+            return self._low
+        @property
+        def high(self):
+            return self._high
+        def width(self):
+            return self.high - self.low  # routed through accessors
+
+    class CalibratedRange(Range):
+        def __init__(self, low, high, offset):
+            super().__init__(low, high)
+            self._offset = offset
+        @property
+        def low(self):
+            return self._low + self._offset
+    ```
+  </TabItem>
+  <TabItem label="Go">
+    ```go
+    // Before
+    type Range struct {
+        low  float64
+        high float64
+    }
+    func (r Range) Width() float64 {
+        return r.high - r.low
+    }
+
+    // After — accessor methods so a wrapping type can reinterpret a bound
+    type Range struct {
+        low  float64
+        high float64
+    }
+    func (r Range) Low() float64  { return r.low }
+    func (r Range) High() float64 { return r.high }
+
+    // Width depends on the accessor, not the raw field.
+    func WidthOf(r interface{ Low() float64; High() float64 }) float64 {
+        return r.High() - r.Low()
+    }
+
+    type CalibratedRange struct {
+        Range
+        offset float64
+    }
+    func (c CalibratedRange) Low() float64 { return c.Range.Low() + c.offset }
+    ```
+  </TabItem>
+  <TabItem label="Rust">
+    ```rust
+    // Before
+    struct Range {
+        low: f64,
+        high: f64,
+    }
+    impl Range {
+        fn width(&self) -> f64 {
+            self.high - self.low
+        }
+    }
+
+    // After — a trait of accessors lets width() ignore the storage
+    trait Bounds {
+        fn low(&self) -> f64;
+        fn high(&self) -> f64;
+        fn width(&self) -> f64 {
+            self.high() - self.low() // routed through accessors
+        }
+    }
+
+    struct Range {
+        low: f64,
+        high: f64,
+    }
+    impl Bounds for Range {
+        fn low(&self) -> f64 { self.low }
+        fn high(&self) -> f64 { self.high }
+    }
+
+    struct CalibratedRange {
+        inner: Range,
+        offset: f64,
+    }
+    impl Bounds for CalibratedRange {
+        fn low(&self) -> f64 { self.inner.low() + self.offset }
+        fn high(&self) -> f64 { self.inner.high() }
+    }
+    ```
+  </TabItem>
+</Tabs>
+
+## Mechanics
+
+1. Create a getter and (if the field is mutated) a setter for the field, if they do not already exist.
+2. Find every place the owning class reads the field directly and replace it with a call to the getter.
+3. Find every place the class writes the field directly and replace it with a call to the setter.
+4. **Run your tests** after each replacement, so a failure points at one tiny change.
+5. Make the raw field as private as the language allows, so only the accessors reach it.
+6. Now add your hook — validation in the setter, a default or lazy build in the getter, or an override in a subclass — confident that every access flows through it.
+
+## When to use / trade-offs
+
+Reach for Self-Encapsulate Field when you need a subclass to reinterpret a value, when you want one guaranteed spot for validation or lazy initialisation, or as a preparatory step before changing how the field is stored. It pairs naturally with **Replace Type Code with Subclasses**, where subclasses must be able to override how a value is produced.
+
+The cost is indirection and a little ceremony — a getter call instead of a bare field read. Many teams prefer direct access until a concrete need for a hook appears, then apply this move. In Go and Rust, where there is no inheritance, the equivalent is defining accessor methods (often behind an interface or trait) so a wrapping type can layer on its own behaviour.
+
+## Related
+
+- [Encapsulate Variable](/refactoring-from-zero-to-hero/en/organizing-data/encapsulate-variable/)
+- [Replace Type Code with Subclasses](/refactoring-from-zero-to-hero/en/organizing-data/replace-type-code-with-subclasses/)
+- [Replace Primitive with Object](/refactoring-from-zero-to-hero/en/organizing-data/replace-primitive-with-object/)
+
+<Callout title="Encapsulate Variable, but pointed inward">
+Encapsulate Variable puts a boundary between a field and the *outside* world. Self-Encapsulate Field puts that same boundary between a field and the *class itself* — so even the owner's own methods go through the accessor, giving subclasses and validation a seam to hook into.
+</Callout>
+
+export const quizSelfEncapsulate = [
+  {
+    q: 'What does Self-Encapsulate Field route through accessors that Encapsulate Variable does not?',
+    options: [
+      'The network calls',
+      "The owning class's own internal reads and writes of the field",
+      'The test fixtures',
+      'The constructor parameters only',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'Why is a single getter/setter pair valuable?',
+    options: [
+      'It makes the class compile faster',
+      'It gives you one place to add validation, lazy initialisation, or a subclass override',
+      'It removes the need for a constructor',
+      'It deletes the underlying field',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'In Go or Rust, where there is no inheritance, what plays the role of an overridable accessor?',
+    options: [
+      'A global variable',
+      'Accessor methods, often behind an interface or trait, that a wrapping type can re-implement',
+      'A panic in the getter',
+      'Making every field public',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'Which move does Self-Encapsulate Field most naturally prepare for?',
+    options: [
+      'Replace Type Code with Subclasses, where subclasses override how a value is produced',
+      'Deleting the class',
+      'Inlining every function',
+      'Removing all tests',
+    ],
+    answer: 0,
+  },
+];
+
+<Quiz client:visible id="organizing-data/self-encapsulate-field" questions={quizSelfEncapsulate} />
+
+<ProgressTracker client:visible id="organizing-data/self-encapsulate-field" />

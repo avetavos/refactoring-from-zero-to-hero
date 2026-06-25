@@ -1,0 +1,184 @@
+---
+title: Rename Field
+description: When a record or struct field's name no longer fits the data it holds, rename it — and update every user — so the name once again tells the truth about its contents.
+sidebar:
+  order: 9
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+## Intent
+
+Field names are the vocabulary of a data structure. When a field is called `name` but actually holds a customer's title, or `date` when it really stores a creation timestamp, the name lies, and every reader pays a small tax to decode it. Rename Field changes the field to a name that matches what it now holds, and updates everything that reads or writes it. The data structure starts telling the truth again.
+
+## The smell
+
+The smell is a **field name that no longer matches its data**. Names drift as software grows: a field added for one purpose gets reused for another, a domain term changes, or the original name was simply vague. You notice it when the name needs a comment to explain it, when newcomers consistently misread it, or when the field's name and its actual usage have quietly diverged. A stale name is a small but constant source of misunderstanding.
+
+## Before → After
+
+A customer record whose field is called `name` but holds a formal title. After, it is renamed `title`, with accessors updated so callers read the clearer name.
+
+<Tabs syncKey="lang">
+  <TabItem label="TypeScript">
+    ```ts
+    // Before
+    interface Customer {
+      name: string; // actually a formal title like "Dr."
+      email: string;
+    }
+    function greet(c: Customer): string {
+      return `Welcome, ${c.name}`;
+    }
+
+    // After
+    interface Customer {
+      title: string;
+      email: string;
+    }
+    function greet(c: Customer): string {
+      return `Welcome, ${c.title}`;
+    }
+    ```
+  </TabItem>
+  <TabItem label="Python">
+    ```python
+    # Before
+    from dataclasses import dataclass
+
+    @dataclass
+    class Customer:
+        name: str  # actually a formal title like "Dr."
+        email: str
+
+    def greet(c):
+        return f"Welcome, {c.name}"
+
+    # After
+    @dataclass
+    class Customer:
+        title: str
+        email: str
+
+    def greet(c):
+        return f"Welcome, {c.title}"
+    ```
+  </TabItem>
+  <TabItem label="Go">
+    ```go
+    // Before
+    type Customer struct {
+        Name  string // actually a formal title like "Dr."
+        Email string
+    }
+    func Greet(c Customer) string {
+        return "Welcome, " + c.Name
+    }
+
+    // After
+    type Customer struct {
+        Title string
+        Email string
+    }
+    func Greet(c Customer) string {
+        return "Welcome, " + c.Title
+    }
+    ```
+  </TabItem>
+  <TabItem label="Rust">
+    ```rust
+    // Before
+    struct Customer {
+        name: String, // actually a formal title like "Dr."
+        email: String,
+    }
+    fn greet(c: &Customer) -> String {
+        format!("Welcome, {}", c.name)
+    }
+
+    // After
+    struct Customer {
+        title: String,
+        email: String,
+    }
+    fn greet(c: &Customer) -> String {
+        format!("Welcome, {}", c.title)
+    }
+    ```
+  </TabItem>
+</Tabs>
+
+## Mechanics
+
+1. If the record is small and entirely under your control, your editor's rename-symbol refactoring can do the whole job in one safe step — use it and run your tests.
+2. For a widely used or externally shared record, go incrementally. First, if the field is not already encapsulated, hide it behind a getter and setter so callers depend on accessors rather than the raw field.
+3. Rename the underlying field, keeping the accessors temporarily named for the old name. **Run your tests.**
+4. Rename the getter and setter to the new name, updating call sites in small batches. **Run your tests** after each batch.
+5. If the field is serialised (JSON, a database column, a wire format), keep the persisted key stable with an explicit mapping — or migrate it deliberately — so you do not break stored data or other services.
+6. When every reader and writer uses the new name and any serialisation mapping is settled, the rename is complete.
+
+## When to use / trade-offs
+
+Rename Field is worth doing the moment a name causes a misread, because the cost of a confusing name compounds with every person who reads it. It is cheapest on small, internal structures where a tool-assisted rename is instant and safe.
+
+The hazard is reach. A field can be referenced far beyond your file: in serialised payloads, database schemas, API contracts, or other repositories you do not control. For those, a blind rename breaks consumers. Decouple the *internal* name from the *external* one — map the new field name to the old serialised key — or run a planned migration. When in doubt about who reads the data, encapsulate first and rename behind that boundary.
+
+## Related
+
+- [Encapsulate Variable](/refactoring-from-zero-to-hero/en/organizing-data/encapsulate-variable/)
+- [Self-Encapsulate Field](/refactoring-from-zero-to-hero/en/organizing-data/self-encapsulate-field/)
+- [Replace Primitive with Object](/refactoring-from-zero-to-hero/en/organizing-data/replace-primitive-with-object/)
+
+<Callout title="Encapsulate first when the data escapes your module">
+A rename inside one file is trivial. A rename of a field that is serialised or shared across services is not — it can break consumers you never see. Put an accessor boundary around the field first, so you can change the internal name freely while keeping the external contract stable.
+</Callout>
+
+export const quizRenameField = [
+  {
+    q: 'What problem does Rename Field solve?',
+    options: [
+      'A field that is never used',
+      "A field whose name no longer matches the data it holds",
+      'A function that is too long',
+      'A duplicated database query',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'For a small, fully internal record, what is the safest fastest approach?',
+    options: [
+      'Leave a comment explaining the misnomer',
+      "Use the editor's rename-symbol refactoring and run the tests",
+      'Add a second field with the new name and copy values',
+      'Make the field public',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'Why is renaming a serialised field riskier than renaming a local one?',
+    options: [
+      'Serialised fields run slower',
+      'The name may appear in stored data, API contracts, or other services that a blind rename would break',
+      'Serialisation forbids renaming entirely',
+      'It changes the program behaviour by design',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'What protects consumers when a field that escapes your module must be renamed?',
+    options: [
+      'Deleting the old field immediately',
+      'Encapsulating the field first and/or mapping the new name to the stable serialised key',
+      'Renaming in every repository simultaneously without a plan',
+      'Skipping the tests',
+    ],
+    answer: 1,
+  },
+];
+
+<Quiz client:visible id="organizing-data/rename-field" questions={quizRenameField} />
+
+<ProgressTracker client:visible id="organizing-data/rename-field" />

@@ -1,0 +1,279 @@
+---
+title: Replace Type Code with State/Strategy
+description: When a type code drives varying behaviour and can change at runtime, hold a State or Strategy object the host can swap, rather than baking the variant into a fixed subclass.
+sidebar:
+  order: 11
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+export const stateDiagram = `flowchart TD
+  subgraph Before["Before — a type code with switching"]
+    A["Order<br/>status: 'pending' | 'shipped' | 'delivered'"]
+    A --> B{"switch status"}
+    B --> C["pending behaviour"]
+    B --> D["shipped behaviour"]
+    B --> E["delivered behaviour"]
+  end
+  subgraph After["After — a swappable state object"]
+    F["Order<br/>holds a State"]
+    F --> G["OrderState (interface)<br/>label() / canCancel()"]
+    G --> H["Pending"]
+    G --> I["Shipped"]
+    G --> J["Delivered"]
+  end
+  Before -.->|"Replace Type Code with State/Strategy"| After`;
+
+## Intent
+
+Take a type code that both *drives varying behaviour* and *changes over the object's lifetime* — an order's `status`, a connection's mode — and replace it with a State (or Strategy) object the host holds and can swap. The host delegates the varying behaviour to that object; transitioning is just assigning a new state. Because the host's class never changes, this works precisely where Replace Type Code with Subclasses cannot.
+
+## The smell
+
+The smell is the same scattered `switch` over a type code as in the subclass refactoring, but with one extra property: **the code changes at runtime**. An order moves `pending → shipped → delivered`; a document goes `draft → published → archived`. You cannot model a changing identity by changing an object's class — most languages will not let an object become a different class mid-life. So the branching keeps multiplying across methods, and every transition is a raw field reassignment with no guarantee the new value is even valid.
+
+## Before → After
+
+An `Order` whose `status` string is checked by a `switch` in two methods. After, the order holds an `OrderState` it delegates to and swaps on transition.
+
+<Tabs syncKey="lang">
+  <TabItem label="TypeScript">
+    ```ts
+    // Before
+    class Order {
+      constructor(public status: string) {}
+      label(): string {
+        switch (this.status) {
+          case 'pending': return 'Awaiting payment';
+          case 'shipped': return 'On the way';
+          case 'delivered': return 'Complete';
+          default: throw new Error(`unknown ${this.status}`);
+        }
+      }
+      canCancel(): boolean {
+        return this.status === 'pending';
+      }
+    }
+
+    // After
+    interface OrderState {
+      label(): string;
+      canCancel(): boolean;
+    }
+    const Pending: OrderState = { label: () => 'Awaiting payment', canCancel: () => true };
+    const Shipped: OrderState = { label: () => 'On the way', canCancel: () => false };
+    const Delivered: OrderState = { label: () => 'Complete', canCancel: () => false };
+
+    class Order {
+      constructor(private state: OrderState = Pending) {}
+      label(): string { return this.state.label(); }
+      canCancel(): boolean { return this.state.canCancel(); }
+      ship(): void { this.state = Shipped; } // a transition is a swap
+    }
+    ```
+  </TabItem>
+  <TabItem label="Python">
+    ```python
+    # Before
+    class Order:
+        def __init__(self, status):
+            self.status = status
+        def label(self):
+            if self.status == "pending":
+                return "Awaiting payment"
+            elif self.status == "shipped":
+                return "On the way"
+            elif self.status == "delivered":
+                return "Complete"
+            raise ValueError(self.status)
+        def can_cancel(self):
+            return self.status == "pending"
+
+    # After
+    from typing import Protocol
+
+    class OrderState(Protocol):
+        def label(self) -> str: ...
+        def can_cancel(self) -> bool: ...
+
+    class Pending:
+        def label(self): return "Awaiting payment"
+        def can_cancel(self): return True
+
+    class Shipped:
+        def label(self): return "On the way"
+        def can_cancel(self): return False
+
+    class Delivered:
+        def label(self): return "Complete"
+        def can_cancel(self): return False
+
+    class Order:
+        def __init__(self, state=None):
+            self.state = state or Pending()
+        def label(self):
+            return self.state.label()
+        def can_cancel(self):
+            return self.state.can_cancel()
+        def ship(self):
+            self.state = Shipped()  # a transition is a swap
+    ```
+  </TabItem>
+  <TabItem label="Go">
+    ```go
+    // Before
+    type Order struct{ Status string }
+    func (o Order) Label() string {
+        switch o.Status {
+        case "pending":
+            return "Awaiting payment"
+        case "shipped":
+            return "On the way"
+        case "delivered":
+            return "Complete"
+        default:
+            panic("unknown " + o.Status)
+        }
+    }
+    func (o Order) CanCancel() bool { return o.Status == "pending" }
+
+    // After
+    type OrderState interface {
+        Label() string
+        CanCancel() bool
+    }
+    type pending struct{}
+    func (pending) Label() string   { return "Awaiting payment" }
+    func (pending) CanCancel() bool { return true }
+
+    type shipped struct{}
+    func (shipped) Label() string   { return "On the way" }
+    func (shipped) CanCancel() bool { return false }
+
+    type Order struct{ state OrderState }
+    func NewOrder() *Order          { return &Order{state: pending{}} }
+    func (o *Order) Label() string  { return o.state.Label() }
+    func (o *Order) CanCancel() bool { return o.state.CanCancel() }
+    func (o *Order) Ship()          { o.state = shipped{} } // swap
+    ```
+  </TabItem>
+  <TabItem label="Rust">
+    ```rust
+    // Before
+    struct Order { status: String }
+    impl Order {
+        fn label(&self) -> &str {
+            match self.status.as_str() {
+                "pending" => "Awaiting payment",
+                "shipped" => "On the way",
+                "delivered" => "Complete",
+                other => panic!("unknown {other}"),
+            }
+        }
+        fn can_cancel(&self) -> bool { self.status == "pending" }
+    }
+
+    // After
+    trait OrderState {
+        fn label(&self) -> &str;
+        fn can_cancel(&self) -> bool;
+    }
+    struct Pending;
+    impl OrderState for Pending {
+        fn label(&self) -> &str { "Awaiting payment" }
+        fn can_cancel(&self) -> bool { true }
+    }
+    struct Shipped;
+    impl OrderState for Shipped {
+        fn label(&self) -> &str { "On the way" }
+        fn can_cancel(&self) -> bool { false }
+    }
+
+    struct Order { state: Box<dyn OrderState> }
+    impl Order {
+        fn new() -> Self { Order { state: Box::new(Pending) } }
+        fn label(&self) -> &str { self.state.label() }
+        fn can_cancel(&self) -> bool { self.state.can_cancel() }
+        fn ship(&mut self) { self.state = Box::new(Shipped); } // swap
+    }
+    ```
+  </TabItem>
+</Tabs>
+
+<Mermaid code={stateDiagram} title="A runtime-changing type code becomes a swappable State object the host delegates to" />
+
+## Mechanics
+
+1. Encapsulate the type-code field behind accessors, so callers depend on a getter/setter rather than the raw value.
+2. Introduce a state interface declaring the operations that vary with the code.
+3. Create one state class per type-code value, moving each branch of the varying methods into its corresponding state.
+4. Give the host a field holding the current state, and have its methods delegate to that state. **Run your tests** after wiring each method.
+5. Replace each assignment of the type code with a swap of the state object — ideally through methods like `ship()` that name the transition and can guard which moves are legal.
+6. Once nothing reads the raw code, remove it. The host now varies behaviour purely by which state it holds.
+
+## When to use / trade-offs
+
+Choose State/Strategy when the variant **can change after construction**. Because the host keeps its class and merely swaps a held object, it models a lifecycle that subclasses cannot. **State** suits a small set of named conditions with transitions between them (order status); **Strategy** suits injecting one interchangeable algorithm (a pricing policy). Both also let you guard transitions and even add per-state data the host need not carry.
+
+Contrast this with **[Replace Type Code with Subclasses](/refactoring-from-zero-to-hero/en/organizing-data/replace-type-code-with-subclasses/)**: that move bakes the variant into the object's *type*, which is perfect when the type is **fixed for life** (an employee's role) but impossible when it must change. The cost of State/Strategy is one more object and a layer of delegation; you pay it to gain a runtime-swappable, guardable lifecycle. If the type never changes, subclasses are simpler.
+
+## Related
+
+- [Replace Type Code with Subclasses](/refactoring-from-zero-to-hero/en/organizing-data/replace-type-code-with-subclasses/)
+- [Encapsulate Variable](/refactoring-from-zero-to-hero/en/organizing-data/encapsulate-variable/)
+- [Replace Primitive with Object](/refactoring-from-zero-to-hero/en/organizing-data/replace-primitive-with-object/)
+
+<Callout title="Fixed type → subclass; changing type → State/Strategy">
+The same scattered switch can be cured two ways. If the variant is settled when the object is born, make it a subclass. If the variant moves through a lifecycle, hold a State object the host swaps — the host stays one class while its behaviour changes underneath it.
+</Callout>
+
+export const quizStateStrategy = [
+  {
+    q: 'What extra property pushes you toward State/Strategy instead of subclasses?',
+    options: [
+      'The object has many fields',
+      'The type code can change at runtime over the object’s lifetime',
+      'The type code is never inspected',
+      'There is only one type-code value',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'After this refactoring, how is a transition between variants expressed?',
+    options: [
+      'By reassigning the raw type-code string',
+      'By swapping the held State object for a different one',
+      'By changing the host object’s class at runtime',
+      'By recompiling the program',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'When is Replace Type Code with Subclasses the better choice?',
+    options: [
+      'When the type is fixed for the life of the object',
+      'When the type changes through a lifecycle',
+      'When you want to guard transitions',
+      'When the object should hold per-state data',
+    ],
+    answer: 0,
+  },
+  {
+    q: 'What is the typical cost of choosing State/Strategy?',
+    options: [
+      'The program can no longer be tested',
+      'One extra object and a layer of delegation',
+      'All branching must remain in place',
+      'The host must become immutable',
+    ],
+    answer: 1,
+  },
+];
+
+<Quiz client:visible id="organizing-data/replace-type-code-with-state-strategy" questions={quizStateStrategy} />
+
+<ProgressTracker client:visible id="organizing-data/replace-type-code-with-state-strategy" />

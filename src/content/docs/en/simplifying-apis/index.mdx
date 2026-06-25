@@ -35,13 +35,17 @@ You can usually feel a bad interface at the call site. You squint at an argument
 
 ## What this module covers
 
-Five refactorings that make function and method interfaces clearer and easier to call:
+Nine refactorings that make function and method interfaces clearer and easier to call:
 
-- **Rename Function/Variable** — when a name misleads or under-explains, rename it and update every caller. Names are the cheapest documentation you will ever write.
-- **Parameterize Function** — when two near-identical functions differ only by a literal value, merge them into one function that takes that value as a parameter.
-- **Introduce Parameter Object** — when a clump of arguments always travels together, group them into a single object so the relationship becomes explicit.
-- **Remove Flag Argument** — when a boolean argument switches behaviour, split the function into two clearly-named functions.
-- **Replace Constructor with Factory Function** — when a constructor is too limiting, wrap it in a factory function that can pick a subtype and carry a meaningful name.
+- **[Rename Function/Variable](/refactoring-from-zero-to-hero/en/simplifying-apis/rename-function/)** — when a name misleads or under-explains, rename it and update every caller. Names are the cheapest documentation you will ever write.
+- **[Parameterize Function](/refactoring-from-zero-to-hero/en/simplifying-apis/parameterize-function/)** — when two near-identical functions differ only by a literal value, merge them into one function that takes that value as a parameter.
+- **[Introduce Parameter Object](/refactoring-from-zero-to-hero/en/simplifying-apis/introduce-parameter-object/)** — when a clump of arguments always travels together, group them into a single object so the relationship becomes explicit.
+- **[Remove Flag Argument](/refactoring-from-zero-to-hero/en/simplifying-apis/remove-flag-argument/)** — when a boolean argument switches behaviour, split the function into two clearly-named functions.
+- **[Replace Constructor with Factory Function](/refactoring-from-zero-to-hero/en/simplifying-apis/replace-constructor-with-factory/)** — when a constructor is too limiting, wrap it in a factory function that can pick a subtype and carry a meaningful name.
+- **[Separate Query from Modifier](/refactoring-from-zero-to-hero/en/simplifying-apis/separate-query-from-modifier/)** — when a function both returns a value and changes state, split it into a pure query and a separate command.
+- **[Preserve Whole Object](/refactoring-from-zero-to-hero/en/simplifying-apis/preserve-whole-object/)** — when a caller unpacks several fields from an object just to pass them along, hand over the whole object instead.
+- **[Replace Parameter with Query](/refactoring-from-zero-to-hero/en/simplifying-apis/replace-parameter-with-query/)** — when a parameter is derivable from data the function already has, drop it and compute it inside.
+- **[Remove Setting Method](/refactoring-from-zero-to-hero/en/simplifying-apis/remove-setting-method/)** — when a field should be fixed at construction, delete its setter to make the object immutable.
 
 Each lesson shows the same before-and-after in TypeScript, Python, Go, and Rust, then walks through safe, ordered mechanics — running your tests between every step.
 

@@ -1,0 +1,175 @@
+---
+title: Introduce Assertion
+description: Make an assumption a section of code silently depends on explicit, so a broken assumption fails loudly at its source instead of corrupting data downstream.
+sidebar:
+  order: 7
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+export const assertionDiagram = `flowchart LR
+  A["Caller passes bad value"] --> B{"Assertion present?"}
+  B -->|"No"| C["Wrong math runs<br/>NaN spreads<br/>fails far away"]
+  B -->|"Yes"| D["Stops here<br/>with a clear message"]`;
+
+## Intent
+
+A piece of code often only works when something is already true — a discount is between 0 and 1, a list is non-empty, an account has been opened. That assumption usually lives in the programmer's head, not in the code. **Introduce Assertion** writes the assumption down as a check that does nothing when the world is as expected and stops the program loudly when it is not.
+
+An assertion is a statement about what *must* be true at a point in the code. It is not error handling for input you expect to be wrong; it is a tripwire for a situation that should be impossible. If it ever fires, a caller has a bug.
+
+## The smell
+
+You read a calculation and think, *"this only makes sense if the rate is positive"* — but nothing in the code says so. The assumption is invisible, so the day a zero or a negative slips through, the function happily produces garbage. The damage surfaces three layers away, in a total that is silently wrong, and you spend an afternoon tracing it back. The condition the code relied on was never stated, so nothing guarded it.
+
+## Before → After
+
+A function applies a discount that must be a fraction between 0 and 1. Before, that constraint is unwritten. After, an assertion states it, so a bad rate fails at the door.
+
+<Tabs syncKey="lang">
+  <TabItem label="TypeScript">
+    ```ts
+    // Before
+    function applyDiscount(price: number, rate: number): number {
+      // silently assumes 0 <= rate <= 1
+      return price - price * rate;
+    }
+
+    // After
+    function applyDiscount(price: number, rate: number): number {
+      if (rate < 0 || rate > 1) {
+        throw new Error(`discount rate must be in [0, 1], got ${rate}`);
+      }
+      return price - price * rate;
+    }
+    ```
+  </TabItem>
+  <TabItem label="Python">
+    ```python
+    # Before
+    def apply_discount(price, rate):
+        # silently assumes 0 <= rate <= 1
+        return price - price * rate
+
+    # After
+    def apply_discount(price, rate):
+        assert 0 <= rate <= 1, f"discount rate must be in [0, 1], got {rate}"
+        return price - price * rate
+    ```
+  </TabItem>
+  <TabItem label="Go">
+    ```go
+    // Go has no assert keyword. State the invariant with an explicit
+    // check and panic for a true "this can never happen" bug. If the
+    // bad value can come from outside, return an error instead.
+    //
+    // Before
+    func ApplyDiscount(price, rate float64) float64 {
+        // silently assumes 0 <= rate <= 1
+        return price - price*rate
+    }
+
+    // After
+    func ApplyDiscount(price, rate float64) float64 {
+        if rate < 0 || rate > 1 {
+            panic(fmt.Sprintf("discount rate must be in [0, 1], got %v", rate))
+        }
+        return price - price*rate
+    }
+    ```
+  </TabItem>
+  <TabItem label="Rust">
+    ```rust
+    // Use assert! for an invariant that must hold in every build, or
+    // debug_assert! when the check is only worth paying for in dev builds.
+    //
+    // Before
+    fn apply_discount(price: f64, rate: f64) -> f64 {
+        // silently assumes 0.0 <= rate <= 1.0
+        price - price * rate
+    }
+
+    // After
+    fn apply_discount(price: f64, rate: f64) -> f64 {
+        assert!(
+            (0.0..=1.0).contains(&rate),
+            "discount rate must be in [0, 1], got {rate}"
+        );
+        price - price * rate
+    }
+    ```
+  </TabItem>
+</Tabs>
+
+<Mermaid code={assertionDiagram} title="An assertion stops a broken assumption at its source" />
+
+## Mechanics
+
+1. Find the assumption. Read the suspicious code and finish the sentence *"this only works if…"*. That clause is your assertion.
+2. Express it as a check that is true in the normal case. Place it as close as possible to the code that depends on it, before the work begins.
+3. Make the failure loud and specific: include the offending value in the message so a future reader sees *what* broke the assumption, not just *that* it broke.
+4. **Run your tests.** Healthy paths must keep passing untouched — a correct assertion changes nothing for valid input.
+5. Add a test that feeds an illegal value and confirm the assertion fires. This proves the tripwire is wired up.
+6. Repeat for the next unstated assumption. Resist asserting things that are obviously guaranteed by types; assert what a *caller* could realistically get wrong.
+
+## When to use / trade-offs
+
+Introduce an assertion when a section of code quietly depends on a condition and a violation would otherwise corrupt data far from the cause. Assertions double as documentation: they tell the next reader exactly what the code expects, and unlike a comment they cannot drift out of sync, because a false one fails.
+
+The line to watch is **assertion versus error handling**. An assertion guards against a *programmer* mistake — a state that should be impossible if every caller is correct. Input that can legitimately be malformed (a user typo, a bad network payload) is not an assertion's job; validate it and return a real error. In Rust this is the `assert!`/`debug_assert!` versus `Result` choice; in Go it is `panic` versus a returned `error`. Never put a side effect inside an assertion, since builds that strip assertions (Python's `-O`, Rust's `debug_assert!`) would then silently change behaviour.
+
+## Related
+
+- [Replace Nested Conditional with Guard Clauses](/refactoring-from-zero-to-hero/en/simplifying-conditionals/replace-nested-conditional-with-guard-clauses/)
+- [Replace Error Code with Exception](/refactoring-from-zero-to-hero/en/simplifying-conditionals/replace-error-code-with-exception/)
+- [Decompose Conditional](/refactoring-from-zero-to-hero/en/simplifying-conditionals/decompose-conditional/)
+
+<Callout title="Assert the impossible, validate the possible">
+If a bad value can reach your function during normal operation, it is *input* — validate it and return an error your caller can handle. Reserve assertions for conditions that can only fail because of a bug. A firing assertion is a message to a programmer, never to a user.
+</Callout>
+
+export const quizAssertion = [
+  {
+    q: 'What is an assertion meant to catch?',
+    options: [
+      'Expected bad input from a user or network',
+      'A condition that should be impossible if all callers are correct',
+      'Performance regressions in a hot loop',
+      'Missing translations in the UI',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'Since Go has no assert keyword, how does the lesson state an invariant for a true "cannot happen" bug?',
+    options: [
+      'With a logging call',
+      'With an explicit check plus panic (or a returned error if the value can come from outside)',
+      'By ignoring it entirely',
+      'With a comment only',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'In Rust, which macro runs the check only in development builds?',
+    options: ['assert!', 'debug_assert!', 'panic!', 'expect'],
+    answer: 1,
+  },
+  {
+    q: 'Why should an assertion never contain a side effect?',
+    options: [
+      'It would slow the program down',
+      'Builds that strip assertions would silently change behaviour',
+      'Side effects are a syntax error in assertions',
+      'The compiler forbids it',
+    ],
+    answer: 1,
+  },
+];
+
+<Quiz client:visible id="simplifying-conditionals/introduce-assertion" questions={quizAssertion} />
+
+<ProgressTracker client:visible id="simplifying-conditionals/introduce-assertion" />

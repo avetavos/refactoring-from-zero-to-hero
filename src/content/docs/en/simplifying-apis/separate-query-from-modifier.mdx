@@ -1,0 +1,221 @@
+---
+title: Separate Query from Modifier
+description: Split a function that both returns a value and changes state into a pure query and a separate command, so callers can ask without acting.
+sidebar:
+  order: 7
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+export const separateDiagram = `flowchart LR
+  subgraph Before["Before"]
+    A["findHighScore()<br/>returns the max<br/>AND logs an alert"]
+  end
+  subgraph After["After"]
+    B["highScore()<br/>pure query"]
+    C["alertOnHighScore()<br/>command"]
+  end
+  Before -.->|"Separate Query from Modifier"| After`;
+
+## Intent
+
+When one function answers a question *and* changes the world as a side effect, callers lose the freedom to merely ask. Pull the two jobs apart: a **query** that returns a value and touches nothing, and a **command** that performs the change and returns nothing. Now a caller who only wants the answer can call the query without triggering the side effect.
+
+## The smell
+
+You want to call a function just to read its result — maybe in a test, a log line, or an assertion — but you cannot, because calling it also sends an email, mutates a field, or advances a cursor. The signature lies about its cost: it looks like a question but it is secretly an action. Any function that returns a value yet also has an observable side effect is a candidate.
+
+## Before → After
+
+A function scans scores, returns the highest, and — buried inside — fires an alert when the high score crosses a threshold. We split it into a pure `highScore` query and an `alertOnHighScore` command.
+
+<Tabs syncKey="lang">
+  <TabItem label="TypeScript">
+    ```ts
+    // Before
+    function findHighScore(scores: number[]): number {
+      let highest = 0;
+      for (const s of scores) {
+        if (s > highest) highest = s;
+      }
+      if (highest > 9000) {
+        sendAlert(`New record: ${highest}`);
+      }
+      return highest;
+    }
+
+    // After
+    function highScore(scores: number[]): number {
+      return scores.reduce((highest, s) => (s > highest ? s : highest), 0);
+    }
+
+    function alertOnHighScore(scores: number[]): void {
+      if (highScore(scores) > 9000) {
+        sendAlert(`New record: ${highScore(scores)}`);
+      }
+    }
+    ```
+  </TabItem>
+  <TabItem label="Python">
+    ```python
+    # Before
+    def find_high_score(scores):
+        highest = 0
+        for s in scores:
+            if s > highest:
+                highest = s
+        if highest > 9000:
+            send_alert(f"New record: {highest}")
+        return highest
+
+    # After
+    def high_score(scores):
+        return max(scores, default=0)
+
+    def alert_on_high_score(scores):
+        if high_score(scores) > 9000:
+            send_alert(f"New record: {high_score(scores)}")
+    ```
+  </TabItem>
+  <TabItem label="Go">
+    ```go
+    // Before
+    func FindHighScore(scores []int) int {
+        highest := 0
+        for _, s := range scores {
+            if s > highest {
+                highest = s
+            }
+        }
+        if highest > 9000 {
+            sendAlert(fmt.Sprintf("New record: %d", highest))
+        }
+        return highest
+    }
+
+    // After
+    func HighScore(scores []int) int {
+        highest := 0
+        for _, s := range scores {
+            if s > highest {
+                highest = s
+            }
+        }
+        return highest
+    }
+
+    func AlertOnHighScore(scores []int) {
+        if h := HighScore(scores); h > 9000 {
+            sendAlert(fmt.Sprintf("New record: %d", h))
+        }
+    }
+    ```
+  </TabItem>
+  <TabItem label="Rust">
+    ```rust
+    // Before
+    fn find_high_score(scores: &[i32]) -> i32 {
+        let mut highest = 0;
+        for &s in scores {
+            if s > highest {
+                highest = s;
+            }
+        }
+        if highest > 9000 {
+            send_alert(&format!("New record: {highest}"));
+        }
+        highest
+    }
+
+    // After
+    fn high_score(scores: &[i32]) -> i32 {
+        scores.iter().copied().max().unwrap_or(0)
+    }
+
+    fn alert_on_high_score(scores: &[i32]) {
+        let h = high_score(scores);
+        if h > 9000 {
+            send_alert(&format!("New record: {h}"));
+        }
+    }
+    ```
+  </TabItem>
+</Tabs>
+
+<Mermaid code={separateDiagram} title="One mixed function becomes a pure query plus a command" />
+
+## Mechanics
+
+1. Copy the function and name the copy as a pure query — by convention a noun or a `get`/`is`-style name that promises only an answer.
+2. Strip every side effect out of the query copy, leaving only the value it computes. Have it return that value.
+3. Find each caller of the original. Where the caller used the return value, switch it to the query.
+4. Leave the original function doing only its side effect. Inside it, call the new query rather than recomputing the value.
+5. **Run your tests** after each caller is moved across.
+6. If the original now returns a value nobody uses, change it to return nothing so the command's signature is honest.
+
+## When to use / trade-offs
+
+Apply this whenever a function with a return value also mutates state, performs I/O, or fires events — and especially before you write tests, since a pure query is trivial to assert on. The clean separation also makes the query safe to call repeatedly or cache.
+
+The cost is that a caller who genuinely wanted both behaviours now makes two calls, and the value may be computed twice. That recomputation is usually cheap; if it is not, compute once and pass the result. Some operations are inherently atomic — a `pop` that returns and removes in one step — and forcing them apart would invite race conditions. There, keep them together on purpose.
+
+## Related
+
+- [Remove Flag Argument](/refactoring-from-zero-to-hero/en/simplifying-apis/remove-flag-argument/)
+- [Replace Parameter with Query](/refactoring-from-zero-to-hero/en/simplifying-apis/replace-parameter-with-query/)
+- [Rename Function/Variable](/refactoring-from-zero-to-hero/en/simplifying-apis/rename-function/)
+
+<Callout title="Command-Query Separation">
+This refactoring is the practical form of the Command-Query Separation principle: a method should either change state or return a result, but not both. When you can trust that queries are side-effect free, you can read code without fear that a glance triggers a change.
+</Callout>
+
+export const quizSeparate = [
+  {
+    q: 'What is the defining trait of a function that needs Separate Query from Modifier?',
+    options: [
+      'It takes too many parameters',
+      'It both returns a value and produces an observable side effect',
+      'It is never called from tests',
+      'It has a misleading name',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'After the split, what should the pure query do?',
+    options: [
+      'Return a value and log it',
+      'Return a value while touching nothing else',
+      'Perform the side effect and return nothing',
+      'Take a flag to choose between modes',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'Which principle does this refactoring put into practice?',
+    options: [
+      'Don’t Repeat Yourself',
+      'Command-Query Separation',
+      'Single Responsibility for files',
+      'Dependency Inversion',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'When is it acceptable to keep query and modifier together?',
+    options: [
+      'Whenever the function is short',
+      'When the operation is inherently atomic, like a pop that returns and removes',
+      'When the function has no parameters',
+      'Never — they must always be split',
+    ],
+    answer: 1,
+  },
+];
+
+<Quiz client:visible id="simplifying-apis/separate-query-from-modifier" questions={quizSeparate} />
+
+<ProgressTracker client:visible id="simplifying-apis/separate-query-from-modifier" />

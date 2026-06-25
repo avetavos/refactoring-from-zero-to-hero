@@ -1,0 +1,210 @@
+---
+title: Move Statements to Callers
+description: When a function does one job too many for some callers, lift the varying statements out into the callers where the difference belongs.
+sidebar:
+  order: 8
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+## Intent
+
+A function that started as a single clear unit can grow until it is doing slightly *different* things for different callers. When part of its body should vary by caller, pull that part out of the function and into each caller. The function keeps the shared core; the variable behaviour moves to where the variation actually lives.
+
+## The smell
+
+You notice yourself reaching for a boolean parameter — `render(person, includeFooter)` — or wishing one particular caller could skip a chunk of the function. That itch means the function is bundling a step that is not universal. The common part and the per-caller part have been welded together. This is the exact inverse of **Move Statements into Function**: there, identical statements wanted to come in; here, divergent statements want to go out.
+
+## Before → After
+
+A `renderPerson` that always emits a photo block at the end. A new caller needs the heading but a *different* footer. Rather than add a flag, we move the photo block out to the callers.
+
+<Tabs syncKey="lang">
+  <TabItem label="TypeScript">
+    ```ts
+    // Before — one caller wants a different ending, tempting a flag
+    function renderPerson(person: Person): string {
+      return [
+        `<p>${person.name}</p>`,
+        emitPhotoData(person.photo),
+      ].join('\n');
+    }
+
+    const listing = people.map(renderPerson).join('\n');
+
+    // After — shared core stays, the varying tail moves to callers
+    function renderPerson(person: Person): string {
+      return `<p>${person.name}</p>`;
+    }
+
+    const listing = people
+      .map((p) => [renderPerson(p), emitPhotoData(p.photo)].join('\n'))
+      .join('\n');
+
+    // a different caller can now end differently
+    const compact = people.map(renderPerson).join('\n');
+    ```
+  </TabItem>
+  <TabItem label="Python">
+    ```python
+    # Before — one caller wants a different ending, tempting a flag
+    def render_person(person):
+        return "\n".join([
+            f"<p>{person.name}</p>",
+            emit_photo_data(person.photo),
+        ])
+
+    listing = "\n".join(render_person(p) for p in people)
+
+    # After — shared core stays, the varying tail moves to callers
+    def render_person(person):
+        return f"<p>{person.name}</p>"
+
+    listing = "\n".join(
+        "\n".join([render_person(p), emit_photo_data(p.photo)]) for p in people
+    )
+
+    # a different caller can now end differently
+    compact = "\n".join(render_person(p) for p in people)
+    ```
+  </TabItem>
+  <TabItem label="Go">
+    ```go
+    // Before — one caller wants a different ending, tempting a flag
+    func renderPerson(person Person) string {
+        return fmt.Sprintf("<p>%s</p>\n%s", person.Name, emitPhotoData(person.Photo))
+    }
+
+    func listing(people []Person) string {
+        parts := make([]string, len(people))
+        for i, p := range people {
+            parts[i] = renderPerson(p)
+        }
+        return strings.Join(parts, "\n")
+    }
+
+    // After — shared core stays, the varying tail moves to callers
+    func renderPerson(person Person) string {
+        return fmt.Sprintf("<p>%s</p>", person.Name)
+    }
+
+    func listing(people []Person) string {
+        parts := make([]string, len(people))
+        for i, p := range people {
+            parts[i] = renderPerson(p) + "\n" + emitPhotoData(p.Photo)
+        }
+        return strings.Join(parts, "\n")
+    }
+
+    // a different caller can now end differently
+    func compact(people []Person) string {
+        parts := make([]string, len(people))
+        for i, p := range people {
+            parts[i] = renderPerson(p)
+        }
+        return strings.Join(parts, "\n")
+    }
+    ```
+  </TabItem>
+  <TabItem label="Rust">
+    ```rust
+    // Before — one caller wants a different ending, tempting a flag
+    fn render_person(person: &Person) -> String {
+        format!("<p>{}</p>\n{}", person.name, emit_photo_data(&person.photo))
+    }
+
+    fn listing(people: &[Person]) -> String {
+        people.iter().map(render_person).collect::<Vec<_>>().join("\n")
+    }
+
+    // After — shared core stays, the varying tail moves to callers
+    fn render_person(person: &Person) -> String {
+        format!("<p>{}</p>", person.name)
+    }
+
+    fn listing(people: &[Person]) -> String {
+        people
+            .iter()
+            .map(|p| format!("{}\n{}", render_person(p), emit_photo_data(&p.photo)))
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
+
+    // a different caller can now end differently
+    fn compact(people: &[Person]) -> String {
+        people.iter().map(render_person).collect::<Vec<_>>().join("\n")
+    }
+    ```
+  </TabItem>
+</Tabs>
+
+## Mechanics
+
+1. Identify the statements that should vary by caller — usually the leading or trailing part of the function, not the middle.
+2. If there are only one or two callers, copy the statements directly into each caller, right next to the call.
+3. With many callers, do it safely: extract the *remaining* (shared) body into a new function, leave the original calling that new function plus the variable statements, then point callers at the new shared function one at a time.
+4. **Run your tests** after wiring each caller.
+5. Once every caller holds its own copy of the moved statements, remove them from the original function.
+6. Rename the shared function if its narrower responsibility now deserves a clearer name.
+
+## When to use / trade-offs
+
+Reach for this when a function is *almost* right but one part needs to differ per caller, and you would otherwise reach for a flag parameter. Moving the variation out keeps each function focused on a single, consistent job.
+
+The cost is some duplication at the call sites — each caller now repeats the moved statement. That is acceptable when the callers genuinely differ; the duplication is honest. If the statement turns out to be identical everywhere after all, you have gone the wrong way: apply **Move Statements into Function** to fold it back.
+
+## Related
+
+- [Move Statements into Function](/refactoring-from-zero-to-hero/en/moving-features/move-statements-into-function/)
+- [Split Loop](/refactoring-from-zero-to-hero/en/moving-features/split-loop/)
+- [Extract Function](/refactoring-from-zero-to-hero/en/composing-methods/extract-function/)
+
+<Callout title="Prefer this over a flag parameter">
+Whenever you are about to add a boolean like `includeFooter` to make one caller behave differently, pause. That flag is the function telling you it does two jobs. Move the differing statements to the callers and let each one ask for exactly what it needs.
+</Callout>
+
+export const quizMoveOut = [
+  {
+    q: 'What signals that statements should move to the callers?',
+    options: [
+      'Every caller runs the function identically',
+      'You are tempted to add a boolean flag so some callers can behave differently',
+      'The function has a good name',
+      'The function is very short',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'With many callers, what is the safe way to move statements out?',
+    options: [
+      'Delete the statements and hope the tests catch problems',
+      'Extract the shared body into a new function, then redirect callers one at a time',
+      'Add the statements to a global hook',
+      'Inline every caller first',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'Move Statements to Callers is the inverse of which refactoring?',
+    options: ['Split Loop', 'Move Statements into Function', 'Inline Class', 'Move Field'],
+    answer: 1,
+  },
+  {
+    q: 'What is the accepted trade-off of moving statements to callers?',
+    options: [
+      'The program runs slower',
+      'Some honest duplication appears at the call sites where callers genuinely differ',
+      'The function loses its name',
+      'All callers must be in the same file',
+    ],
+    answer: 1,
+  },
+];
+
+<Quiz client:visible id="moving-features/move-statements-to-callers" questions={quizMoveOut} />
+
+<ProgressTracker client:visible id="moving-features/move-statements-to-callers" />

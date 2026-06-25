@@ -35,13 +35,17 @@ A function grows over time. It accumulates a temporary variable here, a clever o
 
 ## What this module covers
 
-Five refactorings, each small and reversible:
+Nine refactorings, each small and reversible:
 
-- **Extract Function** — lift a fragment into its own well-named function so the caller reads as a list of intentions. The most fundamental move of all.
-- **Inline Function** — the inverse: when a helper's body is as plain as its name, fold it back in.
-- **Extract Variable** — give a confusing sub-expression a name so the line explains itself.
-- **Replace Temp with Query** — turn a local that holds a computed value into a function, so the calculation is reusable and easy to extract.
-- **Split Phase** — when one block does two different jobs, separate them into ordered phases joined by a clear intermediate value.
+- **[Extract Function](/refactoring-from-zero-to-hero/en/composing-methods/extract-function/)** — lift a fragment into its own well-named function so the caller reads as a list of intentions. The most fundamental move of all.
+- **[Inline Function](/refactoring-from-zero-to-hero/en/composing-methods/inline-function/)** — the inverse: when a helper's body is as plain as its name, fold it back in.
+- **[Extract Variable](/refactoring-from-zero-to-hero/en/composing-methods/extract-variable/)** — give a confusing sub-expression a name so the line explains itself.
+- **[Inline Variable](/refactoring-from-zero-to-hero/en/composing-methods/inline-variable/)** — the inverse: delete a variable that only echoes its expression and adds no clarity.
+- **[Replace Temp with Query](/refactoring-from-zero-to-hero/en/composing-methods/replace-temp-with-query/)** — turn a local that holds a computed value into a function, so the calculation is reusable and easy to extract.
+- **[Slide Statements](/refactoring-from-zero-to-hero/en/composing-methods/slide-statements/)** — move related statements together so a coherent fragment sits ready to read or extract.
+- **[Split Phase](/refactoring-from-zero-to-hero/en/composing-methods/split-phase/)** — when one block does two different jobs, separate them into ordered phases joined by a clear intermediate value.
+- **[Substitute Algorithm](/refactoring-from-zero-to-hero/en/composing-methods/substitute-algorithm/)** — replace a convoluted way of doing something with a clearer one that yields the same result.
+- **[Replace Loop with Pipeline](/refactoring-from-zero-to-hero/en/composing-methods/replace-loop-with-pipeline/)** — convert an imperative loop into a chain of named stages — filter, map, reduce.
 
 Each lesson shows the same before-and-after in TypeScript, Python, Go, and Rust, then walks through the safe, ordered mechanics — running your tests between every step.
 

@@ -1,0 +1,187 @@
+---
+title: Preserve Whole Object
+description: Stop unpacking several values from an object just to pass them as separate arguments — hand the whole object over and let the callee reach in.
+sidebar:
+  order: 8
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+export const preserveDiagram = `flowchart LR
+  subgraph Before["Before"]
+    A["caller pulls low + high<br/>from range"] --> B["fits(low, high)"]
+  end
+  subgraph After["After"]
+    C["caller passes range"] --> D["fits(range)"]
+  end
+  Before -.->|"Preserve Whole Object"| After`;
+
+## Intent
+
+A caller already holds an object, then digs out two or three of its fields only to pass them, one by one, into a function. Hand the **whole object** across instead. The argument list shrinks, the function can reach for any field it needs, and if the object grows a new relevant field later, the signature does not have to change.
+
+## The smell
+
+At the call site you see a string of accessor calls feeding straight into another call: `plot(point.x, point.y)`, `fits(range.low, range.high)`. The values being unpacked all come from the same object and travel together. The function's parameter list mirrors the object's internals, so the two are quietly coupled while pretending to be independent.
+
+## Before → After
+
+A reading is checked against a temperature `range`. The caller pulls `low` and `high` out of the range to pass them in. Instead, pass the range itself and let the check ask it directly.
+
+<Tabs syncKey="lang">
+  <TabItem label="TypeScript">
+    ```ts
+    // Before
+    function fitsRange(reading: number, low: number, high: number): boolean {
+      return reading >= low && reading <= high;
+    }
+
+    const ok = fitsRange(today, range.low, range.high);
+
+    // After
+    interface Range { low: number; high: number; }
+
+    function fitsRange(reading: number, range: Range): boolean {
+      return reading >= range.low && reading <= range.high;
+    }
+
+    const ok = fitsRange(today, range);
+    ```
+  </TabItem>
+  <TabItem label="Python">
+    ```python
+    # Before
+    def fits_range(reading, low, high):
+        return low <= reading <= high
+
+    ok = fits_range(today, range_.low, range_.high)
+
+    # After
+    def fits_range(reading, range_):
+        return range_.low <= reading <= range_.high
+
+    ok = fits_range(today, range_)
+    ```
+  </TabItem>
+  <TabItem label="Go">
+    ```go
+    // Before
+    func FitsRange(reading, low, high float64) bool {
+        return reading >= low && reading <= high
+    }
+
+    ok := FitsRange(today, r.Low, r.High)
+
+    // After
+    type Range struct {
+        Low  float64
+        High float64
+    }
+
+    func FitsRange(reading float64, r Range) bool {
+        return reading >= r.Low && reading <= r.High
+    }
+
+    ok := FitsRange(today, r)
+    ```
+  </TabItem>
+  <TabItem label="Rust">
+    ```rust
+    // Before
+    fn fits_range(reading: f64, low: f64, high: f64) -> bool {
+        reading >= low && reading <= high
+    }
+
+    let ok = fits_range(today, range.low, range.high);
+
+    // After
+    struct Range {
+        low: f64,
+        high: f64,
+    }
+
+    fn fits_range(reading: f64, range: &Range) -> bool {
+        reading >= range.low && reading <= range.high
+    }
+
+    let ok = fits_range(today, &range);
+    ```
+  </TabItem>
+</Tabs>
+
+<Mermaid code={preserveDiagram} title="Several unpacked fields collapse into one whole-object argument" />
+
+## Mechanics
+
+1. Add a new parameter for the whole object, leaving the existing field parameters in place for now.
+2. Inside the function, replace each use of an unpacked field with a read from the whole object.
+3. Update each caller to pass the object and stop passing the individual fields. **Run your tests** after each one.
+4. Once every caller is converted, delete the now-unused field parameters.
+5. Look for logic in the caller that only manipulated those fields — it may belong inside the function, or as a method on the object itself.
+
+## When to use / trade-offs
+
+Reach for this when the unpacked fields all belong to one object, when several functions pull the same cluster of fields, or when the function would benefit from access to more of the object than it currently receives. It often reveals **Feature Envy** — code that fiddles with another object's data — which you can then move onto the object as a method.
+
+The trade-off is a tighter dependency: the function now knows about the object's type, not just two plain numbers. If the callee should stay ignorant of that type — for reuse in unrelated contexts, or to avoid a circular dependency — keep the loose parameters. And if a caller does not already have the whole object handy, assembling one just to make the call is a step backward.
+
+## Related
+
+- [Introduce Parameter Object](/refactoring-from-zero-to-hero/en/simplifying-apis/introduce-parameter-object/)
+- [Replace Parameter with Query](/refactoring-from-zero-to-hero/en/simplifying-apis/replace-parameter-with-query/)
+- [Parameterize Function](/refactoring-from-zero-to-hero/en/simplifying-apis/parameterize-function/)
+
+<Callout title="Whole object vs parameter object">
+Preserve Whole Object reuses an object you already have. Introduce Parameter Object invents a *new* type to bundle arguments that previously had no home. Both shrink the argument list — pick the existing object when one already groups the values, and a new type when nothing does.
+</Callout>
+
+export const quizPreserve = [
+  {
+    q: 'What does Preserve Whole Object replace in an argument list?',
+    options: [
+      'A single object with its individual fields',
+      'Several fields unpacked from one object with the object itself',
+      'A boolean flag with two functions',
+      'A constructor with a factory',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'Which call site smell signals this refactoring?',
+    options: [
+      'A long if/else chain',
+      'Several accessors of the same object feeding straight into one call',
+      'A function with no parameters',
+      'Duplicated string literals',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'What deeper smell does Preserve Whole Object often expose?',
+    options: [
+      'Feature Envy — code manipulating another object’s data',
+      'Primitive Obsession in the database',
+      'Dead code in the build script',
+      'A missing index',
+    ],
+    answer: 0,
+  },
+  {
+    q: 'When should you keep passing loose fields instead of the whole object?',
+    options: [
+      'When the object has more than three fields',
+      'When the callee should stay ignorant of the object’s type, e.g. to avoid a circular dependency',
+      'Whenever the function is private',
+      'When the fields are numbers',
+    ],
+    answer: 1,
+  },
+];
+
+<Quiz client:visible id="simplifying-apis/preserve-whole-object" questions={quizPreserve} />
+
+<ProgressTracker client:visible id="simplifying-apis/preserve-whole-object" />

@@ -1,0 +1,202 @@
+---
+title: Replace Control Flag with Break/Return
+description: A boolean variable that only exists to steer a loop hides the real exit condition — delete it and let break, return, or continue say what is happening.
+sidebar:
+  order: 8
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+export const flagDiagram = `flowchart LR
+  subgraph Before["Before"]
+    A["found = false"] --> B["loop while !found"]
+    B --> C["set found = true"]
+    C --> B
+  end
+  subgraph After["After"]
+    D["loop"] --> E["break / return"]
+  end
+  Before -.->|"Replace Control Flag"| After`;
+
+## Intent
+
+A **control flag** is a variable whose only purpose is to decide whether a loop keeps running. You set it, you test it at the top of the loop, you flip it somewhere in the middle, and the loop notices on the next pass. **Replace Control Flag with Break/Return** removes the variable entirely and lets the loop's exit be expressed directly with `break`, `return`, or `continue` at the exact moment the decision is made.
+
+The control structures of a language already know how to stop and skip. A flag is a hand-rolled, delayed version of that — so the language construct, used directly, is both shorter and clearer.
+
+## The smell
+
+You see a boolean named `found`, `done`, or `finished`, declared just before a loop and read in the loop's condition. To understand when the loop ends you have to scan the whole body hunting for every place the flag is flipped, then reason about *when* the condition will next be tested. The exit is smeared across several lines instead of stated where it happens. A flag that is also used *after* the loop is a stronger signal still: it is really two ideas — "stop looping" and "report a result" — sharing one variable.
+
+## Before → After
+
+Searching a list for a customer who owes money. Before, a `found` flag drives a `while`. After, the function returns the moment it finds one.
+
+<Tabs syncKey="lang">
+  <TabItem label="TypeScript">
+    ```ts
+    // Before
+    function hasDebtor(customers: Customer[]): boolean {
+      let found = false;
+      let i = 0;
+      while (!found && i < customers.length) {
+        if (customers[i].balance < 0) {
+          found = true;
+        }
+        i++;
+      }
+      return found;
+    }
+
+    // After
+    function hasDebtor(customers: Customer[]): boolean {
+      for (const customer of customers) {
+        if (customer.balance < 0) {
+          return true;
+        }
+      }
+      return false;
+    }
+    ```
+  </TabItem>
+  <TabItem label="Python">
+    ```python
+    # Before
+    def has_debtor(customers):
+        found = False
+        i = 0
+        while not found and i < len(customers):
+            if customers[i].balance < 0:
+                found = True
+            i += 1
+        return found
+
+    # After
+    def has_debtor(customers):
+        for customer in customers:
+            if customer.balance < 0:
+                return True
+        return False
+    ```
+  </TabItem>
+  <TabItem label="Go">
+    ```go
+    // Before
+    func HasDebtor(customers []Customer) bool {
+        found := false
+        i := 0
+        for !found && i < len(customers) {
+            if customers[i].Balance < 0 {
+                found = true
+            }
+            i++
+        }
+        return found
+    }
+
+    // After
+    func HasDebtor(customers []Customer) bool {
+        for _, c := range customers {
+            if c.Balance < 0 {
+                return true
+            }
+        }
+        return false
+    }
+    ```
+  </TabItem>
+  <TabItem label="Rust">
+    ```rust
+    // Before
+    fn has_debtor(customers: &[Customer]) -> bool {
+        let mut found = false;
+        let mut i = 0;
+        while !found && i < customers.len() {
+            if customers[i].balance < 0.0 {
+                found = true;
+            }
+            i += 1;
+        }
+        found
+    }
+
+    // After
+    fn has_debtor(customers: &[Customer]) -> bool {
+        customers.iter().any(|c| c.balance < 0.0)
+    }
+    ```
+  </TabItem>
+</Tabs>
+
+<Mermaid code={flagDiagram} title="A flag-driven loop becomes a direct break or return" />
+
+## Mechanics
+
+1. Find the loop and the flag that controls it. Confirm the flag exists only to govern the loop — that it is not also carrying a result the code needs afterward.
+2. Decide on the replacement. If the loop does no more work after the flag is set, `return` the answer right there. If there *is* work after the loop, use `break` to leave it. To skip the rest of one iteration only, use `continue`.
+3. Replace the line that sets the flag with the chosen jump.
+4. Remove the flag from the loop condition, simplifying the condition to whatever genuinely remains (often the iteration bound, or nothing — a plain `for…of`).
+5. Delete the flag declaration and any final `return flag`, replacing it with the value the loop now falls through to.
+6. **Run your tests** after each removal so a regression points at the one line you just changed.
+
+## When to use / trade-offs
+
+Use this whenever a boolean exists purely to end or skip a loop. The payoff is that the exit condition appears exactly where the decision is taken, so a reader sees *why* the loop stops without simulating it in their head. It also tends to unlock further cleanup: once the flag is gone, the loop body is often a candidate for a built-in like `any`, `find`, or `filter`.
+
+The caution is overusing jumps. A handful of `break`/`return` exits read clearly; a loop with five `continue`s and three `break`s buried in nested conditions can be harder to follow than the flag was. If removing the flag would scatter many exits through deep nesting, first apply **Replace Nested Conditional with Guard Clauses** to flatten the body, or extract the loop into its own function so each early exit is a clean answer. The inverse is rarely worth doing: reintroducing a flag almost never improves readability.
+
+## Related
+
+- [Replace Nested Conditional with Guard Clauses](/refactoring-from-zero-to-hero/en/simplifying-conditionals/replace-nested-conditional-with-guard-clauses/)
+- [Decompose Conditional](/refactoring-from-zero-to-hero/en/simplifying-conditionals/decompose-conditional/)
+- [Consolidate Conditional Expression](/refactoring-from-zero-to-hero/en/simplifying-conditionals/consolidate-conditional/)
+
+<Callout title="One flag, one job">
+A control flag that is also read after the loop is doing two jobs at once: ending the loop and reporting a result. Split them. Let the loop exit with break or return, and compute the reported value from the loop's outcome — not from a variable you have been mutating in place.
+</Callout>
+
+export const quizFlag = [
+  {
+    q: 'What is a "control flag"?',
+    options: [
+      'A compiler optimization setting',
+      'A boolean variable whose only job is to decide whether a loop keeps running',
+      'A feature toggle read from configuration',
+      'A flag passed on the command line',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'When the loop does no further work after the flag would be set, what is the cleanest replacement?',
+    options: [
+      'Add another flag',
+      'return the answer right there',
+      'continue to the next iteration',
+      'Wrap the body in a try/catch',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'Which jump leaves a loop but lets code after the loop still run?',
+    options: ['continue', 'return', 'break', 'throw'],
+    answer: 2,
+  },
+  {
+    q: 'What does the lesson recommend if removing the flag would scatter many exits through deep nesting?',
+    options: [
+      'Keep the flag — it is always clearer',
+      'First flatten the body with guard clauses, or extract the loop into its own function',
+      'Convert the loop to recursion',
+      'Add comments next to each exit',
+    ],
+    answer: 1,
+  },
+];
+
+<Quiz client:visible id="simplifying-conditionals/replace-control-flag-with-break" questions={quizFlag} />
+
+<ProgressTracker client:visible id="simplifying-conditionals/replace-control-flag-with-break" />

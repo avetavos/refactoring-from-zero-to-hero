@@ -35,13 +35,17 @@ Software decisions made on day one rarely survive contact with day one hundred. 
 
 ## What this module covers
 
-Five refactorings, each reversible:
+Nine refactorings, each reversible:
 
-- **Move Function** — when a function references another object's data and methods more than its own (Feature Envy), relocate it to the class it envies.
-- **Move Field** — when a field is read and written from a different record more than its current home, move it to where it is used.
-- **Extract Class** — when one class has grown to do two distinct jobs (a Large Class), peel one responsibility into a new class.
-- **Inline Class** — the inverse: when a class no longer pulls its weight, fold it back into the class that uses it.
-- **Hide Delegate** (and its inverse, **Remove Middle Man**) — encapsulate a delegation so callers stop walking object chains, honouring the Law of Demeter.
+- **[Move Function](/refactoring-from-zero-to-hero/en/moving-features/move-function/)** — when a function references another object's data and methods more than its own (Feature Envy), relocate it to the class it envies.
+- **[Move Field](/refactoring-from-zero-to-hero/en/moving-features/move-field/)** — when a field is read and written from a different record more than its current home, move it to where it is used.
+- **[Extract Class](/refactoring-from-zero-to-hero/en/moving-features/extract-class/)** — when one class has grown to do two distinct jobs (a Large Class), peel one responsibility into a new class.
+- **[Inline Class](/refactoring-from-zero-to-hero/en/moving-features/inline-class/)** — the inverse: when a class no longer pulls its weight, fold it back into the class that uses it.
+- **[Hide Delegate](/refactoring-from-zero-to-hero/en/moving-features/hide-delegate-and-remove-middle-man/)** (and its inverse, **Remove Middle Man**) — encapsulate a delegation so callers stop walking object chains, honouring the Law of Demeter.
+- **[Move Statements into Function](/refactoring-from-zero-to-hero/en/moving-features/move-statements-into-function/)** — when the same statement always runs beside a call, fold it into the function so callers cannot forget it.
+- **[Move Statements to Callers](/refactoring-from-zero-to-hero/en/moving-features/move-statements-to-callers/)** — the inverse: when a function does one job too many for some callers, push the varying statements out to them.
+- **[Split Loop](/refactoring-from-zero-to-hero/en/moving-features/split-loop/)** — when one loop does two unrelated jobs, split it into two single-purpose loops for clarity.
+- **[Combine Functions into Class](/refactoring-from-zero-to-hero/en/moving-features/combine-functions-into-class/)** — when functions keep passing the same data clump around, gather them into a class that holds that data as fields.
 
 Each lesson shows the same before-and-after in TypeScript, Python, Go, and Rust, then walks through safe, ordered mechanics — running your tests between every step.
 

@@ -1,0 +1,271 @@
+---
+title: Pull Up Constructor Body
+description: When sibling subclass constructors share the same initialization, move the common construction into the superclass constructor and call up to it.
+sidebar:
+  order: 9
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+export const ctorDiagram = `classDiagram
+  class Employee {
+    +name: string
+    +id: string
+    +Employee(name, id)
+  }
+  class Manager {
+    +Manager(name, id, reports)
+  }
+  class Engineer {
+    +Engineer(name, id, stack)
+  }
+  Employee <|-- Manager : super(name, id)
+  Employee <|-- Engineer : super(name, id)`;
+
+## Intent
+
+**Pull Up Constructor Body** is **Pull Up Method** applied to the one method with special rules: the constructor. When several sibling subclasses begin their constructors with the same field-setting code, that shared initialization moves into the superclass constructor. Each subclass constructor then *calls up* to the parent for the common part and keeps only the lines unique to itself.
+
+## The smell
+
+Open two sibling subclasses and their constructors start identically: `this.name = name; this.id = id; this.hiredAt = now();` repeated verbatim, line for line. It is **Duplicated Code** in the most load-bearing place — object setup. Add a field to the base concept tomorrow and you must remember to wire it through *every* subclass constructor. The common setup belongs to the shared concept, so it belongs in the shared constructor.
+
+## Before → After
+
+`Manager` and `Engineer` both initialise `name` and `id` themselves. After, the superclass constructor owns that, and each subclass calls up before doing its own bit.
+
+<Tabs syncKey="lang">
+  <TabItem label="TypeScript">
+    ```ts
+    // Before — each subclass constructor repeats the common setup
+    class Employee {
+      name!: string;
+      id!: string;
+    }
+
+    class Manager extends Employee {
+      reports: string[];
+      constructor(name: string, id: string, reports: string[]) {
+        super();
+        this.name = name;   // duplicated
+        this.id = id;       // duplicated
+        this.reports = reports;
+      }
+    }
+
+    class Engineer extends Employee {
+      stack: string;
+      constructor(name: string, id: string, stack: string) {
+        super();
+        this.name = name;   // duplicated
+        this.id = id;       // duplicated
+        this.stack = stack;
+      }
+    }
+
+    // After — the superclass constructor owns the common fields
+    class Employee {
+      constructor(public name: string, public id: string) {}
+    }
+
+    class Manager extends Employee {
+      constructor(name: string, id: string, public reports: string[]) {
+        super(name, id);
+      }
+    }
+
+    class Engineer extends Employee {
+      constructor(name: string, id: string, public stack: string) {
+        super(name, id);
+      }
+    }
+    ```
+  </TabItem>
+  <TabItem label="Python">
+    ```python
+    # Before — each subclass __init__ repeats the common setup
+    class Employee:
+        pass
+
+    class Manager(Employee):
+        def __init__(self, name, id, reports):
+            self.name = name      # duplicated
+            self.id = id          # duplicated
+            self.reports = reports
+
+    class Engineer(Employee):
+        def __init__(self, name, id, stack):
+            self.name = name      # duplicated
+            self.id = id          # duplicated
+            self.stack = stack
+
+    # After — the superclass __init__ owns the common fields
+    class Employee:
+        def __init__(self, name, id):
+            self.name = name
+            self.id = id
+
+    class Manager(Employee):
+        def __init__(self, name, id, reports):
+            super().__init__(name, id)
+            self.reports = reports
+
+    class Engineer(Employee):
+        def __init__(self, name, id, stack):
+            super().__init__(name, id)
+            self.stack = stack
+    ```
+  </TabItem>
+  <TabItem label="Go">
+    ```go
+    // Go has no constructors or inheritance. The equivalent move is to embed a
+    // shared Employee struct and give it a constructor function the "subtype"
+    // constructors call up to — so the common field setup lives in one place.
+
+    type Employee struct {
+        Name string
+        ID   string
+    }
+
+    func newEmployee(name, id string) Employee {
+        return Employee{Name: name, ID: id} // common setup, one place
+    }
+
+    type Manager struct {
+        Employee // embedded
+        Reports []string
+    }
+
+    func NewManager(name, id string, reports []string) Manager {
+        return Manager{Employee: newEmployee(name, id), Reports: reports}
+    }
+
+    type Engineer struct {
+        Employee // embedded
+        Stack string
+    }
+
+    func NewEngineer(name, id, stack string) Engineer {
+        return Engineer{Employee: newEmployee(name, id), Stack: stack}
+    }
+    ```
+  </TabItem>
+  <TabItem label="Rust">
+    ```rust
+    // Rust has no inheritance or constructors. The equivalent is a shared
+    // Employee struct with a constructor function, held as a field by each
+    // "subtype", whose own constructors call the shared one for common setup.
+
+    struct Employee {
+        name: String,
+        id: String,
+    }
+
+    impl Employee {
+        fn new(name: String, id: String) -> Self {
+            Employee { name, id } // common setup, one place
+        }
+    }
+
+    struct Manager {
+        base: Employee,
+        reports: Vec<String>,
+    }
+
+    impl Manager {
+        fn new(name: String, id: String, reports: Vec<String>) -> Self {
+            Manager { base: Employee::new(name, id), reports }
+        }
+    }
+
+    struct Engineer {
+        base: Employee,
+        stack: String,
+    }
+
+    impl Engineer {
+        fn new(name: String, id: String, stack: String) -> Self {
+            Engineer { base: Employee::new(name, id), stack }
+        }
+    }
+    ```
+  </TabItem>
+</Tabs>
+
+<Mermaid code={ctorDiagram} title="Common field setup moves into the Employee constructor; subclasses call up to it" />
+
+## Mechanics
+
+1. Add a constructor on the superclass if it lacks one. Give it parameters for the fields the subclasses set identically.
+2. Move the shared assignment lines into that superclass constructor.
+3. In each subclass constructor, replace those lines with a call up to the parent — `super(...)` in TypeScript/Python — passing the common arguments.
+4. Make sure the call-up happens *first*, before the subclass touches any field, since field setup depends on the base being initialised.
+5. **Run your tests.** Constructed objects must hold the same field values as before.
+6. Watch for ordering hazards: if subclasses ran the common code at *different* points relative to their own logic, reconcile that before pulling up.
+
+## When to use / trade-offs
+
+Reach for this whenever sibling constructors share a prefix of identical initialization. Centralising it means a new shared field is wired through in exactly one place, and the subclass constructors shrink to just what makes each type distinct.
+
+The catch is the constructor's strict rules: the call up to the parent must run before the subtype uses any inherited field, and if the siblings interleaved common and specific setup in different orders, you must untangle that first — sometimes the safer route is to extract the common work into a helper the constructors call rather than into the constructor itself. In Go and Rust there is no constructor to pull up: you express the same intent with a shared constructor *function* plus embedding (Go) or a held base struct (Rust), so the common setup still lives in exactly one place.
+
+## Related
+
+- [Pull Up & Push Down](/refactoring-from-zero-to-hero/en/generalization-and-inheritance/pull-up-and-push-down/)
+- [Extract Superclass & Interface](/refactoring-from-zero-to-hero/en/generalization-and-inheritance/extract-superclass-and-interface/)
+- [Replace Superclass with Delegation](/refactoring-from-zero-to-hero/en/generalization-and-inheritance/replace-superclass-with-delegation/)
+
+<Callout title="The constructor is a method with extra rules">
+Pulling up ordinary methods is routine; pulling up constructor bodies adds one constraint — the parent must be initialised before the child runs. Always make the call-up the first statement, and if the existing subclasses did their shared work at differing points, fix that ordering before you pull anything up. In Go and Rust the same discipline shows up as "build the embedded/base struct first".
+</Callout>
+
+export const quizPullUpCtor = [
+  {
+    q: 'When is Pull Up Constructor Body the right move?',
+    options: [
+      'When sibling subclass constructors share the same initialization code',
+      'When a single function is too long',
+      'When a class has no constructor',
+      'When two classes are completely unrelated',
+    ],
+    answer: 0,
+  },
+  {
+    q: 'In TypeScript and Python, how does a subclass constructor reuse the pulled-up setup?',
+    options: [
+      'By copying the lines back in',
+      'By calling up to the superclass constructor (super(...)) first',
+      'By using a global init function',
+      'By overriding the superclass field',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'What ordering rule must you respect when pulling up a constructor body?',
+    options: [
+      'The subclass-specific code must run before the call to the parent',
+      'The call up to the parent must come first, before the subclass touches inherited fields',
+      'Order does not matter for constructors',
+      'The parent constructor must run last',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'How do Go and Rust express this intent without inheritance?',
+    options: [
+      'They cannot share constructor logic at all',
+      'A shared constructor function plus struct embedding (Go) or a held base struct (Rust) keeps common setup in one place',
+      'They duplicate the setup in every type by design',
+      'They use class inheritance like TypeScript',
+    ],
+    answer: 1,
+  },
+];
+
+<Quiz client:visible id="generalization-and-inheritance/pull-up-constructor-body" questions={quizPullUpCtor} />
+
+<ProgressTracker client:visible id="generalization-and-inheritance/pull-up-constructor-body" />
