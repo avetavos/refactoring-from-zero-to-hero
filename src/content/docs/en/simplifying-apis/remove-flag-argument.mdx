@@ -1,0 +1,204 @@
+---
+title: Remove Flag Argument
+description: When a boolean argument switches a function between two behaviours, split it into two clearly-named functions that each do one thing.
+sidebar:
+  order: 5
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+## Intent
+
+Take a function that uses a boolean argument to choose between two distinct behaviours, and replace it with two separate functions — one per behaviour — each with a name that says what it does. The caller stops passing a cryptic `true` and starts calling a function whose name is the answer.
+
+## The smell
+
+A flag argument hides intent at the call site. When you read `sendEmail(order, true)`, the `true` tells you nothing — you have to open the function to learn that `true` means "send urgently" while `false` means "queue for later". The boolean is doing the job a function name should do. It also tends to grow a forked body: an `if (urgent) ... else ...` that mashes two unrelated flows into one function, so neither reads cleanly and both must be tested through the same door.
+
+## Before → After
+
+A notification function whose boolean picks between an urgent and a normal path. After, two named functions, each focused.
+
+<Tabs syncKey="lang">
+  <TabItem label="TypeScript">
+    ```ts
+    // Before
+    function notify(message: string, urgent: boolean): void {
+      if (urgent) {
+        console.log(`[URGENT] ${message}`);
+      } else {
+        console.log(`[info] ${message}`);
+      }
+    }
+
+    notify("Server down", true);
+    notify("Backup finished", false);
+
+    // After
+    function notifyUrgent(message: string): void {
+      console.log(`[URGENT] ${message}`);
+    }
+
+    function notifyInfo(message: string): void {
+      console.log(`[info] ${message}`);
+    }
+
+    notifyUrgent("Server down");
+    notifyInfo("Backup finished");
+    ```
+  </TabItem>
+  <TabItem label="Python">
+    ```python
+    # Before
+    def notify(message, urgent):
+        if urgent:
+            print(f"[URGENT] {message}")
+        else:
+            print(f"[info] {message}")
+
+    notify("Server down", True)
+    notify("Backup finished", False)
+
+    # After
+    def notify_urgent(message):
+        print(f"[URGENT] {message}")
+
+    def notify_info(message):
+        print(f"[info] {message}")
+
+    notify_urgent("Server down")
+    notify_info("Backup finished")
+    ```
+  </TabItem>
+  <TabItem label="Go">
+    ```go
+    // Before
+    func Notify(message string, urgent bool) {
+        if urgent {
+            fmt.Printf("[URGENT] %s\n", message)
+        } else {
+            fmt.Printf("[info] %s\n", message)
+        }
+    }
+
+    Notify("Server down", true)
+    Notify("Backup finished", false)
+
+    // After
+    func NotifyUrgent(message string) {
+        fmt.Printf("[URGENT] %s\n", message)
+    }
+
+    func NotifyInfo(message string) {
+        fmt.Printf("[info] %s\n", message)
+    }
+
+    NotifyUrgent("Server down")
+    NotifyInfo("Backup finished")
+    ```
+  </TabItem>
+  <TabItem label="Rust">
+    ```rust
+    // Before
+    fn notify(message: &str, urgent: bool) {
+        if urgent {
+            println!("[URGENT] {message}");
+        } else {
+            println!("[info] {message}");
+        }
+    }
+
+    notify("Server down", true);
+    notify("Backup finished", false);
+
+    // After
+    fn notify_urgent(message: &str) {
+        println!("[URGENT] {message}");
+    }
+
+    fn notify_info(message: &str) {
+        println!("[info] {message}");
+    }
+
+    notify_urgent("Server down");
+    notify_info("Backup finished");
+    ```
+  </TabItem>
+</Tabs>
+
+## Mechanics
+
+1. Confirm the flag truly selects between *behaviours*, not just a value. If it only toggles a number or a label, Parameterize Function may fit better than splitting.
+2. Create a new function for one branch of the flag. Give it a name that captures that branch's intent, like `notifyUrgent`.
+3. Copy the relevant branch's logic into the new function and drop the dead branch. **Run your tests.**
+4. Find every caller that passed the flag with that value and redirect it to the new function, removing the boolean argument.
+5. Repeat steps 2 through 4 for the other branch.
+6. **Run your tests** after each redirection so a failure points at one caller.
+7. When no caller passes the flag any more, delete the original function.
+
+## When to use / trade-offs
+
+Split out a flag argument whenever a boolean parameter changes *what the function does*, whenever a literal `true` or `false` at a call site is unreadable, or whenever the body has forked into two flows that share little. Two named functions make each call self-explanatory and let each path be tested directly.
+
+The cost is more functions in the namespace, and some genuinely shared setup may now live in two places — extract that shared part into a private helper so you do not duplicate it. Be pragmatic, too: a flag that merely flips configuration data, with no behavioural fork, is fine to keep. The smell is specifically a boolean that *decides between behaviours*.
+
+## Related
+
+- [Parameterize Function](/refactoring-from-zero-to-hero/en/simplifying-apis/parameterize-function/)
+- [Rename Function/Variable](/refactoring-from-zero-to-hero/en/simplifying-apis/rename-function/)
+- [Replace Constructor with Factory Function](/refactoring-from-zero-to-hero/en/simplifying-apis/replace-constructor-with-factory/)
+
+<Callout title="Let the function name answer the question">
+A flag argument forces the caller to encode a decision as data the reader must decode. Two functions move that decision into the name, so `notifyUrgent("Server down")` reads like a sentence. The call site should tell you what happens — not make you go and find out.
+</Callout>
+
+export const quizFlag = [
+  {
+    q: 'Why does a flag argument hide intent at the call site?',
+    options: [
+      'It makes the function run more slowly',
+      'A bare true or false says nothing about which behaviour is selected without reading the body',
+      'It uses extra memory',
+      'It prevents the function from returning a value',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'When is splitting into two functions the right move rather than parameterizing?',
+    options: [
+      'When the boolean only toggles a numeric value or label',
+      'When the boolean selects between two distinct behaviours',
+      'When the function has no arguments',
+      'When the function is already short',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'What should you do with setup logic shared by both branches after the split?',
+    options: [
+      'Duplicate it fully into each function and leave it',
+      'Extract it into a private helper that both functions call',
+      'Delete it from both functions',
+      'Move it into a global variable',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'After redirecting all callers away from the flag, what is the final step?',
+    options: [
+      'Add the flag back as a default',
+      'Delete the original flag-taking function',
+      'Rename the new functions to match the old one',
+      'Re-introduce the boolean parameter',
+    ],
+    answer: 1,
+  },
+];
+
+<Quiz client:visible id="simplifying-apis/remove-flag-argument" questions={quizFlag} />
+
+<ProgressTracker client:visible id="simplifying-apis/remove-flag-argument" />

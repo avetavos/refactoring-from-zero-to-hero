@@ -1,0 +1,215 @@
+---
+title: Replace Inheritance with Delegation
+description: A subclass uses only part of its parent — or the "is-a" was a lie. Hold the former parent as a field and delegate to it instead.
+sidebar:
+  order: 4
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+export const delegationDiagram = `classDiagram
+  class List {
+    +add(item)
+    +size() number
+  }
+  class Stack
+  Stack --> List : holds & delegates
+  note for Stack "Stack HAS-A List, not IS-A List"`;
+
+## Intent
+
+**Replace Inheritance with Delegation** unhooks a subclass from its parent and instead gives it a *field* holding an instance of the former parent. The class forwards (delegates) the calls it genuinely needs and ignores the rest. You do this when a subclass uses only a fraction of its superclass's interface, or when the inheritance modelled a "has-a" relationship dressed up as "is-a".
+
+## The smell
+
+The classic symptom is **Refused Bequest**: `Stack extends List`, but a stack should not let callers `insertAt` the middle or `remove` from the bottom. By inheriting, `Stack` exposes the entire `List` interface and silently breaks its own invariants. The relationship is wrong — a stack *has* a list, it is not *a* list. Replacing inheritance with delegation lets `Stack` expose only `push` and `pop`, keeping the list private.
+
+## Before → After
+
+A `Stack` built by extending `List` leaks every list operation. After the refactoring it *holds* a list and exposes only stack operations.
+
+<Tabs syncKey="lang">
+  <TabItem label="TypeScript">
+    ```ts
+    // Before — Stack IS-A List, leaking add/get/removeAt to callers
+    class List<T> {
+      private items: T[] = [];
+      add(item: T): void { this.items.push(item); }
+      removeLast(): T | undefined { return this.items.pop(); }
+      size(): number { return this.items.length; }
+    }
+
+    class Stack<T> extends List<T> {
+      push(item: T): void { this.add(item); }
+      pop(): T | undefined { return this.removeLast(); }
+    }
+
+    // After — Stack HAS-A List and delegates only what it needs
+    class Stack<T> {
+      private list = new List<T>();
+      push(item: T): void { this.list.add(item); }
+      pop(): T | undefined { return this.list.removeLast(); }
+      size(): number { return this.list.size(); }
+    }
+    ```
+  </TabItem>
+  <TabItem label="Python">
+    ```python
+    # Before — Stack IS-A list, leaking insert/remove/index to callers
+    class Stack(list):
+        def push(self, item):
+            self.append(item)
+
+        def pop_top(self):
+            return self.pop()
+
+    # After — Stack HAS-A list and delegates only what it needs
+    class Stack:
+        def __init__(self):
+            self._items = []
+
+        def push(self, item):
+            self._items.append(item)
+
+        def pop_top(self):
+            return self._items.pop()
+
+        def size(self):
+            return len(self._items)
+    ```
+  </TabItem>
+  <TabItem label="Go">
+    ```go
+    // Go favours composition by default. The "before" abuses embedding so a
+    // Stack promotes every List method. The "after" holds the list as an
+    // unexported field and exposes only Push/Pop — the idiomatic Go style.
+
+    // Before — embedding promotes Add/RemoveLast/Size onto Stack
+    type List struct{ items []int }
+
+    func (l *List) Add(item int)    { l.items = append(l.items, item) }
+    func (l *List) RemoveLast() int { n := len(l.items) - 1; v := l.items[n]; l.items = l.items[:n]; return v }
+    func (l *List) Size() int       { return len(l.items) }
+
+    type Stack struct{ List } // leaks Add, RemoveLast to callers
+
+    // After — Stack holds a List and delegates only what it needs
+    type Stack struct{ list List }
+
+    func (s *Stack) Push(item int) { s.list.Add(item) }
+    func (s *Stack) Pop() int      { return s.list.RemoveLast() }
+    func (s *Stack) Size() int     { return s.list.Size() }
+    ```
+  </TabItem>
+  <TabItem label="Rust">
+    ```rust
+    // Rust has no inheritance at all, so delegation is the only option — and
+    // the idiomatic one. The Stack owns a Vec (the "list") privately and
+    // exposes only push and pop.
+
+    // Before (the closest mistake) — exposing the inner Vec publicly,
+    // so callers can call insert/remove/truncate and break the invariant.
+    pub struct Stack {
+        pub items: Vec<i32>,
+    }
+
+    // After — the Vec is private; only stack operations are delegated outward.
+    pub struct Stack {
+        items: Vec<i32>,
+    }
+
+    impl Stack {
+        pub fn new() -> Self {
+            Stack { items: Vec::new() }
+        }
+        pub fn push(&mut self, item: i32) {
+            self.items.push(item);
+        }
+        pub fn pop(&mut self) -> Option<i32> {
+            self.items.pop()
+        }
+        pub fn size(&self) -> usize {
+            self.items.len()
+        }
+    }
+    ```
+  </TabItem>
+</Tabs>
+
+<Mermaid code={delegationDiagram} title="Stack stops being a List and starts holding one" />
+
+## Mechanics
+
+1. Create a field in the subclass to hold an instance of the (former) superclass. Initialise it — either with a fresh instance or with the object itself if you are unwrapping a self-reference.
+2. For each superclass method the subclass actually uses, add a delegating method that forwards the call to the field.
+3. Remove the `extends` / embedding relationship so the class no longer inherits the parent's full interface.
+4. Adjust callers that relied on inherited members they should never have reached — this is the leak you are sealing.
+5. **Run your tests** after each delegating method is wired up.
+6. Once delegation is in place, you are free to narrow the exposed interface and protect invariants the old inheritance violated.
+
+## When to use / trade-offs
+
+Use this when a subclass refuses much of its bequest, when inheritance is leaking operations that break the subclass's own rules, or when "is-a" was never really true. After the move you control exactly which operations are public, so invariants become enforceable.
+
+The cost is a little forwarding boilerplate — one short method per delegated operation. That is a small, honest price for an accurate relationship. In Go this is simply choosing a held field over embedding; in Rust delegation is the *only* path, so this refactoring is just "write idiomatic Rust from the start".
+
+## Related
+
+- [Replace Subclass with Delegation](/refactoring-from-zero-to-hero/en/generalization-and-inheritance/replace-subclass-with-delegation/)
+- [Pull Up & Push Down](/refactoring-from-zero-to-hero/en/generalization-and-inheritance/pull-up-and-push-down/)
+- [Extract Superclass & Interface](/refactoring-from-zero-to-hero/en/generalization-and-inheritance/extract-superclass-and-interface/)
+
+<Callout title="Favour composition over inheritance">
+Inheritance binds you to the *whole* parent interface and its evolution; composition lets you forward only what you mean to support. When in doubt, hold the collaborator as a field and delegate. Go and Rust bake this advice into the language — they give you no inheritance to misuse, so you reach for delegation by default and your relationships stay honest.
+</Callout>
+
+export const quizReplaceInh = [
+  {
+    q: 'What problem does Replace Inheritance with Delegation solve?',
+    options: [
+      'A function that is too long',
+      'A subclass that uses only part of its parent or models a false "is-a" relationship',
+      'A missing database index',
+      'Two methods with the same name',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'After the refactoring, how does the class reuse the former parent?',
+    options: [
+      'It copies all the parent code inline',
+      'It holds the former parent as a field and delegates the calls it needs',
+      'It deletes the parent entirely',
+      'It makes the parent abstract',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'Why is this refactoring "free" in Rust?',
+    options: [
+      'Rust optimizes inheritance away automatically',
+      'Rust has no inheritance, so delegation is already the only and idiomatic approach',
+      'Rust forbids structs',
+      'Rust requires every type to extend a base trait',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'What is the main cost of choosing delegation over inheritance?',
+    options: [
+      'It always runs slower',
+      'A little forwarding boilerplate — one short method per delegated operation',
+      'You lose the ability to write tests',
+      'The class can no longer hold fields',
+    ],
+    answer: 1,
+  },
+];
+
+<Quiz client:visible id="generalization-and-inheritance/replace-inheritance-with-delegation" questions={quizReplaceInh} />
+
+<ProgressTracker client:visible id="generalization-and-inheritance/replace-inheritance-with-delegation" />

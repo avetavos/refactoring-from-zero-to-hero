@@ -1,0 +1,256 @@
+---
+title: Inline Class
+description: เมื่อคลาสไม่คุ้มกับการมีอยู่อีกต่อไป ให้พับฟิลด์และเมธอดของมันกลับเข้าไปในคลาสที่ใช้มัน — สิ่งตรงข้ามของ Extract Class
+sidebar:
+  order: 5
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+export const inlineClassDiagram = `classDiagram
+  class ShipmentBefore {
+    trackingInfo
+    status()
+  }
+  class TrackingInformation {
+    shippingCompany
+    trackingNumber
+    display()
+  }
+  class ShipmentAfter {
+    shippingCompany
+    trackingNumber
+    status()
+    trackingDisplay()
+  }
+  ShipmentBefore --> TrackingInformation : has a
+  TrackingInformation ..> ShipmentAfter : Inline Class`;
+
+## Intent
+
+นำคลาสที่หดเล็กลงจนแทบไม่เหลืออะไร — ฟิลด์ไม่กี่ตัวและเมธอดหนึ่งหรือสองตัวที่ไม่คุ้มกับการเป็น type แยกต่างหากอีกต่อไป — มารวมเข้ากับคลาสที่ถือมันไว้ พฤติกรรมไม่เปลี่ยนแปลง คุณเพียงแค่นำชั้นที่หยุดคุ้มกับการมีอยู่ออกไป
+
+## The smell
+
+นี่คือสิ่งตรงข้ามของ **Extract Class** และเป็นยารักษาคลาสที่กลายเป็นชั้นกลางที่ไม่จำเป็น สัญญาณบ่งชี้: คลาสที่มีฟิลด์เดียวและเมธอดเล็กน้อย type ที่มีอยู่เพียงเพื่อถูกห่อโดยผู้เรียกเดียว หรือความรับผิดชอบในอดีตที่การ refactor ก่อนหน้าได้ทำให้กลวงเปล่า หากการอ่านโค้ดหมายถึงการกระโดดไปยังคลาสเล็ก ๆ แล้วกลับมาทันที การกระโดดนั้นเป็นภาระล้วน ๆ
+
+## Before → After
+
+คลาส `TrackingInformation` ที่ถือสองฟิลด์และจัดรูปแบบมัน ถูกใช้โดย `Shipment` เดียว ก่อนหน้านี้ ข้อมูลและเมธอดเดียวของมันอยู่ใน type แยกต่างหาก หลังจากนั้น พวกมันพับเข้าไปใน `Shipment`
+
+<Tabs syncKey="lang">
+  <TabItem label="TypeScript">
+    ```ts
+    // Before
+    class TrackingInformation {
+      constructor(public shippingCompany: string, public trackingNumber: string) {}
+
+      display(): string {
+        return `${this.shippingCompany}: ${this.trackingNumber}`;
+      }
+    }
+
+    class Shipment {
+      constructor(public trackingInfo: TrackingInformation) {}
+
+      status(): string {
+        return `Shipped via ${this.trackingInfo.display()}`;
+      }
+    }
+
+    // After
+    class Shipment {
+      constructor(public shippingCompany: string, public trackingNumber: string) {}
+
+      private trackingDisplay(): string {
+        return `${this.shippingCompany}: ${this.trackingNumber}`;
+      }
+
+      status(): string {
+        return `Shipped via ${this.trackingDisplay()}`;
+      }
+    }
+    ```
+  </TabItem>
+  <TabItem label="Python">
+    ```python
+    # Before
+    class TrackingInformation:
+        def __init__(self, shipping_company, tracking_number):
+            self.shipping_company = shipping_company
+            self.tracking_number = tracking_number
+
+        def display(self):
+            return f"{self.shipping_company}: {self.tracking_number}"
+
+    class Shipment:
+        def __init__(self, tracking_info):
+            self.tracking_info = tracking_info
+
+        def status(self):
+            return f"Shipped via {self.tracking_info.display()}"
+
+    # After
+    class Shipment:
+        def __init__(self, shipping_company, tracking_number):
+            self.shipping_company = shipping_company
+            self.tracking_number = tracking_number
+
+        def _tracking_display(self):
+            return f"{self.shipping_company}: {self.tracking_number}"
+
+        def status(self):
+            return f"Shipped via {self._tracking_display()}"
+    ```
+  </TabItem>
+  <TabItem label="Go">
+    ```go
+    // Before
+    type TrackingInformation struct {
+        ShippingCompany string
+        TrackingNumber  string
+    }
+
+    func (t TrackingInformation) Display() string {
+        return fmt.Sprintf("%s: %s", t.ShippingCompany, t.TrackingNumber)
+    }
+
+    type Shipment struct {
+        TrackingInfo TrackingInformation
+    }
+
+    func (s Shipment) Status() string {
+        return fmt.Sprintf("Shipped via %s", s.TrackingInfo.Display())
+    }
+
+    // After
+    type Shipment struct {
+        ShippingCompany string
+        TrackingNumber  string
+    }
+
+    func (s Shipment) trackingDisplay() string {
+        return fmt.Sprintf("%s: %s", s.ShippingCompany, s.TrackingNumber)
+    }
+
+    func (s Shipment) Status() string {
+        return fmt.Sprintf("Shipped via %s", s.trackingDisplay())
+    }
+    ```
+  </TabItem>
+  <TabItem label="Rust">
+    ```rust
+    // Before
+    struct TrackingInformation {
+        shipping_company: String,
+        tracking_number: String,
+    }
+
+    impl TrackingInformation {
+        fn display(&self) -> String {
+            format!("{}: {}", self.shipping_company, self.tracking_number)
+        }
+    }
+
+    struct Shipment {
+        tracking_info: TrackingInformation,
+    }
+
+    impl Shipment {
+        fn status(&self) -> String {
+            format!("Shipped via {}", self.tracking_info.display())
+        }
+    }
+
+    // After
+    struct Shipment {
+        shipping_company: String,
+        tracking_number: String,
+    }
+
+    impl Shipment {
+        fn tracking_display(&self) -> String {
+            format!("{}: {}", self.shipping_company, self.tracking_number)
+        }
+
+        fn status(&self) -> String {
+            format!("Shipped via {}", self.tracking_display())
+        }
+    }
+    ```
+  </TabItem>
+</Tabs>
+
+<Mermaid code={inlineClassDiagram} title="TrackingInformation บาง ๆ พับกลับเข้าไปใน Shipment" />
+
+## Mechanics
+
+1. บนคลาสที่ดูดซับ ให้ประกาศเมธอดสาธารณะของคลาสที่คุณกำลังจะ inline และให้แต่ละตัวเพียงมอบหมาย (delegate) ไปยัง instance ภายในไปก่อน
+2. อัปเดตผู้เรียกทุกตัวของคลาสที่กำลังจะถูกลบให้ผ่านคลาสที่ดูดซับแทน
+3. **รันเทสต์ของคุณ** เพื่อยืนยันว่าการมอบหมายทำงานเหมือนกันทุกประการ
+4. ย้ายฟิลด์และเมธอดของคลาสภายในเข้าไปในคลาสที่ดูดซับทีละตัว โดยใช้ **Move Field** และ **Move Function**
+5. แทนที่บอดี้ของเมธอดที่มอบหมายแต่ละตัวด้วยตรรกะจริงที่ตอนนี้อาศัยอยู่ในเครื่องแล้ว
+6. **รันเทสต์ของคุณ** หลังการย้ายแต่ละครั้ง เพื่อให้ความล้มเหลวชี้ไปยังขั้นตอนเดียว
+7. ลบคลาสที่ตอนนี้ว่างเปล่าเมื่อไม่มีอะไรอ้างอิงมัน
+
+## When to use / trade-offs
+
+Inline คลาสเมื่อมันหดเล็กลงเหลือฟิลด์เดียวที่มีพฤติกรรมเล็กน้อย เมื่อมันมีอยู่เพียงเพื่อห่อผู้เรียกเดียว หรือเมื่อการแยกครั้งก่อนไม่เคยเติบโตเป็นความรับผิดชอบที่แท้จริงและตอนนี้เพียงเพิ่มการอ้อมค้อม
+
+ต้นทุนคือคลาสที่ดูดซับใหญ่ขึ้น ดังนั้นอย่า inline type ที่ยังทำงานจริงและแยกออกได้ — นั่นคือเส้นทางกลับไปสู่ Large Class สิ่งตรงข้ามคือ **Extract Class**: หากคลาสที่รวมแล้วงอกความรับผิดชอบที่สองในภายหลัง ก็แยกมันออกอีกครั้ง
+
+## Related
+
+- [Extract Class](/refactoring-from-zero-to-hero/th/moving-features/extract-class/)
+- [Move Field](/refactoring-from-zero-to-hero/th/moving-features/move-field/)
+- [Move Function](/refactoring-from-zero-to-hero/th/moving-features/move-function/)
+
+<Callout title="Inline เฉพาะสิ่งที่กลวงไปแล้ว">
+Inline Class ไม่ใช่การคัดค้านคลาสเล็ก ๆ — คลาสเล็กที่มุ่งเน้นเป็นจุดแข็ง Inline เฉพาะคลาสที่ *สูญเสีย* เหตุผลในการมีอยู่ไปแล้ว: ฟิลด์เดียว เมธอดเล็กน้อย ไม่มีอนาคตที่เป็นอิสระ หากคลาสยังมีงานทำ ก็ปล่อยให้มันยืนอยู่
+</Callout>
+
+export const quizInlineClass = [
+  {
+    q: 'เมื่อใดที่ Inline Class เป็นการย้ายที่ถูกต้อง?',
+    options: [
+      'เมื่อคลาสมีเมธอดมากมาย',
+      'เมื่อคลาสหดเล็กลงเหลือเศษเสี้ยวเล็กน้อยที่ไม่คุ้มกับการมีอยู่อีกต่อไป',
+      'เมื่อใดก็ตามที่สองคลาสอ้างอิงซึ่งกันและกัน',
+      'เมื่อคลาสมีชื่อยาว',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'Inline Class เป็นสิ่งตรงข้ามของการ refactor ใด?',
+    options: ['Move Field', 'Extract Class', 'Hide Delegate', 'Remove Middle Man'],
+    answer: 1,
+  },
+  {
+    q: 'อะไรคือความเสี่ยงของการ inline คลาสที่ยังทำงานจริงอยู่?',
+    options: [
+      'คอมไพเลอร์จะปฏิเสธมัน',
+      'คลาสที่ดูดซับเติบโตกลับไปสู่การเป็น Large Class',
+      'เทสต์จะทำงานช้าลง',
+      'ฟิลด์สูญเสีย type ของมัน',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'อะไรคือขั้นตอนแรกที่แนะนำเมื่อ inline คลาส?',
+    options: [
+      'ลบคลาสทันที',
+      'ประกาศเมธอดของมันบนคลาสที่ดูดซับและให้พวกมันมอบหมายเข้าไปด้านใน',
+      'Inline ผู้เรียกทุกตัวพร้อมกัน',
+      'เปลี่ยนชื่อคลาสก่อน',
+    ],
+    answer: 1,
+  },
+];
+
+<Quiz client:visible id="moving-features/inline-class" questions={quizInlineClass} />
+
+<ProgressTracker client:visible id="moving-features/inline-class" />

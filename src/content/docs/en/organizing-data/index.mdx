@@ -1,0 +1,83 @@
+---
+title: Organizing Data
+description: Reshape how data is represented and accessed — encapsulate fields, name your literals, guard your collections, and grow primitives into the small types they were always trying to be.
+sidebar:
+  order: 1
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+export const overviewDiagram = `flowchart TD
+  A["Data that is awkward to work with"] --> B{"What is wrong?"}
+  B -->|"A field is read and written everywhere"| C["Encapsulate Variable"]
+  B -->|"A bare number or string has no name"| D["Replace Magic Literal"]
+  B -->|"A list or map field is mutated from outside"| E["Encapsulate Collection"]
+  B -->|"A primitive is sprouting behaviour"| F["Replace Primitive with Object"]
+  B -->|"A type code drives branching logic"| G["Replace Type Code with Subclasses"]
+  C --> H["Data with a clear, guarded shape"]
+  D --> H
+  E --> H
+  F --> H
+  G --> H`;
+
+## Intent
+
+The **organizing data** family is about the *shape* of the values a program carries around and the *paths* by which code reaches them. A program is only as clear as its data. When a field can be touched from anywhere, when a raw `0.07` floats through three modules with no name, or when a humble string secretly carries rules about how it must be formatted, the data is working against you. These refactorings put a boundary around data, give it a name, and let it grow the behaviour it has been quietly asking for.
+
+## The smell
+
+Tangled data shows up in small, recurring ways. The same literal appears in five files and nobody remembers what it means. A list field gets handed out and a distant caller `push`es into it, breaking an invariant the owner never agreed to. A phone number lives as a `string`, so every validation and every reformat is copy-pasted at each use site. None of these are dramatic, but together they make the codebase brittle: a change to *how* data is stored ripples through every place that read it directly.
+
+<Mermaid code={overviewDiagram} title="Choosing an organizing-data move by what is wrong" />
+
+## What this module covers
+
+Five refactorings, each one tightening the relationship between data and the code that uses it:
+
+- **Encapsulate Variable** — wrap direct access to a piece of data behind accessor functions, so you have one place to validate, log, or later change the representation.
+- **Replace Magic Literal** — give an unexplained number or string a symbolic name, so the literal documents its own meaning and changes in one spot.
+- **Encapsulate Collection** — stop exposing a mutable list or map field; return a read-only view and offer explicit add and remove methods so the owner keeps control of its contents.
+- **Replace Primitive with Object** — when a primitive value starts attracting validation and formatting rules, promote it to a small value type that holds both the data and its behaviour.
+- **Replace Type Code with Subclasses** — when a type-code field drives `switch`-style branching, replace the conditional logic with polymorphism across a small class hierarchy.
+
+Each lesson shows the same before-and-after in TypeScript, Python, Go, and Rust, then walks the safe, ordered mechanics — running your tests between every step.
+
+<Callout title="Encapsulation is the recurring theme">
+Almost every move in this module is a form of putting a boundary around data: an accessor, a name, a read-only view, a value type, a class. The payoff is the same each time — when the representation changes, only the code *inside* the boundary changes, and the dozens of call sites outside it stay exactly as they were.
+</Callout>
+
+export const quizIndex = [
+  {
+    q: 'What do "organizing data" refactorings primarily change?',
+    options: [
+      'The observable behaviour of the program',
+      'How data is represented and how code reaches it',
+      'The speed of the network layer',
+      'The build configuration',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'Which refactoring gives an unexplained number or string a symbolic name?',
+    options: ['Encapsulate Collection', 'Replace Magic Literal', 'Replace Type Code with Subclasses', 'Encapsulate Variable'],
+    answer: 1,
+  },
+  {
+    q: 'What recurring idea ties this module together?',
+    options: [
+      'Removing all functions',
+      'Putting a boundary around data so call sites are insulated from the representation',
+      'Inlining every helper',
+      'Making every field public',
+    ],
+    answer: 1,
+  },
+];
+
+<Quiz client:visible id="organizing-data/index" questions={quizIndex} />
+
+<ProgressTracker client:visible id="organizing-data/index" />

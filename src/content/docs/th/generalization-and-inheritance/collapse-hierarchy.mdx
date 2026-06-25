@@ -1,0 +1,216 @@
+---
+title: Collapse Hierarchy
+description: subclass กับ superclass ของมันเคลื่อนเข้าใกล้กันมากจนสอง type ไม่คุ้มที่จะมีอยู่อีกต่อไป — รวมมันเป็นหนึ่ง
+sidebar:
+  order: 6
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+export const collapseDiagram = `classDiagram
+  class Employee {
+    +name string
+    +grade number
+    +annualCost() number
+  }
+  note for Employee "Salesperson merged back in — one type now"`;
+
+## เจตนา
+
+**Collapse Hierarchy** รวม superclass กับ subclass ที่ไม่ต่างกันมากพอจะมีอยู่เป็นสอง type แยกกันอีกต่อไป สมาชิกของตัวหนึ่งถูกพับเข้าไปในอีกตัว คลาสที่ตอนนี้ซ้ำซ้อนถูกลบทิ้ง และผู้อ่านทุกคนก็รอดพ้นจากชั้นของการอ้อมที่ไม่ได้ให้อะไรพวกเขาเลย
+
+## กลิ่นไม่ดี
+
+ลำดับชั้นกร่อนได้ refactoring ดึงสมาชิกขึ้นและผลักลงจนกระทั่ง subclass แทบไม่ได้เพิ่มอะไร — อาจเป็นฟิลด์เล็กน้อยหนึ่งตัว อาจเป็น override ที่ตอนนี้ตรงกับพ่อแม่ นี่คือ **Lazy Class** ที่สวมชุด subclass: type พิเศษ ไฟล์พิเศษ การกระโดดพิเศษสำหรับผู้อ่านทุกคน ทั้งหมดเพื่อแสดงความแตกต่างที่หายไปเงียบ ๆ แล้ว เมื่อ subclass กับ superclass ของมันกลายเป็นฝาแฝดที่เกือบเหมือนกัน การเคลื่อนไหวที่ซื่อตรงคือทำให้มันเป็นหนึ่ง
+
+## ก่อน → หลัง
+
+subclass `Salesperson` เคยต่อยอด `Employee` อย่างมีความหมาย แต่ refactoring ที่ต่อเนื่องกันทำให้มันเหลือถือเพียงฟิลด์เดียวที่ `Employee` ก็เป็นเจ้าของได้ดีพอ ๆ กัน เรารวมมัน
+
+<Tabs syncKey="lang">
+  <TabItem label="TypeScript">
+    ```ts
+    // Before — Salesperson adds almost nothing over Employee
+    class Employee {
+      constructor(public name: string, public monthlyPay: number) {}
+      annualCost(): number { return this.monthlyPay * 12; }
+    }
+
+    class Salesperson extends Employee {
+      constructor(name: string, monthlyPay: number, public region: string) {
+        super(name, monthlyPay);
+      }
+    }
+
+    // After — one Employee carries the region field directly
+    class Employee {
+      constructor(
+        public name: string,
+        public monthlyPay: number,
+        public region: string = "",
+      ) {}
+      annualCost(): number { return this.monthlyPay * 12; }
+    }
+    ```
+  </TabItem>
+  <TabItem label="Python">
+    ```python
+    # Before — Salesperson adds almost nothing over Employee
+    class Employee:
+        def __init__(self, name, monthly_pay):
+            self.name = name
+            self.monthly_pay = monthly_pay
+
+        def annual_cost(self):
+            return self.monthly_pay * 12
+
+    class Salesperson(Employee):
+        def __init__(self, name, monthly_pay, region):
+            super().__init__(name, monthly_pay)
+            self.region = region
+
+    # After — one Employee carries the region field directly
+    class Employee:
+        def __init__(self, name, monthly_pay, region=""):
+            self.name = name
+            self.monthly_pay = monthly_pay
+            self.region = region
+
+        def annual_cost(self):
+            return self.monthly_pay * 12
+    ```
+  </TabItem>
+  <TabItem label="Go">
+    ```go
+    // Go has no class hierarchy. The equivalent "hierarchy" is a thin struct
+    // that embeds a base just to add one field. Collapsing means folding that
+    // field into the base struct and deleting the wrapper.
+
+    // Before — Salesperson embeds Employee only to add Region
+    type Employee struct {
+        Name       string
+        MonthlyPay float64
+    }
+
+    func (e Employee) AnnualCost() float64 { return e.MonthlyPay * 12 }
+
+    type Salesperson struct {
+        Employee
+        Region string
+    }
+
+    // After — one Employee struct carries Region directly
+    type Employee struct {
+        Name       string
+        MonthlyPay float64
+        Region     string
+    }
+
+    func (e Employee) AnnualCost() float64 { return e.MonthlyPay * 12 }
+    ```
+  </TabItem>
+  <TabItem label="Rust">
+    ```rust
+    // Rust has no inheritance. The equivalent is a wrapper struct that holds
+    // a base struct just to bolt on one field. Collapsing folds the field into
+    // the base and removes the wrapper.
+
+    // Before — Salesperson wraps Employee only to add a region
+    struct Employee {
+        name: String,
+        monthly_pay: f64,
+    }
+
+    impl Employee {
+        fn annual_cost(&self) -> f64 {
+            self.monthly_pay * 12.0
+        }
+    }
+
+    struct Salesperson {
+        employee: Employee,
+        region: String,
+    }
+
+    // After — one Employee struct carries region directly
+    struct Employee {
+        name: String,
+        monthly_pay: f64,
+        region: String,
+    }
+
+    impl Employee {
+        fn annual_cost(&self) -> f64 {
+            self.monthly_pay * 12.0
+        }
+    }
+    ```
+  </TabItem>
+</Tabs>
+
+<Mermaid code={collapseDiagram} title="สอง type ที่เกือบเหมือนกันกลายเป็น Employee เดียว" />
+
+## กลไก
+
+1. ตัดสินใจว่าคลาสไหนจะอยู่รอด โดยทั่วไป superclass จะดูดซับ subclass แต่ถ้าชื่อ subclass อ่านแล้วเข้ากับแนวคิดที่รวมแล้วดีกว่า ก็เก็บมันไว้แทน
+2. ใช้ **Pull Up** และ **Push Down** เพื่อย้ายฟิลด์และเมท็อดทั้งหมดเข้าไปในคลาสเดียวที่จะอยู่รอด เพื่อให้คลาสที่จะถูกกำจัดเหลือว่างเปล่า
+3. ชี้ทุกการอ้างอิงและการเรียก constructor ใหม่จากคลาสที่ถูกลบไปยังคลาสที่อยู่รอด **แล้วรันเทสต์**
+4. ลบคลาสที่ตอนนี้ว่างเปล่าทิ้ง (และเอา embedding/wrapper ออกใน Go และ Rust)
+5. **รันเทสต์** อีกครั้งเป็นครั้งสุดท้าย โปรแกรมควรทำงานเหมือนเดิมเป๊ะ ๆ โดยมี type ให้นำทางน้อยลงหนึ่งตัว
+
+## เมื่อไรควรใช้ / ข้อแลกเปลี่ยน
+
+ยุบลำดับชั้นเมื่อ subclass เพิ่มน้อยมากจน type พิเศษเป็นเพียงภาระล้วน ๆ — ไม่มีพฤติกรรมที่มีความหมาย ไม่มีความแตกต่างจริง มีแค่การอ้อม การเอามันออกทำให้โค้ดสั้นลงและแบนลง และผู้อ่านก็เลิกกระโดดไปมาระหว่างพ่อแม่และลูกเพื่อประกอบแนวคิดเดียว
+
+ข้อแลกเปลี่ยนคือการย้อนกลับได้: ถ้าความแตกต่างกลับมาในภายหลัง คุณก็จะ re-extract subclass (หรือ interface) ขึ้นมาใหม่ ซึ่งไม่เป็นไร — Collapse Hierarchy คือสิ่งตรงข้ามตามธรรมชาติของ **Extract Superclass** และการ refactoring ก็ตั้งใจให้ไหลได้ทั้งสองทางเมื่อความเข้าใจของคุณเปลี่ยน ใน Go และ Rust ไม่เคยมีลำดับชั้นของคลาสตั้งแต่แรก ดังนั้น "collapse" จึงเป็นเพียงการลบ wrapper struct ที่ไม่จำเป็นและฝังฟิลด์เดียวของมันเข้าไป
+
+## เกี่ยวข้อง
+
+- [Extract Superclass & Interface](/refactoring-from-zero-to-hero/th/generalization-and-inheritance/extract-superclass-and-interface/)
+- [Pull Up & Push Down](/refactoring-from-zero-to-hero/th/generalization-and-inheritance/pull-up-and-push-down/)
+- [Replace Inheritance with Delegation](/refactoring-from-zero-to-hero/th/generalization-and-inheritance/replace-inheritance-with-delegation/)
+
+<Callout title="type ควรหารายได้ให้แก่การมีอยู่ของมันเอง">
+ทุกคลาส, struct, หรือ trait ที่ผู้อ่านพบเป็นภาษีเล็ก ๆ ต่อความสนใจของพวกเขา subclass ที่ไม่เพิ่มอะไรจริงคือภาษีที่ไม่ได้ผลตอบแทน ยุบมันทิ้ง — และถ้าความแตกต่างที่แท้จริงโผล่มาในภายหลัง ค่อย extract type ใหม่ตอนนั้น เมื่อมันแบกน้ำหนักได้จริง ๆ ใน Go และ Rust ซึ่ง "ลำดับชั้น" เป็นเพียง wrapper struct การยุบก็เป็นแค่การเอาชั้นที่ไม่เคยจำเป็นต้องมีอยู่ออกไป
+</Callout>
+
+export const quizCollapse = [
+  {
+    q: 'เมื่อไรคือจังหวะที่เหมาะจะทำ Collapse Hierarchy?',
+    options: [
+      'เมื่อ subclass เพิ่มพฤติกรรมที่หลากหลายและชัดเจน',
+      'เมื่อ subclass กับ superclass ของมันไม่ต่างกันมากพอจะมีอยู่เป็นสอง type อีกต่อไป',
+      'เมื่อคุณต้องการ subclass มากขึ้น',
+      'เมื่อฟังก์ชันยาวเกินไป',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'Collapse Hierarchy คือสิ่งตรงข้ามตามธรรมชาติของ refactoring ตัวใด?',
+    options: ['Inline Function', 'Extract Superclass', 'Replace Subclass with Delegation', 'Push Down'],
+    answer: 1,
+  },
+  {
+    q: 'subclass ที่แทบว่างเปล่าแสดงกลิ่นไม่ดีใด?',
+    options: ['Feature Envy', 'Lazy Class', 'Long Parameter List', 'Primitive Obsession'],
+    answer: 1,
+  },
+  {
+    q: '"collapse" หมายถึงอะไรใน Go หรือ Rust ซึ่งไม่มี inheritance?',
+    options: [
+      'การรวมสอง interface เป็นหนึ่ง',
+      'การลบ wrapper/embedding struct ที่ไม่จำเป็นและฝังฟิลด์ของมันเข้าไปใน base',
+      'การเอาเมท็อดทั้งหมดออก',
+      'การแปลง struct เป็นฟังก์ชัน',
+    ],
+    answer: 1,
+  },
+];
+
+<Quiz client:visible id="generalization-and-inheritance/collapse-hierarchy" questions={quizCollapse} />
+
+<ProgressTracker client:visible id="generalization-and-inheritance/collapse-hierarchy" />

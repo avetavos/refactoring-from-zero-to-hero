@@ -1,0 +1,294 @@
+---
+title: Replace Conditional with Polymorphism
+description: เมื่อ switch หรือ if บนชนิดข้อมูลเกิดซ้ำ ให้ผลักแต่ละสาขาเข้าไปเป็นเมธอดของซับคลาส แล้วปล่อยให้ภาษากระจายงานให้คุณ
+sidebar:
+  order: 5
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+export const polymorphismDiagram = `flowchart TD
+  subgraph Before["Before — one switch, repeated"]
+    A["plumage(bird):<br/>switch bird.type<br/>case EuropeanSwallow ...<br/>case AfricanSwallow ...<br/>case NorwegianBlue ..."]
+  end
+  subgraph After["After — polymorphic classes"]
+    B["Bird.plumage()"]
+    B --> C["EuropeanSwallow.plumage()"]
+    B --> D["AfricanSwallow.plumage()"]
+    B --> E["NorwegianBlue.plumage()"]
+  end
+  Before -.->|"Replace Conditional with Polymorphism"| After`;
+
+## เจตนา
+
+เอา `switch` (หรือโซ่ `if/else`) ที่แตกสาขาตาม *ชนิด* ของค่า แล้วให้แต่ละชนิดมีคลาสของตัวเองพร้อมเมธอดเวอร์ชันของตัวเอง ป้ายสาขากลายเป็นซับคลาส เนื้อในของแต่ละ case กลายเป็นเมธอดที่ override และการกระจายงาน (dispatch) ที่เคยเขียนด้วยมือก็ถูกภาษาทำให้ ณ จุดที่เรียก
+
+## กลิ่นโค้ด
+
+นี่คือวิธีแก้สำหรับ **type switch ที่เกิดซ้ำ** สัญญาณไม่ใช่ `switch` ตัวเดียว — มันคือ `switch` *ตัวเดียวกัน* บนฟิลด์ชนิดเดียวกันที่ปรากฏในหลายฟังก์ชัน: `plumage`, `airSpeed`, `singing` แต่ละตัวระบุชนิดนกทุกชนิดซ้ำใหม่ ทุกครั้งที่คุณเพิ่มชนิด คุณต้องไปหาและแก้ทั้งหมด และพลาดตัวใดตัวหนึ่งได้ง่าย Polymorphism รวบรวมทุกอย่างที่ชนิดหนึ่งทำเข้าไว้ในคลาสเดียว ดังนั้นการเพิ่มชนิดหมายถึงการเพิ่มคลาส — ไม่ใช่การไล่ตามหา case ที่กระจัดกระจาย
+
+## Before → After
+
+ขนนกของนกขึ้นอยู่กับสายพันธุ์ของมัน ก่อนหน้านี้ `switch` ตัวเดียวบนป้ายชนิดจัดการทุกสายพันธุ์ หลังจากนั้น แต่ละสายพันธุ์เป็นซับคลาสที่ override `plumage`
+
+<Tabs syncKey="lang">
+  <TabItem label="TypeScript">
+    ```ts
+    // Before
+    function plumage(bird: Bird): string {
+      switch (bird.type) {
+        case 'EuropeanSwallow':
+          return 'average';
+        case 'AfricanSwallow':
+          return bird.numberOfCoconuts > 2 ? 'tired' : 'average';
+        case 'NorwegianBlue':
+          return bird.voltage > 100 ? 'scorched' : 'beautiful';
+        default:
+          return 'unknown';
+      }
+    }
+
+    // After
+    abstract class Bird {
+      abstract plumage(): string;
+    }
+
+    class EuropeanSwallow extends Bird {
+      plumage(): string {
+        return 'average';
+      }
+    }
+
+    class AfricanSwallow extends Bird {
+      constructor(private numberOfCoconuts: number) {
+        super();
+      }
+      plumage(): string {
+        return this.numberOfCoconuts > 2 ? 'tired' : 'average';
+      }
+    }
+
+    class NorwegianBlue extends Bird {
+      constructor(private voltage: number) {
+        super();
+      }
+      plumage(): string {
+        return this.voltage > 100 ? 'scorched' : 'beautiful';
+      }
+    }
+    ```
+  </TabItem>
+  <TabItem label="Python">
+    ```python
+    # Before
+    def plumage(bird):
+        if bird.type == "EuropeanSwallow":
+            return "average"
+        elif bird.type == "AfricanSwallow":
+            return "tired" if bird.number_of_coconuts > 2 else "average"
+        elif bird.type == "NorwegianBlue":
+            return "scorched" if bird.voltage > 100 else "beautiful"
+        return "unknown"
+
+    # After
+    class Bird:
+        def plumage(self):
+            raise NotImplementedError
+
+    class EuropeanSwallow(Bird):
+        def plumage(self):
+            return "average"
+
+    class AfricanSwallow(Bird):
+        def __init__(self, number_of_coconuts):
+            self.number_of_coconuts = number_of_coconuts
+
+        def plumage(self):
+            return "tired" if self.number_of_coconuts > 2 else "average"
+
+    class NorwegianBlue(Bird):
+        def __init__(self, voltage):
+            self.voltage = voltage
+
+        def plumage(self):
+            return "scorched" if self.voltage > 100 else "beautiful"
+    ```
+  </TabItem>
+  <TabItem label="Go">
+    ```go
+    // Before
+    func Plumage(bird Bird) string {
+        switch bird.Type {
+        case "EuropeanSwallow":
+            return "average"
+        case "AfricanSwallow":
+            if bird.NumberOfCoconuts > 2 {
+                return "tired"
+            }
+            return "average"
+        case "NorwegianBlue":
+            if bird.Voltage > 100 {
+                return "scorched"
+            }
+            return "beautiful"
+        default:
+            return "unknown"
+        }
+    }
+
+    // After
+    type Bird interface {
+        Plumage() string
+    }
+
+    type EuropeanSwallow struct{}
+
+    func (e EuropeanSwallow) Plumage() string { return "average" }
+
+    type AfricanSwallow struct{ NumberOfCoconuts int }
+
+    func (a AfricanSwallow) Plumage() string {
+        if a.NumberOfCoconuts > 2 {
+            return "tired"
+        }
+        return "average"
+    }
+
+    type NorwegianBlue struct{ Voltage int }
+
+    func (n NorwegianBlue) Plumage() string {
+        if n.Voltage > 100 {
+            return "scorched"
+        }
+        return "beautiful"
+    }
+    ```
+  </TabItem>
+  <TabItem label="Rust">
+    ```rust
+    // Before
+    fn plumage(bird: &Bird) -> String {
+        match bird.kind.as_str() {
+            "EuropeanSwallow" => "average".to_string(),
+            "AfricanSwallow" => {
+                if bird.number_of_coconuts > 2 { "tired" } else { "average" }.to_string()
+            }
+            "NorwegianBlue" => {
+                if bird.voltage > 100 { "scorched" } else { "beautiful" }.to_string()
+            }
+            _ => "unknown".to_string(),
+        }
+    }
+
+    // After
+    trait Bird {
+        fn plumage(&self) -> String;
+    }
+
+    struct EuropeanSwallow;
+
+    impl Bird for EuropeanSwallow {
+        fn plumage(&self) -> String {
+            "average".to_string()
+        }
+    }
+
+    struct AfricanSwallow {
+        number_of_coconuts: u32,
+    }
+
+    impl Bird for AfricanSwallow {
+        fn plumage(&self) -> String {
+            if self.number_of_coconuts > 2 { "tired" } else { "average" }.to_string()
+        }
+    }
+
+    struct NorwegianBlue {
+        voltage: u32,
+    }
+
+    impl Bird for NorwegianBlue {
+        fn plumage(&self) -> String {
+            if self.voltage > 100 { "scorched" } else { "beautiful" }.to_string()
+        }
+    }
+    ```
+  </TabItem>
+</Tabs>
+
+<Mermaid code={polymorphismDiagram} title="type switch ที่เกิดซ้ำกลายเป็นชนิดฐานและซับคลาสหนึ่งตัวต่อหนึ่ง case" />
+
+## กลไก
+
+1. สร้างชนิดฐาน (คลาส, อินเทอร์เฟซ, หรือ trait) พร้อมเมธอดที่ `switch` คำนวณอยู่ในปัจจุบัน
+2. สร้างซับคลาสหนึ่งตัวต่อหนึ่งป้ายสาขา ย้ายเนื้อในของแต่ละ case เข้าไปใน override ของซับคลาสนั้น โดยแทนการอ้างอิงฟิลด์ชนิดด้วยข้อมูลของซับคลาสเอง
+3. แทนจุดที่สร้างอ็อบเจกต์เพื่อให้ซับคลาสที่ถูกต้องถูกสร้างขึ้นแทนค่าที่มีป้าย — มักผ่าน factory เล็ก ๆ
+4. เปลี่ยน `switch` เดิมให้เป็นการเรียกเมธอดแบบ polymorphic เพียงครั้งเดียว **รันเทสต์ของคุณ**
+5. ทำซ้ำสำหรับฟังก์ชัน *ถัดไป* ที่ switch บนชนิดเดียวกัน ลบ `switch` แต่ละตัวทิ้งเมื่อตรรกะของมันย้ายเข้าไปในซับคลาส รันเทสต์หลังจากทุกเมธอดที่คุณย้าย
+
+## เมื่อไรควรใช้ / ข้อแลกเปลี่ยน
+
+ใช้ท่านี้ **อย่างประหยัด** — มันคุ้มค่าก็ต่อเมื่อเงื่อนไข *ตัวเดียวกัน* บนชนิดข้อมูลปรากฏในมากกว่าหนึ่งที่ จนการเพิ่มชนิดในวันนี้หมายถึงการแก้หลายฟังก์ชัน การเกิดซ้ำนั้นคือสิ่งที่ลำดับชั้นคลาส (class hierarchy) ขจัดออกไป
+
+ต้นทุนมีจริง: คุณเพิ่มลำดับชั้น เพิ่ม factory และเพิ่มความอ้อม สำหรับ `switch` ตัวเดียวที่อยู่ในฟังก์ชันเดียว polymorphism เกินความจำเป็น — `switch` ธรรมดาชัดเจนกว่า และ **Decompose Conditional** หรือ guard clause ทำหน้าที่ได้ดีกว่า เพิ่มคลาสก็ต่อเมื่อการเกิดซ้ำพิสูจน์แล้วว่าโครงสร้างนั้นคุ้มค่า
+
+## ที่เกี่ยวข้อง
+
+- [Decompose Conditional](/refactoring-from-zero-to-hero/th/simplifying-conditionals/decompose-conditional/)
+- [Replace Nested Conditional with Guard Clauses](/refactoring-from-zero-to-hero/th/simplifying-conditionals/replace-nested-conditional-with-guard-clauses/)
+- [Introduce Special Case](/refactoring-from-zero-to-hero/th/simplifying-conditionals/introduce-special-case/)
+
+<Callout title="ใช้อย่างประหยัด — เฉพาะเมื่อเงื่อนไขเกิดซ้ำ">
+switch ตัวเดียวในฟังก์ชันเดียวก็ไม่เป็นไร ปล่อยมันไว้ ตัวกระตุ้นของ polymorphism คือ type switch *ตัวเดียวกัน* ที่ปรากฏข้ามหลายฟังก์ชัน ซึ่งทุกชนิดใหม่บังคับให้แก้หลายที่ จงนำลำดับชั้นเข้ามาก็ต่อเมื่อการเกิดซ้ำนั้นมีจริง — ไม่ใช่ด้วยการคาดการณ์ล่วงหน้า
+</Callout>
+
+export const quizPolymorphism = [
+  {
+    q: 'อะไรคือสัญญาณที่ชัดเจนที่สุดว่าคุณควรหยิบ Replace Conditional with Polymorphism มาใช้?',
+    options: [
+      'คำสั่ง switch ตัวเดียวในฟังก์ชันเดียว',
+      'type switch ตัวเดียวกันที่ซ้ำข้ามหลายฟังก์ชัน',
+      'เงื่อนไขที่มีมากกว่าสองอนุประโยค',
+      'if/else ใด ๆ ที่ return ค่า',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'ป้ายสาขาของ switch กลายเป็นอะไร?',
+    options: [
+      'ฟิลด์ private',
+      'ซับคลาส แต่ละตัว override เมธอด',
+      'guard clause',
+      'ค่าคงที่ของ enum เท่านั้น',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'หลังจากย้ายตรรกะเข้าไปในซับคลาสแล้ว อะไรมาแทน switch เดิม?',
+    options: [
+      'switch ที่ใหญ่ขึ้น',
+      'การเรียกเมธอดแบบ polymorphic เพียงครั้งเดียว',
+      'การตรวจสอบ null',
+      'ลูปวนตามชนิดต่าง ๆ',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'เมื่อไรที่การ refactor นี้เกินความจำเป็น?',
+    options: [
+      'เมื่อเงื่อนไขตัวเดียวกันปรากฏในหลายฟังก์ชัน',
+      'เมื่อ switch ตัวเดียวอยู่ในฟังก์ชันเดียวและไม่เกิดซ้ำ',
+      'เมื่อมีการเพิ่มชนิดใหม่บ่อย ๆ',
+      'เมื่อสาขามีตรรกะที่ซับซ้อน',
+    ],
+    answer: 1,
+  },
+];
+
+<Quiz client:visible id="simplifying-conditionals/replace-conditional-with-polymorphism" questions={quizPolymorphism} />
+
+<ProgressTracker client:visible id="simplifying-conditionals/replace-conditional-with-polymorphism" />

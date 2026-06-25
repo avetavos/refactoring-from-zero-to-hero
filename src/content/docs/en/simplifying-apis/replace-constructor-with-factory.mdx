@@ -1,0 +1,280 @@
+---
+title: Replace Constructor with Factory Function
+description: When a constructor is too rigid — it can't pick a subtype or carry a meaningful name — wrap it in a factory function that decides what to build.
+sidebar:
+  order: 6
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+## Intent
+
+Replace a direct call to a constructor with a call to a factory function. A constructor is constrained: it must share the type's name and it always returns an instance of exactly that type. A factory function is free — it can have a descriptive name, choose which subtype to return, hand back a cached instance, or validate before it builds. Callers ask the factory for what they want, and the factory decides how to make it.
+
+## The smell
+
+A raw constructor leaks construction decisions onto every caller. You see `new Employee("Sara", "manager")` and the caller is left to remember which string means what. Worse, when the type has variants — a manager is really a different kind of employee than an engineer — the bare constructor cannot return the right subtype, so callers branch on a type code themselves. The constructor's name is fixed to the class, so it cannot say `hire` or `fromJson` or `default`. Each of these is the constructor being too limiting for the job.
+
+## Before → After
+
+An employee type whose constructor takes a type string. After, a factory function picks the right subtype and reads clearly.
+
+<Tabs syncKey="lang">
+  <TabItem label="TypeScript">
+    ```ts
+    // Before
+    class Employee {
+      constructor(public name: string, public type: string) {}
+      monthlyBonus(): number {
+        return this.type === "manager" ? 1000 : 200;
+      }
+    }
+
+    const e = new Employee("Sara", "manager");
+
+    // After
+    abstract class Employee {
+      constructor(public name: string) {}
+      abstract monthlyBonus(): number;
+    }
+
+    class Manager extends Employee {
+      monthlyBonus(): number {
+        return 1000;
+      }
+    }
+
+    class Engineer extends Employee {
+      monthlyBonus(): number {
+        return 200;
+      }
+    }
+
+    function hire(name: string, role: string): Employee {
+      switch (role) {
+        case "manager":
+          return new Manager(name);
+        case "engineer":
+          return new Engineer(name);
+        default:
+          throw new Error(`Unknown role: ${role}`);
+      }
+    }
+
+    const e = hire("Sara", "manager");
+    ```
+  </TabItem>
+  <TabItem label="Python">
+    ```python
+    # Before
+    class Employee:
+        def __init__(self, name, type):
+            self.name = name
+            self.type = type
+
+        def monthly_bonus(self):
+            return 1000 if self.type == "manager" else 200
+
+    e = Employee("Sara", "manager")
+
+    # After
+    from abc import ABC, abstractmethod
+
+    class Employee(ABC):
+        def __init__(self, name):
+            self.name = name
+
+        @abstractmethod
+        def monthly_bonus(self):
+            ...
+
+    class Manager(Employee):
+        def monthly_bonus(self):
+            return 1000
+
+    class Engineer(Employee):
+        def monthly_bonus(self):
+            return 200
+
+    def hire(name, role):
+        builders = {"manager": Manager, "engineer": Engineer}
+        if role not in builders:
+            raise ValueError(f"Unknown role: {role}")
+        return builders[role](name)
+
+    e = hire("Sara", "manager")
+    ```
+  </TabItem>
+  <TabItem label="Go">
+    ```go
+    // Before
+    type Employee struct {
+        Name string
+        Type string
+    }
+
+    func (e Employee) MonthlyBonus() float64 {
+        if e.Type == "manager" {
+            return 1000
+        }
+        return 200
+    }
+
+    e := Employee{Name: "Sara", Type: "manager"}
+
+    // After
+    type Employee interface {
+        MonthlyBonus() float64
+    }
+
+    type Manager struct{ Name string }
+
+    func (m Manager) MonthlyBonus() float64 { return 1000 }
+
+    type Engineer struct{ Name string }
+
+    func (e Engineer) MonthlyBonus() float64 { return 200 }
+
+    func Hire(name, role string) (Employee, error) {
+        switch role {
+        case "manager":
+            return Manager{Name: name}, nil
+        case "engineer":
+            return Engineer{Name: name}, nil
+        default:
+            return nil, fmt.Errorf("unknown role: %s", role)
+        }
+    }
+
+    e, err := Hire("Sara", "manager")
+    ```
+  </TabItem>
+  <TabItem label="Rust">
+    ```rust
+    // Before
+    struct Employee {
+        name: String,
+        kind: String,
+    }
+
+    impl Employee {
+        fn monthly_bonus(&self) -> u32 {
+            if self.kind == "manager" { 1000 } else { 200 }
+        }
+    }
+
+    let e = Employee { name: "Sara".to_string(), kind: "manager".to_string() };
+
+    // After
+    trait Employee {
+        fn monthly_bonus(&self) -> u32;
+    }
+
+    struct Manager {
+        name: String,
+    }
+
+    impl Employee for Manager {
+        fn monthly_bonus(&self) -> u32 {
+            1000
+        }
+    }
+
+    struct Engineer {
+        name: String,
+    }
+
+    impl Employee for Engineer {
+        fn monthly_bonus(&self) -> u32 {
+            200
+        }
+    }
+
+    fn hire(name: &str, role: &str) -> Result<Box<dyn Employee>, String> {
+        match role {
+            "manager" => Ok(Box::new(Manager { name: name.to_string() })),
+            "engineer" => Ok(Box::new(Engineer { name: name.to_string() })),
+            other => Err(format!("unknown role: {other}")),
+        }
+    }
+
+    let e = hire("Sara", "manager")?;
+    ```
+  </TabItem>
+</Tabs>
+
+## Mechanics
+
+1. Write a factory function whose body does nothing but call the existing constructor and return the result. Give it a name that says what it makes, like `hire` or `defaultConfig`.
+2. Redirect callers to the factory one at a time, replacing each constructor call with a factory call. **Run your tests** after each.
+3. Once every caller goes through the factory, you have a single chokepoint. Now you can enrich it: validate arguments, return a cached instance, or branch to a subtype.
+4. If you are introducing subtypes, create them, move each branch's behaviour onto the matching subtype, and let the factory return the right one based on its input.
+5. **Run your tests** after each change. The factory's signature stays stable for callers even as what it builds evolves behind it.
+6. If the language allows, make the raw constructor private or non-public so the factory is the only supported way in.
+
+## When to use / trade-offs
+
+Reach for a factory when construction needs a clearer name than the class allows, when the right concrete type depends on the inputs, when you want to hide or pool instances, or when you want to validate before an object exists. The factory becomes the single, well-named door through which objects enter the system.
+
+The trade-off is a layer of indirection: callers no longer see `new` and the concrete type directly, which can make navigation slightly less obvious. For a plain value type with one shape and no variants, a direct constructor is simpler and a factory is needless ceremony. Add the factory when the constructor's rigidity starts to cost you — not before.
+
+## Related
+
+- [Remove Flag Argument](/refactoring-from-zero-to-hero/en/simplifying-apis/remove-flag-argument/)
+- [Introduce Parameter Object](/refactoring-from-zero-to-hero/en/simplifying-apis/introduce-parameter-object/)
+- [Rename Function/Variable](/refactoring-from-zero-to-hero/en/simplifying-apis/rename-function/)
+
+<Callout title="A factory is a constructor that gets to choose">
+A constructor must return its own type, under its own name. A factory function is liberated from both rules: it can be called `hire`, it can hand back a `Manager` or an `Engineer`, and it can refuse to build at all when the inputs are wrong. That freedom is the whole point.
+</Callout>
+
+export const quizFactory = [
+  {
+    q: 'What is a key limitation of a constructor that a factory function escapes?',
+    options: [
+      'A constructor cannot take arguments',
+      'A constructor must share the type name and always returns an instance of exactly that type',
+      'A constructor cannot be tested',
+      'A constructor runs slower than a function',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'What is the safe first step when introducing a factory?',
+    options: [
+      'Delete the constructor immediately',
+      'Write a factory that simply calls the existing constructor, then redirect callers one at a time',
+      'Rename every subtype first',
+      'Remove all tests',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'Why does routing all construction through one factory help?',
+    options: [
+      'It makes the program shorter to type',
+      'It creates a single chokepoint where you can validate, cache, or choose a subtype',
+      'It removes the need for classes',
+      'It guarantees faster object creation',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'When is a plain constructor preferable to a factory?',
+    options: [
+      'When the type has many variants chosen at runtime',
+      'For a plain value type with one shape and no variants',
+      'When you need to validate inputs before building',
+      'When you want a descriptive creation name',
+    ],
+    answer: 1,
+  },
+];
+
+<Quiz client:visible id="simplifying-apis/replace-constructor-with-factory" questions={quizFactory} />
+
+<ProgressTracker client:visible id="simplifying-apis/replace-constructor-with-factory" />

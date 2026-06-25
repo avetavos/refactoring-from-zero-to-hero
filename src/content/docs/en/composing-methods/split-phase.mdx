@@ -1,0 +1,241 @@
+---
+title: Split Phase
+description: Separate code that does two different jobs into two sequential phases joined by a clear intermediate data structure.
+sidebar:
+  order: 6
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+export const phaseDiagram = `flowchart LR
+  R["Raw input<br/>(string)"] --> P1["Phase 1: Parse"]
+  P1 --> I["Intermediate data<br/>(structured order)"]
+  I --> P2["Phase 2: Calculate"]
+  P2 --> O["Result<br/>(price)"]`;
+
+## Intent
+
+When one block of code does two genuinely different things in sequence — say, *parse* some input and then *compute* a result from it — split it into two phases. The first phase produces a clear intermediate data structure; the second phase consumes only that structure.
+
+## The smell
+
+This cures **tangled responsibilities** inside a single stretch of code. Parsing and calculation get interleaved, so a change to the input format forces you to touch the math, and a change to the math forces you to think about strings. The two concerns share variables and the reader can never focus on one at a time. Naming an intermediate structure draws a clean line between them.
+
+## Before → After
+
+A function parses a raw `"name:qty:price"` string and computes a total in one breath. Split it: parse into an order object, then price the order.
+
+<Tabs syncKey="lang">
+  <TabItem label="TypeScript">
+    ```ts
+    // Before
+    function orderTotal(raw: string): number {
+      const parts = raw.split(':');
+      const qty = Number(parts[1]);
+      const price = Number(parts[2]);
+      return qty > 100 ? qty * price * 0.9 : qty * price;
+    }
+
+    // After
+    interface ParsedOrder {
+      name: string;
+      qty: number;
+      price: number;
+    }
+
+    function parseOrder(raw: string): ParsedOrder {
+      const [name, qty, price] = raw.split(':');
+      return { name, qty: Number(qty), price: Number(price) };
+    }
+
+    function priceOrder(order: ParsedOrder): number {
+      const base = order.qty * order.price;
+      return order.qty > 100 ? base * 0.9 : base;
+    }
+
+    function orderTotal(raw: string): number {
+      return priceOrder(parseOrder(raw));
+    }
+    ```
+  </TabItem>
+  <TabItem label="Python">
+    ```python
+    # Before
+    def order_total(raw):
+        parts = raw.split(":")
+        qty = int(parts[1])
+        price = float(parts[2])
+        return qty * price * 0.9 if qty > 100 else qty * price
+
+    # After
+    from dataclasses import dataclass
+
+    @dataclass
+    class ParsedOrder:
+        name: str
+        qty: int
+        price: float
+
+    def parse_order(raw):
+        name, qty, price = raw.split(":")
+        return ParsedOrder(name, int(qty), float(price))
+
+    def price_order(order):
+        base = order.qty * order.price
+        return base * 0.9 if order.qty > 100 else base
+
+    def order_total(raw):
+        return price_order(parse_order(raw))
+    ```
+  </TabItem>
+  <TabItem label="Go">
+    ```go
+    // Before
+    func OrderTotal(raw string) float64 {
+        parts := strings.Split(raw, ":")
+        qty, _ := strconv.Atoi(parts[1])
+        price, _ := strconv.ParseFloat(parts[2], 64)
+        if qty > 100 {
+            return float64(qty) * price * 0.9
+        }
+        return float64(qty) * price
+    }
+
+    // After
+    type ParsedOrder struct {
+        Name  string
+        Qty   int
+        Price float64
+    }
+
+    func parseOrder(raw string) ParsedOrder {
+        parts := strings.Split(raw, ":")
+        qty, _ := strconv.Atoi(parts[1])
+        price, _ := strconv.ParseFloat(parts[2], 64)
+        return ParsedOrder{Name: parts[0], Qty: qty, Price: price}
+    }
+
+    func priceOrder(order ParsedOrder) float64 {
+        base := float64(order.Qty) * order.Price
+        if order.Qty > 100 {
+            return base * 0.9
+        }
+        return base
+    }
+
+    func OrderTotal(raw string) float64 {
+        return priceOrder(parseOrder(raw))
+    }
+    ```
+  </TabItem>
+  <TabItem label="Rust">
+    ```rust
+    // Before
+    fn order_total(raw: &str) -> f64 {
+        let parts: Vec<&str> = raw.split(':').collect();
+        let qty: i32 = parts[1].parse().unwrap();
+        let price: f64 = parts[2].parse().unwrap();
+        if qty > 100 {
+            qty as f64 * price * 0.9
+        } else {
+            qty as f64 * price
+        }
+    }
+
+    // After
+    struct ParsedOrder {
+        name: String,
+        qty: i32,
+        price: f64,
+    }
+
+    fn parse_order(raw: &str) -> ParsedOrder {
+        let parts: Vec<&str> = raw.split(':').collect();
+        ParsedOrder {
+            name: parts[0].to_string(),
+            qty: parts[1].parse().unwrap(),
+            price: parts[2].parse().unwrap(),
+        }
+    }
+
+    fn price_order(order: &ParsedOrder) -> f64 {
+        let base = order.qty as f64 * order.price;
+        if order.qty > 100 {
+            base * 0.9
+        } else {
+            base
+        }
+    }
+
+    fn order_total(raw: &str) -> f64 {
+        price_order(&parse_order(raw))
+    }
+    ```
+  </TabItem>
+</Tabs>
+
+<Mermaid code={phaseDiagram} title="Two phases joined by an explicit intermediate structure" />
+
+## Mechanics
+
+1. Extract the second phase (the calculation) into its own function. **Run your tests.**
+2. Introduce an intermediate data structure and pass it as the argument to that second-phase function.
+3. Examine each value the second phase reads from the first phase. Move each one onto the intermediate structure, one at a time, running tests after each move.
+4. Extract the first phase (the parsing) into its own function that returns the intermediate structure.
+5. Confirm the top-level function is now just first phase feeding second phase, and **run the full suite**.
+
+## When to use / trade-offs
+
+Split Phase when a block clearly handles two stages — parse then compute, validate then act, fetch then format — and the stages share little beyond a handoff. The intermediate structure becomes a named contract between them, so each phase can change independently and be tested on its own.
+
+The cost is one extra data type and a small indirection. If the two "phases" are tightly intertwined or trivially short, the seam is artificial — leave the code as one piece.
+
+## Related
+
+- [Extract Function](/refactoring-from-zero-to-hero/en/composing-methods/extract-function/)
+- [Replace Temp with Query](/refactoring-from-zero-to-hero/en/composing-methods/replace-temp-with-query/)
+
+<Callout title="The intermediate structure is the whole point">
+The split only pays off if the data passed between phases is explicit and well-named. A vague bag of leftover variables is no better than the tangle you started with. Design the intermediate type to describe exactly what phase one produced and phase two needs — nothing more.
+</Callout>
+
+export const quizSplit = [
+  {
+    q: 'What joins the two phases after a Split Phase refactoring?',
+    options: [
+      'A shared global variable',
+      'A clear intermediate data structure',
+      'A network call',
+      'A try/catch block',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'Which pair is a typical candidate for Split Phase?',
+    options: [
+      'Logging and retrying',
+      'Parsing input and then calculating a result from it',
+      'Two identical loops',
+      'A getter and a setter',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'When is Split Phase NOT worth applying?',
+    options: [
+      'When the two stages share little beyond a handoff',
+      'When the stages are tightly intertwined or trivially short',
+      'When the input format changes often',
+      'When the calculation is complex',
+    ],
+    answer: 1,
+  },
+];
+
+<Quiz client:visible id="composing-methods/split-phase" questions={quizSplit} />
+
+<ProgressTracker client:visible id="composing-methods/split-phase" />

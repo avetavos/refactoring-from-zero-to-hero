@@ -1,0 +1,231 @@
+---
+title: Encapsulate Collection
+description: Never hand out a mutable collection field. Return a copy or a read-only view and provide explicit add and remove methods so the owner keeps control of its contents.
+sidebar:
+  order: 4
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+export const collectionDiagram = `flowchart LR
+  subgraph Before["Before"]
+    A["caller"] -->|"gets raw list"| B[("items[]")]
+    A -->|"push() / splice() directly"| B
+  end
+  subgraph After["After"]
+    C["caller"] -->|"items() → read-only copy"| D[("items[] (private)")]
+    C -->|"addItem() / removeItem()"| D
+  end
+  Before -.->|"Encapsulate Collection"| After`;
+
+## Intent
+
+When an object owns a collection — a list, a set, a map — do not expose the raw container. Return a copy or a read-only view from the getter, and provide dedicated `add` and `remove` methods for changes. The owner becomes the single authority over its own contents, free to enforce invariants the moment anything is added or removed.
+
+## The smell
+
+The smell is a getter that returns the **live, mutable collection** itself. The owning object thinks it controls its contents, but in truth any caller can hold the reference and `push`, `splice`, `clear`, or reorder behind the owner's back. Invariants quietly rot: a class that promises "the order total always matches its line items" cannot keep that promise if outsiders can mutate the line-item list directly.
+
+## Before → After
+
+An `Order` whose `items` list is exposed raw, letting callers mutate it. After, the list is private; reads return a defensive copy and changes go through methods that can keep a derived total correct.
+
+<Tabs syncKey="lang">
+  <TabItem label="TypeScript">
+    ```ts
+    // Before
+    class Order {
+      items: LineItem[] = [];
+    }
+    const order = new Order();
+    order.items.push(item); // bypasses the owner entirely
+
+    // After
+    class Order {
+      #items: LineItem[] = [];
+
+      get items(): readonly LineItem[] {
+        return [...this.#items]; // defensive copy
+      }
+
+      addItem(item: LineItem): void {
+        this.#items.push(item);
+      }
+
+      removeItem(item: LineItem): void {
+        this.#items = this.#items.filter((i) => i !== item);
+      }
+
+      get total(): number {
+        return this.#items.reduce((sum, i) => sum + i.price, 0);
+      }
+    }
+    ```
+  </TabItem>
+  <TabItem label="Python">
+    ```python
+    # Before
+    class Order:
+        def __init__(self):
+            self.items = []
+    order = Order()
+    order.items.append(item)  # bypasses the owner entirely
+
+    # After
+    class Order:
+        def __init__(self):
+            self._items = []
+
+        @property
+        def items(self):
+            return tuple(self._items)  # read-only snapshot
+
+        def add_item(self, item):
+            self._items.append(item)
+
+        def remove_item(self, item):
+            self._items.remove(item)
+
+        @property
+        def total(self):
+            return sum(i.price for i in self._items)
+    ```
+  </TabItem>
+  <TabItem label="Go">
+    ```go
+    // Before
+    type Order struct {
+        Items []LineItem // exported: anyone can mutate
+    }
+    order.Items = append(order.Items, item) // bypasses the owner
+
+    // After
+    type Order struct {
+        items []LineItem // unexported
+    }
+
+    func (o *Order) Items() []LineItem {
+        out := make([]LineItem, len(o.items))
+        copy(out, o.items) // defensive copy
+        return out
+    }
+
+    func (o *Order) AddItem(item LineItem) {
+        o.items = append(o.items, item)
+    }
+
+    func (o *Order) Total() float64 {
+        var sum float64
+        for _, i := range o.items {
+            sum += i.Price
+        }
+        return sum
+    }
+    ```
+  </TabItem>
+  <TabItem label="Rust">
+    ```rust
+    // Before
+    pub struct Order {
+        pub items: Vec<LineItem>, // public: anyone can mutate
+    }
+    // order.items.push(item); // bypasses the owner
+
+    // After
+    pub struct Order {
+        items: Vec<LineItem>, // private
+    }
+
+    impl Order {
+        pub fn items(&self) -> &[LineItem] {
+            &self.items // read-only borrow, not a mutable handle
+        }
+
+        pub fn add_item(&mut self, item: LineItem) {
+            self.items.push(item);
+        }
+
+        pub fn remove_item(&mut self, index: usize) {
+            self.items.remove(index);
+        }
+
+        pub fn total(&self) -> f64 {
+            self.items.iter().map(|i| i.price).sum()
+        }
+    }
+    ```
+  </TabItem>
+</Tabs>
+
+<Mermaid code={collectionDiagram} title="A raw mutable list becomes a guarded collection with add and remove methods" />
+
+## Mechanics
+
+1. Add explicit `add` and `remove` methods (or their equivalents) for the collection. Internally they mutate the private field.
+2. Find every external site that mutates the collection directly and reroute it through the new methods. Work in small batches.
+3. **Run your tests** after each batch.
+4. Change the getter so it no longer returns the live container. Return a copy, a read-only view, or an iterator — whatever your language offers to prevent outside mutation.
+5. Make the field itself private or unexported.
+6. **Run your tests** again. With every mutation already going through methods, nothing should break — and now the owner can enforce invariants in those methods.
+
+## When to use / trade-offs
+
+Apply this whenever a class owns a collection that represents part of its state and especially when the collection participates in an invariant. Encapsulating it lets the owner validate additions, reject duplicates, keep a derived value (like a running total) correct, and prevent silent corruption from a distant caller.
+
+The trade-off is the cost of copying on each read and the slightly larger interface. For a small collection read occasionally, the copy is negligible insurance. For a very large or hot-path collection, prefer a read-only *view* over a full copy where your language supports one, so you avoid the allocation while still blocking mutation.
+
+## Related
+
+- [Encapsulate Variable](/refactoring-from-zero-to-hero/en/organizing-data/encapsulate-variable/)
+- [Replace Primitive with Object](/refactoring-from-zero-to-hero/en/organizing-data/replace-primitive-with-object/)
+- [Replace Magic Literal](/refactoring-from-zero-to-hero/en/organizing-data/replace-magic-literal/)
+
+<Callout title="A getter that returns the live list is a lie">
+If your getter hands back the real container, your add and remove methods are theatre — callers can simply ignore them and mutate the list directly. The encapsulation only holds once reads return a copy or read-only view, so that the methods are the *only* way to change the contents.
+</Callout>
+
+export const quizCollection = [
+  {
+    q: 'What is the core rule of Encapsulate Collection?',
+    options: [
+      'Always return the live mutable collection for convenience',
+      'Never expose the raw collection; return a copy or read-only view and offer add/remove methods',
+      'Make the collection a global variable',
+      'Delete the collection field',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'Why is returning the live collection from a getter dangerous?',
+    options: [
+      'It is slower than a copy',
+      'Callers can mutate it directly, bypassing the owner and breaking invariants',
+      'It uses more memory',
+      'It cannot be serialized',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'What should the add and remove methods make possible?',
+    options: [
+      'Letting the owner enforce invariants when contents change',
+      'Hiding the collection from the owner itself',
+      'Removing all validation',
+      'Exposing the field publicly',
+    ],
+    answer: 0,
+  },
+  {
+    q: 'For a very large, hot-path collection, what is often preferable to a full copy on read?',
+    options: ['Returning a read-only view', 'Returning the live mutable list', 'Returning null', 'Returning a deep clone every time'],
+    answer: 0,
+  },
+];
+
+<Quiz client:visible id="organizing-data/encapsulate-collection" questions={quizCollection} />
+
+<ProgressTracker client:visible id="organizing-data/encapsulate-collection" />

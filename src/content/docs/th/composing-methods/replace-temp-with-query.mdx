@@ -1,0 +1,213 @@
+---
+title: Replace Temp with Query
+description: แทนที่ตัวแปรชั่วคราวที่เก็บค่าที่คำนวณไว้ด้วยฟังก์ชัน เพื่อให้ logic นำกลับมาใช้ซ้ำได้และการ extract ง่ายขึ้น
+sidebar:
+  order: 5
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+## เจตนา
+
+นำตัวแปร local ที่ถูกกำหนดค่าด้วยผลของการคำนวณแล้วถูกอ่านอย่างเดียว มาแทนที่ด้วยฟังก์ชัน (เรียกว่า "query") ที่ทำการคำนวณนั้น ทุกที่ที่เคยใช้ temp ตอนนี้เรียก query แทน
+
+## smell
+
+นี่คือวิธีรักษา **temp ที่ตรึง logic ไว้กับที่** ตัวแปรชั่วคราวผูกการคำนวณไว้กับฟังก์ชันเดียว: คุณนำผลลัพธ์ไปใช้ซ้ำที่อื่นไม่ได้ และคุณ Extract Function รอบโค้ดที่พึ่งพามันไม่ได้โดยไม่ลาก temp ไปด้วยในฐานะ parameter การเปลี่ยน temp ให้เป็น query ปลดปล่อยการคำนวณนั้น มันมีค่าที่สุดในฐานะขั้นตอน *เตรียมความพร้อม* — เมื่อค่ากลายเป็น method แล้ว การ extract ที่ใหญ่กว่าก็หลุดออกมาอย่างสะอาด
+
+## Before → After
+
+`basePrice` เป็น temp ที่คำนวณครั้งเดียวและถูกอ่านสองครั้ง เลื่อนขั้นมันให้เป็น query method บน order
+
+<Tabs syncKey="lang">
+  <TabItem label="TypeScript">
+    ```ts
+    // Before
+    class Order {
+      constructor(private quantity: number, private itemPrice: number) {}
+
+      finalPrice(): number {
+        const basePrice = this.quantity * this.itemPrice;
+        const discount = Math.max(this.quantity - 100, 0) * this.itemPrice * 0.1;
+        return basePrice - discount;
+      }
+    }
+
+    // After
+    class Order {
+      constructor(private quantity: number, private itemPrice: number) {}
+
+      private basePrice(): number {
+        return this.quantity * this.itemPrice;
+      }
+
+      private discount(): number {
+        return Math.max(this.quantity - 100, 0) * this.itemPrice * 0.1;
+      }
+
+      finalPrice(): number {
+        return this.basePrice() - this.discount();
+      }
+    }
+    ```
+  </TabItem>
+  <TabItem label="Python">
+    ```python
+    # Before
+    class Order:
+        def __init__(self, quantity, item_price):
+            self.quantity = quantity
+            self.item_price = item_price
+
+        def final_price(self):
+            base_price = self.quantity * self.item_price
+            discount = max(self.quantity - 100, 0) * self.item_price * 0.1
+            return base_price - discount
+
+    # After
+    class Order:
+        def __init__(self, quantity, item_price):
+            self.quantity = quantity
+            self.item_price = item_price
+
+        def base_price(self):
+            return self.quantity * self.item_price
+
+        def discount(self):
+            return max(self.quantity - 100, 0) * self.item_price * 0.1
+
+        def final_price(self):
+            return self.base_price() - self.discount()
+    ```
+  </TabItem>
+  <TabItem label="Go">
+    ```go
+    // Before
+    type Order struct {
+        Quantity  int
+        ItemPrice float64
+    }
+
+    func (o Order) FinalPrice() float64 {
+        basePrice := float64(o.Quantity) * o.ItemPrice
+        discount := math.Max(float64(o.Quantity-100), 0) * o.ItemPrice * 0.1
+        return basePrice - discount
+    }
+
+    // After
+    type Order struct {
+        Quantity  int
+        ItemPrice float64
+    }
+
+    func (o Order) basePrice() float64 {
+        return float64(o.Quantity) * o.ItemPrice
+    }
+
+    func (o Order) discount() float64 {
+        return math.Max(float64(o.Quantity-100), 0) * o.ItemPrice * 0.1
+    }
+
+    func (o Order) FinalPrice() float64 {
+        return o.basePrice() - o.discount()
+    }
+    ```
+  </TabItem>
+  <TabItem label="Rust">
+    ```rust
+    // Before
+    struct Order {
+        quantity: i32,
+        item_price: f64,
+    }
+
+    impl Order {
+        fn final_price(&self) -> f64 {
+            let base_price = self.quantity as f64 * self.item_price;
+            let discount = (self.quantity - 100).max(0) as f64 * self.item_price * 0.1;
+            base_price - discount
+        }
+    }
+
+    // After
+    struct Order {
+        quantity: i32,
+        item_price: f64,
+    }
+
+    impl Order {
+        fn base_price(&self) -> f64 {
+            self.quantity as f64 * self.item_price
+        }
+
+        fn discount(&self) -> f64 {
+            (self.quantity - 100).max(0) as f64 * self.item_price * 0.1
+        }
+
+        fn final_price(&self) -> f64 {
+            self.base_price() - self.discount()
+        }
+    }
+    ```
+  </TabItem>
+</Tabs>
+
+## Mechanics
+
+1. ตรวจสอบว่า temp ถูกกำหนดค่าเพียงครั้งเดียวและไม่เคยถูก mutate หลังการกำหนดค่า ถ้ามันถูกกำหนดค่าใหม่ ให้แยกมันก่อน เพื่อให้แต่ละค่าถูกกำหนดในที่เดียว
+2. ยืนยันว่าการคำนวณฝั่งขวามือไม่มี side effect
+3. extract การคำนวณออกมาเป็นฟังก์ชัน query (เป็น method เมื่อข้อมูลอยู่บน object)
+4. แทนที่การอ่าน temp แต่ละครั้งด้วยการเรียก query
+5. **รันเทสต์ของคุณ** หลังการแทนที่แต่ละครั้ง
+6. ลบการประกาศ temp ที่ตอนนี้ไม่ได้ใช้แล้วทิ้ง
+
+## เมื่อใดควรใช้ / ข้อแลกเปลี่ยน
+
+ใช้มันเมื่อ temp ขวาง Extract Function ที่คุณอยากทำ เมื่อการคำนวณเดียวกันจะมีประโยชน์จากมากกว่าหนึ่ง method หรือเพียงเพื่อลด local state ของ method ที่ยาว ข้อแลกเปลี่ยนหลักคือการคำนวณซ้ำ: query อาจคำนวณใหม่ในทุกการเรียก สำหรับ business logic ทั่วไปสิ่งนี้แทบไม่มีผล และความชัดเจนก็คุ้มค่า สำหรับ hot path ที่ร้อนจริง ๆ ให้วัดก่อนตัดสินใจ
+
+ทิศทางตรงข้ามคือ cache ค่ากลับเข้าไปใน local เมื่อการ profiling พิสูจน์ว่า query เป็นคอขวดจริง — แต่เอื้อมไปหาสิ่งนั้นเมื่อมีหลักฐานเท่านั้น
+
+## ที่เกี่ยวข้อง
+
+- [Extract Function](/refactoring-from-zero-to-hero/th/composing-methods/extract-function/)
+- [Extract Variable](/refactoring-from-zero-to-hero/th/composing-methods/extract-variable/)
+- [Split Phase](/refactoring-from-zero-to-hero/th/composing-methods/split-phase/)
+
+<Callout title="query ปลดล็อก refactoring ที่ใหญ่กว่า">
+ผลตอบแทนที่แท้จริงไม่ใช่ temp ที่หายไป — แต่เป็นสิ่งที่เป็นไปได้หลังจากนั้น เมื่อการคำนวณอยู่ใน query ของตัวเอง โค้ดรอบ ๆ ก็หยุดพึ่งพา local และ Extract Function บนส่วนที่เหลือของ method ก็ทำงานได้ทันทีโดยไม่ต้องมี parameter ที่อึดอัด
+</Callout>
+
+export const quizTemp = [
+  {
+    q: 'Replace Temp with Query แทนที่ตัวแปร local ด้วยอะไร?',
+    options: ['ค่าคงที่ global', 'ฟังก์ชัน (query) ที่คำนวณค่า', 'field ของ class', 'comment'],
+    answer: 1,
+  },
+  {
+    q: 'temp ควรเข้าเงื่อนไขใดก่อนนำ refactoring นี้ไปใช้?',
+    options: [
+      'มันต้องถูกกำหนดค่าครั้งเดียวและไม่ถูก mutate หลังจากนั้น',
+      'มันต้องเป็น string',
+      'มันต้องถูกใช้ในลูป',
+      'มันต้องถูกประกาศเป็นค่าคงที่อยู่แล้ว',
+    ],
+    answer: 0,
+  },
+  {
+    q: 'ทำไม refactoring นี้จึงมักถูกใช้เป็นขั้นตอนเตรียมความพร้อม?',
+    options: [
+      'มันกำจัดความจำเป็นในการเทสต์',
+      'เมื่อค่ากลายเป็น query แล้ว โค้ดรอบ ๆ ก็ไม่พึ่งพา local อีกต่อไป ทำให้ Extract Function ง่ายขึ้น',
+      'มันทำให้โปรแกรมเร็วขึ้นเสมอ',
+      'มันลบ class ที่ครอบอยู่',
+    ],
+    answer: 1,
+  },
+];
+
+<Quiz client:visible id="composing-methods/replace-temp-with-query" questions={quizTemp} />
+
+<ProgressTracker client:visible id="composing-methods/replace-temp-with-query" />

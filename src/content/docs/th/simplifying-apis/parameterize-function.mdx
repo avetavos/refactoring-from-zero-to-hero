@@ -1,0 +1,189 @@
+---
+title: Parameterize Function
+description: เมื่อฟังก์ชันสองตัวที่เกือบเหมือนกันต่างกันแค่ค่า literal ให้รวมมันเป็นฟังก์ชันเดียวที่รับค่านั้นเป็นพารามิเตอร์
+sidebar:
+  order: 3
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+## เจตนา
+
+มองหาฟังก์ชันสองตัวขึ้นไปที่เนื้อในเหมือนกันยกเว้นค่าที่ฝังไว้ตายตัวค่าเดียว แล้วยุบมันให้เหลือฟังก์ชันเดียวที่รับค่านั้นเป็นพารามิเตอร์ ตอนนี้ตรรกะที่ซ้ำซ้อนอยู่ในที่เดียวเป๊ะ ๆ และความแตกต่างระหว่างตัวแปรเดิมกลายเป็นอาร์กิวเมนต์ที่มองเห็นได้ที่จุดเรียกใช้
+
+## กลิ่นไม่ดี
+
+นี่คือรสชาติหนึ่งของ **Duplicated Code** คุณเห็น `discountFivePercent` และ `discountTenPercent` นั่งอยู่ข้าง ๆ กัน เหมือนกันทุกอย่างยกเว้นตัวเลข หรือ `tierBronze` และ `tierSilver` ที่ต่างกันแค่ค่า threshold ทุกครั้งที่ตรรกะที่ใช้ร่วมกันต้องได้รับการแก้ คุณต้องจำให้ได้ว่าต้องไปแก้ทุก clone — และวันหนึ่งคุณก็จะลืมไปสักตัว ค่าคงที่ที่ฝังไว้ตายตัวคือสิ่งเดียวที่แปรเปลี่ยน มันจึงอยากเป็นอาร์กิวเมนต์ ไม่ใช่สำเนาของทั้งฟังก์ชัน
+
+## ก่อน → หลัง
+
+ฟังก์ชันสองตัวที่คำนวณราคาหลังหักส่วนลด ต่างกันแค่อัตรา หลังจากนั้น ฟังก์ชันเดียวรับอัตราเป็นพารามิเตอร์
+
+<Tabs syncKey="lang">
+  <TabItem label="TypeScript">
+    ```ts
+    // Before
+    function priceWithFivePercentOff(price: number): number {
+      return price - price * 0.05;
+    }
+
+    function priceWithTenPercentOff(price: number): number {
+      return price - price * 0.10;
+    }
+
+    const a = priceWithFivePercentOff(200);
+    const b = priceWithTenPercentOff(200);
+
+    // After
+    function discountedPrice(price: number, rate: number): number {
+      return price - price * rate;
+    }
+
+    const a = discountedPrice(200, 0.05);
+    const b = discountedPrice(200, 0.10);
+    ```
+  </TabItem>
+  <TabItem label="Python">
+    ```python
+    # Before
+    def price_with_five_percent_off(price):
+        return price - price * 0.05
+
+    def price_with_ten_percent_off(price):
+        return price - price * 0.10
+
+    a = price_with_five_percent_off(200)
+    b = price_with_ten_percent_off(200)
+
+    # After
+    def discounted_price(price, rate):
+        return price - price * rate
+
+    a = discounted_price(200, 0.05)
+    b = discounted_price(200, 0.10)
+    ```
+  </TabItem>
+  <TabItem label="Go">
+    ```go
+    // Before
+    func PriceWithFivePercentOff(price float64) float64 {
+        return price - price*0.05
+    }
+
+    func PriceWithTenPercentOff(price float64) float64 {
+        return price - price*0.10
+    }
+
+    a := PriceWithFivePercentOff(200)
+    b := PriceWithTenPercentOff(200)
+
+    // After
+    func DiscountedPrice(price, rate float64) float64 {
+        return price - price*rate
+    }
+
+    a := DiscountedPrice(200, 0.05)
+    b := DiscountedPrice(200, 0.10)
+    ```
+  </TabItem>
+  <TabItem label="Rust">
+    ```rust
+    // Before
+    fn price_with_five_percent_off(price: f64) -> f64 {
+        price - price * 0.05
+    }
+
+    fn price_with_ten_percent_off(price: f64) -> f64 {
+        price - price * 0.10
+    }
+
+    let a = price_with_five_percent_off(200.0);
+    let b = price_with_ten_percent_off(200.0);
+
+    // After
+    fn discounted_price(price: f64, rate: f64) -> f64 {
+        price - price * rate
+    }
+
+    let a = discounted_price(200.0, 0.05);
+    let b = discounted_price(200.0, 0.10);
+    ```
+  </TabItem>
+</Tabs>
+
+## กลไก
+
+1. เลือกฟังก์ชันที่เกือบเหมือนกันตัวหนึ่งมาเป็นแม่แบบ
+2. เพิ่มพารามิเตอร์สำหรับค่าที่แปรเปลี่ยน ตั้งชื่อให้สื่อความหมายอย่าง `rate` หรือ `threshold` ไม่ใช่ `value`
+3. ภายในเนื้อใน ให้แทน literal ที่ฝังไว้ตายตัวด้วยพารามิเตอร์ใหม่ **รันเทสต์ของคุณ** — พฤติกรรมควรไม่เปลี่ยนสำหรับกรณีเดิมของฟังก์ชันตัวนั้น เมื่อคุณส่งค่าคงที่เดิมของมันเข้าไป
+4. สำหรับ clone ที่เหลือแต่ละตัว ให้เปลี่ยนเส้นทางผู้เรียกใช้ของมันไปยังฟังก์ชันที่ถูก parameterize แล้ว โดยส่ง literal เฉพาะของ clone นั้นเข้าไปเป็นอาร์กิวเมนต์
+5. **รันเทสต์ของคุณ** หลังเปลี่ยนเส้นทางแต่ละ clone เพื่อให้ความล้มเหลวชี้ไปยังการเรียกใช้จุดเดียว
+6. เมื่อไม่มีอะไรเรียกใช้ clone เดิมแล้ว ให้ลบมันทิ้ง
+7. พิจารณาว่าพารามิเตอร์ใหม่ควรถูกตรวจสอบความถูกต้องหรือไม่ — ตัวอย่างเช่น อัตราส่วนลดที่อยู่นอกช่วงศูนย์ถึงหนึ่งน่าจะเป็นบั๊กที่ควรปฏิเสธ
+
+## เมื่อไรควรใช้ / ข้อแลกเปลี่ยน
+
+หยิบท่านี้มาใช้เมื่อฟังก์ชันต่างกันแค่ค่าคงที่ เมื่อคุณกำลังจะ copy-paste ฟังก์ชันแล้วปรับตัวเลขตัวเดียว หรือเมื่อชุดของตัวแปรที่มีชื่อต่าง ๆ เพิ่มขึ้นเรื่อย ๆ การ parameterize ฆ่าความซ้ำซ้อนและทำให้มิติที่แปรเปลี่ยนชัดเจนและค้นพบได้
+
+ข้อแลกเปลี่ยนคืออาร์กิวเมนต์แบบ literal ที่จุดเรียกใช้อาจอธิบายตัวเองได้น้อยกว่าฟังก์ชันที่ตั้งชื่อมาดี — `0.05` เปล่า ๆ บอกอะไรน้อยกว่า `priceWithFivePercentOff` ถ้าชุดของค่ามีจำนวนน้อยและสื่อความหมาย ค่าคงที่ที่มีชื่อหรือ enum ที่จุดเรียกใช้ก็คืนความชัดเจนนั้นกลับมา และจงต้านทานการ parameterize มากเกินไป: ฟังก์ชันที่มีปุ่มปรับแปดปุ่มใช้ยากกว่า clone ที่มันมาแทนที่
+
+## ที่เกี่ยวข้อง
+
+- [Remove Flag Argument](/refactoring-from-zero-to-hero/th/simplifying-apis/remove-flag-argument/)
+- [Introduce Parameter Object](/refactoring-from-zero-to-hero/th/simplifying-apis/introduce-parameter-object/)
+- [Extract Function](/refactoring-from-zero-to-hero/th/composing-methods/extract-function/)
+
+<Callout title="Parameterize ที่ค่า ไม่ใช่ที่พฤติกรรม">
+ท่านี้เปล่งประกายเมื่อความแตกต่างเพียงอย่างเดียวคือ *ข้อมูล* — อัตรา ขีดจำกัด ป้ายกำกับ เมื่อความแตกต่างคือ *พฤติกรรม* — ตัวแปรหนึ่งบันทึก log และอีกตัวส่งอีเมล — พารามิเตอร์ boolean ตัวเดียวมักจะแตกเนื้อในออกเป็นสอง ซึ่งคือกลิ่นของ Flag Argument ให้พารามิเตอร์บรรยายค่า และให้การแยกฟังก์ชันบรรยายพฤติกรรม
+</Callout>
+
+export const quizParameterize = [
+  {
+    q: 'รูปแบบใดส่งสัญญาณว่า Parameterize Function ใช้ได้?',
+    options: [
+      'ฟังก์ชันเดียวที่ยาวมาก',
+      'ฟังก์ชันสองตัวขึ้นไปที่เนื้อในเหมือนกันซึ่งต่างกันแค่ค่า literal',
+      'ฟังก์ชันที่ไม่มีพารามิเตอร์',
+      'ฟังก์ชันที่ไม่คืนค่าอะไรเลย',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'หลังจากเพิ่มพารามิเตอร์ให้ฟังก์ชันแม่แบบ อะไรยืนยันว่าคุณไม่ได้เปลี่ยนพฤติกรรมของมัน?',
+    options: [
+      'โค้ดคอมไพล์ผ่าน',
+      'ส่งค่าคงที่เดิมเข้าไปแล้วเห็นว่าเทสต์ยังคงผ่าน',
+      'ชื่อฟังก์ชันสั้นลง',
+      'literal ถูกลบออก',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'ข้อเสียของอาร์กิวเมนต์แบบ literal เปล่า ๆ ที่จุดเรียกใช้คืออะไร?',
+    options: [
+      'มันรันช้ากว่า',
+      'มันอาจอธิบายตัวเองได้น้อยกว่าฟังก์ชันตัวแปรที่ตั้งชื่อมาให้สื่อความหมาย',
+      'มันเทสต์ไม่ได้',
+      'มันเพิ่มการใช้หน่วยความจำ',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'เมื่อใดที่ความแตกต่างระหว่างฟังก์ชันบ่งชี้ให้แยกออกแทนที่จะ parameterize?',
+    options: [
+      'เมื่อความแตกต่างเป็นเพียงตัวเลข',
+      'เมื่อความแตกต่างอยู่ที่พฤติกรรม ซึ่งพารามิเตอร์ boolean จะแตกมันออกในเนื้อใน',
+      'เมื่อฟังก์ชันมีชื่อเหมือนกัน',
+      'เมื่อฟังก์ชันทั้งสองสั้น',
+    ],
+    answer: 1,
+  },
+];
+
+<Quiz client:visible id="simplifying-apis/parameterize-function" questions={quizParameterize} />
+
+<ProgressTracker client:visible id="simplifying-apis/parameterize-function" />

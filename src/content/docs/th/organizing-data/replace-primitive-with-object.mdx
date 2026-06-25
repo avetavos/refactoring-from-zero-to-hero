@@ -1,0 +1,248 @@
+---
+title: Replace Primitive with Object
+description: เมื่อค่า primitive เริ่มดึงดูดกฎการตรวจสอบความถูกต้องและการจัดรูปแบบเข้ามา ให้ยกระดับมันขึ้นเป็น value type ขนาดเล็กที่ถือทั้งข้อมูลและพฤติกรรมที่มันร้องขอมาตลอด
+sidebar:
+  order: 5
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+export const primitiveDiagram = `flowchart LR
+  subgraph Before["Before — Primitive Obsession"]
+    A["phone: string"]
+    A --> B["validate() copy-pasted"]
+    A --> C["format() copy-pasted"]
+    A --> D["areaCode() copy-pasted"]
+  end
+  subgraph After["After — a value type"]
+    E["class PhoneNumber"]
+    E --> F["holds the digits"]
+    E --> G["isValid()"]
+    E --> H["formatted()"]
+    E --> I["areaCode()"]
+  end
+  Before -.->|"Replace Primitive with Object"| After`;
+
+## เจตนา
+
+นำค่า primitive — สตริง ตัวเลข — ที่เริ่มสะสมกฎเกี่ยวกับวิธีตรวจสอบความถูกต้อง วิธี parse หรือวิธีจัดรูปแบบ แล้วห่อมันไว้ใน type ขนาดเล็กที่อุทิศไว้โดยเฉพาะ value object ใหม่ถือข้อมูลดิบ *และ* พฤติกรรม ดังนั้นกฎจึงอยู่ในจุดเดียว และชื่อ type ก็ประกาศว่าค่านั้นแท้จริงแล้วคืออะไร
+
+## กลิ่นเหม็น
+
+นี่คือยารักษาอาการ **Primitive Obsession**: การแทนแนวคิดเชิงโดเมนที่มีความหมายด้วย primitive ดิบ ๆ หมายเลขโทรศัพท์เป็น `string` จำนวนเงินเป็น `number` อุณหภูมิเป็น `float` เปลือย ๆ อาการเหมือนกัน คือลอจิกเดียวกันกระจัดกระจายไปทุกที่ที่มีการใช้ primitive — regex เดิมในการตรวจสอบหมายเลขโทรศัพท์ การปัดเศษเดิมในการจัดการเซนต์ การแปลงเดิมที่ทำซ้ำที่แต่ละจุด การทำซ้ำแต่ละครั้งคือจุดที่จะลืมกฎและสร้างบั๊กขึ้นมา
+
+## ก่อน → หลัง
+
+หมายเลขโทรศัพท์ที่ถูกพกพาเป็นสตริงดิบ พร้อมการตรวจสอบความถูกต้องและการจัดรูปแบบที่ทำซ้ำในทุกการใช้งาน หลังจากนั้น value type `PhoneNumber` ขนาดเล็กเป็นเจ้าของตัวเลขและพฤติกรรม
+
+<Tabs syncKey="lang">
+  <TabItem label="TypeScript">
+    ```ts
+    // Before
+    function callCustomer(phone: string): void {
+      const digits = phone.replace(/\D/g, '');
+      if (digits.length !== 10) throw new Error('invalid phone');
+      const pretty = `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
+      dial(pretty);
+    }
+
+    // After
+    class PhoneNumber {
+      private readonly digits: string;
+      constructor(raw: string) {
+        this.digits = raw.replace(/\D/g, '');
+        if (this.digits.length !== 10) throw new Error('invalid phone');
+      }
+      areaCode(): string {
+        return this.digits.slice(0, 3);
+      }
+      formatted(): string {
+        return `(${this.digits.slice(0, 3)}) ${this.digits.slice(3, 6)}-${this.digits.slice(6)}`;
+      }
+    }
+
+    function callCustomer(phone: PhoneNumber): void {
+      dial(phone.formatted());
+    }
+    ```
+  </TabItem>
+  <TabItem label="Python">
+    ```python
+    # Before
+    def call_customer(phone):
+        digits = "".join(c for c in phone if c.isdigit())
+        if len(digits) != 10:
+            raise ValueError("invalid phone")
+        pretty = f"({digits[:3]}) {digits[3:6]}-{digits[6:]}"
+        dial(pretty)
+
+    # After
+    class PhoneNumber:
+        def __init__(self, raw):
+            self._digits = "".join(c for c in raw if c.isdigit())
+            if len(self._digits) != 10:
+                raise ValueError("invalid phone")
+
+        def area_code(self):
+            return self._digits[:3]
+
+        def formatted(self):
+            d = self._digits
+            return f"({d[:3]}) {d[3:6]}-{d[6:]}"
+
+    def call_customer(phone):
+        dial(phone.formatted())
+    ```
+  </TabItem>
+  <TabItem label="Go">
+    ```go
+    // Before
+    func CallCustomer(phone string) error {
+        digits := stripNonDigits(phone)
+        if len(digits) != 10 {
+            return errors.New("invalid phone")
+        }
+        pretty := fmt.Sprintf("(%s) %s-%s", digits[:3], digits[3:6], digits[6:])
+        dial(pretty)
+        return nil
+    }
+
+    // After
+    type PhoneNumber struct {
+        digits string
+    }
+
+    func NewPhoneNumber(raw string) (PhoneNumber, error) {
+        d := stripNonDigits(raw)
+        if len(d) != 10 {
+            return PhoneNumber{}, errors.New("invalid phone")
+        }
+        return PhoneNumber{digits: d}, nil
+    }
+
+    func (p PhoneNumber) AreaCode() string { return p.digits[:3] }
+
+    func (p PhoneNumber) Formatted() string {
+        return fmt.Sprintf("(%s) %s-%s", p.digits[:3], p.digits[3:6], p.digits[6:])
+    }
+
+    func CallCustomer(phone PhoneNumber) {
+        dial(phone.Formatted())
+    }
+    ```
+  </TabItem>
+  <TabItem label="Rust">
+    ```rust
+    // Before
+    fn call_customer(phone: &str) -> Result<(), String> {
+        let digits: String = phone.chars().filter(|c| c.is_ascii_digit()).collect();
+        if digits.len() != 10 {
+            return Err("invalid phone".into());
+        }
+        let pretty = format!("({}) {}-{}", &digits[..3], &digits[3..6], &digits[6..]);
+        dial(&pretty);
+        Ok(())
+    }
+
+    // After
+    pub struct PhoneNumber {
+        digits: String,
+    }
+
+    impl PhoneNumber {
+        pub fn parse(raw: &str) -> Result<Self, String> {
+            let digits: String = raw.chars().filter(|c| c.is_ascii_digit()).collect();
+            if digits.len() != 10 {
+                return Err("invalid phone".into());
+            }
+            Ok(Self { digits })
+        }
+
+        pub fn area_code(&self) -> &str {
+            &self.digits[..3]
+        }
+
+        pub fn formatted(&self) -> String {
+            format!("({}) {}-{}", &self.digits[..3], &self.digits[3..6], &self.digits[6..])
+        }
+    }
+
+    fn call_customer(phone: &PhoneNumber) {
+        dial(&phone.formatted());
+    }
+    ```
+  </TabItem>
+</Tabs>
+
+<Mermaid code={primitiveDiagram} title="primitive ดิบที่มีกฎกระจัดกระจายกลายเป็น value type ที่เป็นเจ้าของพฤติกรรมของมัน" />
+
+## กลไก
+
+1. สร้างคลาสใหม่ที่มีฟิลด์เดียวถือ primitive ไว้ ให้คอนสตรักเตอร์ (หรือฟังก์ชัน parse) ที่รับค่าดิบและตรวจสอบความถูกต้องเพียงครั้งเดียว
+2. ย้ายพฤติกรรมที่กระจัดกระจายชิ้นหนึ่ง — การตรวจสอบความถูกต้อง การจัดรูปแบบ การ parse — เข้าไปเป็นเมท็อดบน type ใหม่
+3. แทนที่การใช้งาน primitive ดิบหนึ่งจุดด้วย value object โดยเรียกเมท็อดใหม่แทนลอจิกที่เขียนอินไลน์
+4. **รันเทสต์ของคุณ**
+5. ทำซ้ำ: ย้ายแต่ละจุดใช้งานและรวมแต่ละกฎที่ซ้ำกันเข้าเป็นเมท็อด ทีละอัน
+6. เมื่อทุกจุดใช้ value object แล้ว primitive และลอจิกที่กระจัดกระจายของมันจะหายไปจากโค้ดที่เรียกใช้ ตอนนี้ type เป็นบ้านของกฎใด ๆ ในอนาคตเกี่ยวกับแนวคิดนั้น
+
+## เมื่อไรควรใช้ / ข้อแลกเปลี่ยน
+
+ยกระดับ primitive เมื่อมันแบกความหมายเกินกว่า type ดิบของมัน และเมื่อคุณพบว่าตัวเองทำลอจิกเกี่ยวกับมันซ้ำ ๆ — การตรวจสอบความถูกต้อง การเปรียบเทียบ การจัดรูปแบบ การแปลงหน่วย value object รวมศูนย์กฎเหล่านั้น ทำให้สถานะที่ไม่ถูกต้องสร้างได้ยากขึ้น และให้ระบบ type ดักจับ `PhoneNumber` ที่ถูกส่งเข้าไปในที่ที่คาดหวัง `ZipCode` ได้
+
+ต้นทุนคือคลาสเพิ่มอีกหนึ่งและงานในการสร้างมันที่ขอบเขต สำหรับค่าที่ใช้ในที่เดียวโดยไม่มีกฎผูกติด primitive ดิบก็เพียงพอดีอยู่แล้ว — การห่อมันจะเป็นพิธีรีตองที่ไม่ได้ผลตอบแทน สัญญาณที่ให้ลงมือทำคือ *การทำซ้ำ*: สำเนาที่สองหรือที่สามของกฎเดียวกันคือช่วงเวลาที่ object เริ่มคุ้มค่า
+
+## ที่เกี่ยวข้อง
+
+- [Replace Magic Literal](/refactoring-from-zero-to-hero/th/organizing-data/replace-magic-literal/)
+- [Encapsulate Variable](/refactoring-from-zero-to-hero/th/organizing-data/encapsulate-variable/)
+- [Replace Type Code with Subclasses](/refactoring-from-zero-to-hero/th/organizing-data/replace-type-code-with-subclasses/)
+
+<Callout title="ตรวจสอบครั้งเดียว ตรงประตู">
+ชัยชนะที่ยิ่งใหญ่ที่สุดของ value object คือคอนสตรักเตอร์เป็นประตูทางเข้าเพียงประตูเดียว ตรวจสอบความถูกต้องตรงนั้น แล้วทุกอินสแตนซ์ที่มีอยู่ก็ถูกต้องตั้งแต่การสร้าง — ไม่มีผู้เรียกคนใดสามารถถือหมายเลขโทรศัพท์ที่ผิดรูปแบบได้เลย เพราะมันไม่อาจถูกสร้างขึ้นมาได้ตั้งแต่แรก โค้ดส่วนที่เหลือของคุณก็หยุดตรวจซ้ำในสิ่งที่ไม่มีทางผิดได้
+</Callout>
+
+export const quizPrimitive = [
+  {
+    q: 'Replace Primitive with Object รักษากลิ่นเหม็นใด?',
+    options: ['Long Function', 'Primitive Obsession', 'Duplicate imports', 'Dead code'],
+    answer: 1,
+  },
+  {
+    q: 'สัญญาณที่ชัดเจนที่สุดว่า primitive ควรกลายเป็น object คืออะไร?',
+    options: [
+      'มันถูกใช้เพียงครั้งเดียวโดยไม่มีกฎ',
+      'ลอจิกการตรวจสอบความถูกต้องหรือการจัดรูปแบบเดียวกันถูกทำซ้ำที่หลายจุด',
+      'มันเป็นค่าคงที่',
+      'มันไม่เคยถูกอ่าน',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'ทำไมการตรวจสอบความถูกต้องในคอนสตรักเตอร์จึงมีคุณค่ามาก?',
+    options: [
+      'มันทำให้โปรแกรมเป็น multithreaded',
+      'ทุกอินสแตนซ์ถูกต้องตั้งแต่การสร้าง ดังนั้นโค้ดอื่นจึงไม่ต้องตรวจซ้ำ',
+      'มันขจัดความจำเป็นในการเทสต์',
+      'มันซ่อนค่าจากตัวเจ้าของ',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'เมื่อใดที่ primitive ดิบยังเป็นตัวเลือกที่ถูกต้องอยู่?',
+    options: [
+      'เมื่อค่ามีกฎกระจัดกระจายมากมาย',
+      'เมื่อค่าถูกใช้ในที่เดียวโดยไม่มีพฤติกรรมผูกติด',
+      'เมื่อค่ามีส่วนร่วมในค่าคงตัว',
+      'เมื่อค่าถูกทำซ้ำทุกที่',
+    ],
+    answer: 1,
+  },
+];
+
+<Quiz client:visible id="organizing-data/replace-primitive-with-object" questions={quizPrimitive} />
+
+<ProgressTracker client:visible id="organizing-data/replace-primitive-with-object" />

@@ -1,0 +1,77 @@
+---
+title: Moving Features
+description: วางพฤติกรรมและข้อมูลแต่ละชิ้นไว้ในที่ที่ควรอยู่ — ย้ายฟังก์ชันและฟิลด์ระหว่างคลาสและโมดูล จากนั้นแยกหรือรวมคลาสให้ตรงกับความรับผิดชอบ
+sidebar:
+  order: 1
+---
+
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+export const overviewDiagram = `flowchart TD
+  A["A feature sits in the wrong place"] --> B{"What is misplaced?"}
+  B -->|"A function leans on another context"| C["Move Function"]
+  B -->|"A field is used elsewhere more"| D["Move Field"]
+  B -->|"One class does two jobs"| E["Extract Class"]
+  B -->|"A class no longer earns its keep"| F["Inline Class"]
+  B -->|"Callers navigate an object chain"| G["Hide Delegate"]
+  C --> H["Each module owns the right work"]
+  D --> H
+  E --> H
+  F --> H
+  G --> H`;
+
+## Intent
+
+กลุ่ม **moving features** เป็นเรื่องของ *ตำแหน่ง* การ refactor แบบ composing-methods จะปรับรูปร่างภายในของฟังก์ชัน แต่การย้ายเหล่านี้จะตัดสินว่าฟังก์ชัน ฟิลด์ หรือกลุ่มพฤติกรรมทั้งก้อนควรไปอยู่ในคลาสหรือโมดูลใด โปรแกรมยังคงทำสิ่งเดิมหลังจากนั้น — แต่งานแต่ละชิ้นจะอยู่ติดกับข้อมูลและผู้ร่วมงานที่มันใช้จริง
+
+## The smell
+
+การตัดสินใจเรื่องซอฟต์แวร์ในวันแรกแทบไม่เคยรอดมาถึงวันที่ร้อย ฟังก์ชันที่เคยเป็นของ `Order` ค่อย ๆ เติบโตจนอ่านข้อมูลส่วนใหญ่จาก `Customer` ฟิลด์ที่เพิ่มเข้าไปใน record หนึ่งกลับถูกแตะต้องทุกที่ยกเว้น record นั้น คลาสเล็ก ๆ ค่อย ๆ ดูดซับความรับผิดชอบที่สองเข้ามาอย่างเงียบ ๆ จนกลายเป็นสองคลาสที่สวมชื่อเดียวกัน เมื่อพฤติกรรมและข้อมูลที่มันพึ่งพิงห่างกันออกไป ทุกการเปลี่ยนแปลงก็หมายถึงการกระโดดไปมาระหว่างไฟล์ การย้ายในโมดูลนี้จะดึงมันกลับมาอยู่ด้วยกัน
+
+<Mermaid code={overviewDiagram} title="เลือกการย้ายแบบ moving-features ตามสิ่งที่วางผิดที่" />
+
+## What this module covers
+
+การ refactor ห้าแบบ ซึ่งแต่ละแบบย้อนกลับได้:
+
+- **Move Function** — เมื่อฟังก์ชันอ้างอิงข้อมูลและเมธอดของอ็อบเจกต์อื่นมากกว่าของตัวเอง (Feature Envy) ให้ย้ายมันไปยังคลาสที่มันอิจฉา
+- **Move Field** — เมื่อฟิลด์ถูกอ่านและเขียนจาก record อื่นมากกว่าบ้านปัจจุบันของมัน ให้ย้ายมันไปยังที่ที่ถูกใช้งาน
+- **Extract Class** — เมื่อคลาสหนึ่งเติบโตจนทำสองงานที่ต่างกัน (Large Class) ให้แยกความรับผิดชอบหนึ่งออกไปเป็นคลาสใหม่
+- **Inline Class** — สิ่งตรงข้าม: เมื่อคลาสไม่คุ้มกับการมีอยู่อีกต่อไป ให้พับมันกลับเข้าไปในคลาสที่ใช้มัน
+- **Hide Delegate** (และสิ่งตรงข้ามคือ **Remove Middle Man**) — ห่อหุ้มการมอบหมาย (delegation) เพื่อให้ผู้เรียกเลิกเดินไล่ตามสายของอ็อบเจกต์ ตามหลัก Law of Demeter
+
+แต่ละบทเรียนแสดง before-and-after เดียวกันใน TypeScript, Python, Go และ Rust จากนั้นพาเดินผ่านกลไก (mechanics) ที่ปลอดภัยและเป็นลำดับขั้น — โดยรันเทสต์ของคุณระหว่างทุกขั้นตอน
+
+<Callout title="ย้าย ไม่ใช่เขียนใหม่">
+ทุกการย้ายในที่นี้รักษาพฤติกรรมที่สังเกตได้ คุณกำลังย้ายตำแหน่งโค้ด ไม่ใช่ออกแบบมันใหม่ ทำการย้ายเป็นขั้นเล็ก ๆ พร้อมชุดเทสต์ที่เป็นสีเขียว และเมื่อมันลงตัวแล้ว *เท่านั้น* คุณจึงค่อยพิจารณาเปลี่ยนสิ่งที่โค้ดที่ย้ายมานั้นทำ
+</Callout>
+
+export const quizIndex = [
+  {
+    q: 'การ refactor แบบ "moving features" เปลี่ยนสิ่งใดเป็นหลัก?',
+    options: [
+      'พฤติกรรมที่สังเกตได้ของโปรแกรม',
+      'คลาสหรือโมดูลที่ฟังก์ชัน ฟิลด์ หรือความรับผิดชอบอาศัยอยู่',
+      'คำสั่งภายในของฟังก์ชันเดียว',
+      'ระดับการ optimize ของคอมไพเลอร์',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'Move Function แก้ smell ใดได้ตรงที่สุด?',
+    options: ['Long Function', 'Feature Envy', 'Duplicated Code', 'Primitive Obsession'],
+    answer: 1,
+  },
+  {
+    q: 'Inline Class เป็นสิ่งตรงข้ามของการ refactor ใดในโมดูลนี้?',
+    options: ['Move Field', 'Hide Delegate', 'Extract Class', 'Move Function'],
+    answer: 2,
+  },
+];
+
+<Quiz client:visible id="moving-features/index" questions={quizIndex} />
+
+<ProgressTracker client:visible id="moving-features/index" />

@@ -1,0 +1,255 @@
+---
+title: Replace Type Code with Subclasses
+description: When a type-code field drives switch-style branching, replace the conditional logic with polymorphism across a small class hierarchy — and know when State or Strategy fits better.
+sidebar:
+  order: 6
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+export const typeCodeDiagram = `flowchart TD
+  subgraph Before["Before — a type code"]
+    A["Employee<br/>type: 'engineer' | 'manager' | 'sales'"]
+    A --> B{"switch type"}
+    B --> C["pay logic for engineer"]
+    B --> D["pay logic for manager"]
+    B --> E["pay logic for sales"]
+  end
+  subgraph After["After — a hierarchy"]
+    F["Employee (abstract)<br/>payAmount()"]
+    F --> G["Engineer"]
+    F --> H["Manager"]
+    F --> I["Salesperson"]
+  end
+  Before -.->|"Replace Type Code with Subclasses"| After`;
+
+## Intent
+
+Take a field that holds a *type code* — an enum or string like `"engineer"`, `"manager"`, `"sales"` — that drives conditional behaviour, and replace each branch with a subclass. The shared base declares the operation; each subclass supplies its own version. The `switch` vanishes, and adding a new variant means adding a class instead of editing every conditional.
+
+## The smell
+
+The smell is a **type code paired with switching logic**: one field whose value is repeatedly inspected by `switch` or chained `if` statements that pick behaviour. The trouble compounds. The same `switch` over the same code tends to appear in several methods, so every new type means editing each of them, and the compiler offers no help when you forget one. Polymorphism turns those scattered branches into a single dispatch the language performs for you.
+
+## Before → After
+
+An `Employee` whose pay depends on a `type` string checked by a `switch`. After, each employee type is a subclass that knows its own pay rule.
+
+<Tabs syncKey="lang">
+  <TabItem label="TypeScript">
+    ```ts
+    // Before
+    class Employee {
+      constructor(public type: string, public base: number) {}
+      payAmount(): number {
+        switch (this.type) {
+          case 'engineer': return this.base;
+          case 'manager': return this.base * 1.2;
+          case 'sales': return this.base + 500;
+          default: throw new Error(`unknown type ${this.type}`);
+        }
+      }
+    }
+
+    // After
+    abstract class Employee {
+      constructor(public base: number) {}
+      abstract payAmount(): number;
+    }
+    class Engineer extends Employee {
+      payAmount(): number { return this.base; }
+    }
+    class Manager extends Employee {
+      payAmount(): number { return this.base * 1.2; }
+    }
+    class Salesperson extends Employee {
+      payAmount(): number { return this.base + 500; }
+    }
+    ```
+  </TabItem>
+  <TabItem label="Python">
+    ```python
+    # Before
+    class Employee:
+        def __init__(self, kind, base):
+            self.kind = kind
+            self.base = base
+        def pay_amount(self):
+            if self.kind == "engineer":
+                return self.base
+            elif self.kind == "manager":
+                return self.base * 1.2
+            elif self.kind == "sales":
+                return self.base + 500
+            raise ValueError(f"unknown type {self.kind}")
+
+    # After
+    from abc import ABC, abstractmethod
+
+    class Employee(ABC):
+        def __init__(self, base):
+            self.base = base
+        @abstractmethod
+        def pay_amount(self): ...
+
+    class Engineer(Employee):
+        def pay_amount(self):
+            return self.base
+
+    class Manager(Employee):
+        def pay_amount(self):
+            return self.base * 1.2
+
+    class Salesperson(Employee):
+        def pay_amount(self):
+            return self.base + 500
+    ```
+  </TabItem>
+  <TabItem label="Go">
+    ```go
+    // Before
+    type Employee struct {
+        Kind string
+        Base float64
+    }
+    func (e Employee) PayAmount() float64 {
+        switch e.Kind {
+        case "engineer":
+            return e.Base
+        case "manager":
+            return e.Base * 1.2
+        case "sales":
+            return e.Base + 500
+        default:
+            panic("unknown type " + e.Kind)
+        }
+    }
+
+    // After
+    type Employee interface {
+        PayAmount() float64
+    }
+
+    type Engineer struct{ Base float64 }
+    func (e Engineer) PayAmount() float64 { return e.Base }
+
+    type Manager struct{ Base float64 }
+    func (m Manager) PayAmount() float64 { return m.Base * 1.2 }
+
+    type Salesperson struct{ Base float64 }
+    func (s Salesperson) PayAmount() float64 { return s.Base + 500 }
+    ```
+  </TabItem>
+  <TabItem label="Rust">
+    ```rust
+    // Before
+    struct Employee {
+        kind: String,
+        base: f64,
+    }
+    impl Employee {
+        fn pay_amount(&self) -> f64 {
+            match self.kind.as_str() {
+                "engineer" => self.base,
+                "manager" => self.base * 1.2,
+                "sales" => self.base + 500.0,
+                other => panic!("unknown type {other}"),
+            }
+        }
+    }
+
+    // After
+    trait Employee {
+        fn pay_amount(&self) -> f64;
+    }
+
+    struct Engineer { base: f64 }
+    impl Employee for Engineer {
+        fn pay_amount(&self) -> f64 { self.base }
+    }
+
+    struct Manager { base: f64 }
+    impl Employee for Manager {
+        fn pay_amount(&self) -> f64 { self.base * 1.2 }
+    }
+
+    struct Salesperson { base: f64 }
+    impl Employee for Salesperson {
+        fn pay_amount(&self) -> f64 { self.base + 500.0 }
+    }
+    ```
+  </TabItem>
+</Tabs>
+
+<Mermaid code={typeCodeDiagram} title="A type-code switch becomes a class hierarchy with one method per subclass" />
+
+## Mechanics
+
+1. If the type code is not yet encapsulated, hide it behind an accessor first, so callers do not depend on the raw field.
+2. Create a subclass for one value of the type code. Provide a factory (or constructor) that returns the right subclass for a given code, so creation stays in one place.
+3. Move the behaviour for that value — one branch of the `switch` — into an overriding method on the subclass.
+4. **Run your tests.**
+5. Repeat for each remaining type-code value, removing each branch from the original conditional as you go.
+6. When the last branch is gone, delete the now-empty `switch` and, if nothing else needs it, the type-code field itself. The base operation is now abstract, supplied entirely by subclasses.
+
+## When to use / trade-offs
+
+Use subclasses when the type is fixed for the life of the object and when several methods branch on the same code. Polymorphism collapses those branches and lets the compiler ensure every subclass implements the operation, so a forgotten case becomes a build error rather than a runtime surprise.
+
+But subclasses are not always the right tool. If an object's type *changes during its lifetime* — an order moving from "pending" to "shipped" to "delivered" — you cannot swap its class, so reach for the **State** pattern: hold a separate state object the entity can replace as it transitions. And if you only need to vary one algorithm rather than a whole family of behaviour, **Strategy** — injecting a behaviour object — is lighter than a full hierarchy. Choose subclasses for stable identity, State for changing identity, Strategy for swappable single algorithms.
+
+## Related
+
+- [Encapsulate Variable](/refactoring-from-zero-to-hero/en/organizing-data/encapsulate-variable/)
+- [Replace Magic Literal](/refactoring-from-zero-to-hero/en/organizing-data/replace-magic-literal/)
+- [Replace Primitive with Object](/refactoring-from-zero-to-hero/en/organizing-data/replace-primitive-with-object/)
+
+<Callout title="Stable type → subclass; changing type → State">
+The deciding question is whether the type can change after the object is born. An employee's role is stable enough to be its class; an order's status flips again and again, so it must be data the object holds, not the class it *is*. Use subclasses for the former and the State pattern for the latter.
+</Callout>
+
+export const quizTypeCode = [
+  {
+    q: 'What does Replace Type Code with Subclasses remove?',
+    options: [
+      'All the data fields',
+      'Switch or if branching on a type code, replacing it with polymorphism',
+      'The test suite',
+      'The constructor',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'Why does the compiler help after this refactoring?',
+    options: [
+      'It deletes unused subclasses',
+      'It can ensure every subclass implements the required operation, catching a missed case at build time',
+      'It runs the program faster',
+      'It rewrites the switch automatically',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'An order moves from pending to shipped to delivered during its life. Which pattern fits best?',
+    options: ['Subclasses', 'The State pattern', 'Replace Magic Literal', 'Encapsulate Collection'],
+    answer: 1,
+  },
+  {
+    q: 'When is the Strategy pattern lighter than a full subclass hierarchy?',
+    options: [
+      'When you need to vary just one swappable algorithm rather than a whole family of behaviour',
+      'When the type never changes',
+      'When there is only one type code value',
+      'When you want to delete the class',
+    ],
+    answer: 0,
+  },
+];
+
+<Quiz client:visible id="organizing-data/replace-type-code-with-subclasses" questions={quizTypeCode} />
+
+<ProgressTracker client:visible id="organizing-data/replace-type-code-with-subclasses" />

@@ -1,0 +1,87 @@
+---
+title: Generalization & Inheritance
+description: ย้ายฟีเจอร์ขึ้น ลง และข้างเข้าออกในลำดับชั้นของ type — และรู้ว่าเมื่อไรควรสลับจาก inheritance ไปใช้ composition — เพื่อให้โค้ดซ้ำหายไปและความสัมพันธ์สื่อความจริง
+sidebar:
+  order: 1
+---
+
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+export const overviewDiagram = `classDiagram
+  class Superclass {
+    +shared() members
+  }
+  class SubclassA
+  class SubclassB
+  Superclass <|-- SubclassA : pull up / push down
+  Superclass <|-- SubclassB : extract superclass
+  class Interface {
+    <<interface>>
+    +protocol()
+  }
+  Interface <|.. SubclassA : extract interface
+  class Delegate {
+    +behaviour()
+  }
+  SubclassB --> Delegate : replace inheritance / subclass with delegation`;
+
+## เจตนา
+
+กลุ่มของ **generalization and inheritance** ย้ายฟีเจอร์ *ในแนวตั้ง* และ *ในแนวข้าง* ข้ามไปมาในลำดับชั้นของ type ที่เกี่ยวข้องกัน สมาชิกที่พี่น้องสองคลาสมีร่วมกันถูกดึงขึ้นไปไว้ที่พ่อแม่ สมาชิกที่มีเพียงสาขาเดียวต้องใช้ถูกผลักลงไป สองคลาสที่ไม่เกี่ยวข้องกันแต่เติบโตจนคล้ายกันก็งอกพ่อแม่ร่วมกันขึ้นมา และเมื่อ inheritance กลายเป็นเครื่องมือที่ผิด — เมื่อ subclass ใช้พ่อแม่เพียงเสี้ยวเดียว หรือความสัมพันธ์แบบ "is-a" เป็นเรื่องโกหก — การเคลื่อนไหวเหล่านี้ช่วยให้คุณสลับมันไปเป็น composition โดยไม่เปลี่ยนสิ่งที่โปรแกรมทำ
+
+## กลิ่นไม่ดี
+
+inheritance ทรงพลังและล้ำเส้นได้ง่าย เมท็อดที่เหมือนกันถูกคัดลอกวางลงไปใน subclass สามตัว ฟิลด์อยู่ใน superclass แต่ subclass เพียงครึ่งหนึ่งเท่านั้นที่แตะมัน คลาสหนึ่ง extends อีกคลาสเพียงเพื่อยืม helper สองตัว แล้วก็ inherit อีกสิบสองตัวที่ต้องแกล้งทำเป็นไม่มี แต่ละกรณีคือลำดับชั้นที่ไม่ได้บอกความจริงเกี่ยวกับวิธีที่ type สัมพันธ์กันอีกต่อไป refactoring ที่อยู่ในนี้จัดลำดับชั้นให้ตรง — หรือสลายมันไปเป็น delegation เมื่อ composition เหมาะกว่า
+
+<Mermaid code={overviewDiagram} title="ฟีเจอร์เคลื่อนข้ามลำดับชั้นอย่างไรในโมดูลนี้" />
+
+## โมดูลนี้ครอบคลุมอะไรบ้าง
+
+refactoring ห้าตัว แต่ละตัวย้อนกลับได้:
+
+- **Pull Up Method / Field** — เมื่อพี่น้องมีสมาชิกที่เหมือนกัน ให้ย้ายมันขึ้นไปไว้ที่ superclass เพื่อให้มันอยู่ในที่เดียวเป๊ะ ๆ ส่วน **Push Down** เป็นสิ่งตรงข้าม: สมาชิกที่มีเพียงบาง subclass ต้องใช้จะหล่นลงไปอยู่ใน subclass เหล่านั้น
+- **Extract Superclass / Interface** — เมื่อสองคลาสมีฟีเจอร์ร่วมกัน ให้ยกความเหมือนขึ้นไปเป็นพ่อแม่ใหม่ และเมื่อมันมีเพียง protocol ร่วมกัน ให้ extract เป็น interface (เป็น trait ใน Rust)
+- **Replace Inheritance with Delegation** — เมื่อ subclass พึ่งพาพ่อแม่เพียงบางส่วน ให้ถือพ่อแม่เดิมไว้เป็นฟิลด์แล้ว delegate ไปหามัน
+- **Replace Subclass with Delegation** — เมื่อ subclass แตกต่างกันตามแกนเดียว ให้แทนลำดับชั้นทั้งหมดด้วยคลาสเดียวที่ถือ strategy object ไว้
+- **Collapse Hierarchy** — เมื่อ subclass กับ superclass ของมันใกล้กันเกินกว่าจะให้มีสอง type ได้ ก็รวมมันเป็นหนึ่ง
+
+แต่ละบทเรียนแสดง before-and-after เดียวกันใน TypeScript, Python, Go และ Rust สังเกตว่า **Go และ Rust ไม่มี class inheritance**: Go ประกอบพฤติกรรมผ่าน *struct embedding* และ interface ส่วน Rust ผ่าน *trait* และฟิลด์ที่ถือไว้ ดังนั้นตัวอย่างในภาษาเหล่านั้นจึงจำลองเจตนาเดียวกันด้วย composition — ซึ่งอย่างที่คุณจะได้เห็น คือจุดที่ refactoring หลายตัวเหล่านี้พยายามนำคุณไปอยู่แล้ว
+
+<Callout title="inheritance เป็นเครื่องมือคม ไม่ใช่ค่าตั้งต้น">
+หยิบลำดับชั้นมาใช้เมื่อ subtype *เป็น* ชนิดหนึ่งของ supertype จริง ๆ และใช้ interface ทั้งหมดของมันร่วมกัน ทันทีที่ subclass เริ่ม override สมาชิกให้กลายเป็น no-op หรือยืมพ่อแม่เพียงเสี้ยวเดียว ความสัมพันธ์นั้นกำลังโกหก — และ refactoring แบบ delegation ในโมดูลนี้คือทางออกของคุณ Go และ Rust ทำให้บทเรียนนี้เป็นเชิงโครงสร้าง: เมื่อไม่มี inheritance ให้พึ่ง คุณก็ประกอบด้วย composition โดยปริยาย
+</Callout>
+
+export const quizIndex = [
+  {
+    q: 'refactoring ในโมดูลนี้ย้ายอะไรเป็นหลัก?',
+    options: [
+      'statement ภายในฟังก์ชันเดียว',
+      'ฟีเจอร์ขึ้น ลง และข้าง ข้ามลำดับชั้นของ type',
+      'แถวในฐานข้อมูลระหว่างตาราง',
+      'ไฟล์ระหว่างไดเรกทอรี',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'Go และ Rust จำลองเจตนาของ refactoring แบบ inheritance เหล่านี้อย่างไร?',
+    options: [
+      'ใช้ class inheritance เหมือน TypeScript และ Python ทุกประการ',
+      'ไม่สามารถแสดงแนวคิดเหล่านี้ได้เลย',
+      'ผ่าน composition — struct embedding และ interface ใน Go, trait และฟิลด์ที่ถือไว้ใน Rust',
+      'ผ่าน global function เท่านั้น',
+    ],
+    answer: 2,
+  },
+  {
+    q: 'Push Down อธิบายได้ดีที่สุดว่าเป็นสิ่งตรงข้ามของ refactoring ตัวใด?',
+    options: ['Collapse Hierarchy', 'Pull Up', 'Extract Interface', 'Replace Subclass with Delegation'],
+    answer: 1,
+  },
+];
+
+<Quiz client:visible id="generalization-and-inheritance/index" questions={quizIndex} />
+
+<ProgressTracker client:visible id="generalization-and-inheritance/index" />

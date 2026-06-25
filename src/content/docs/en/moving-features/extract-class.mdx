@@ -1,0 +1,247 @@
+---
+title: Extract Class
+description: When one class has grown to do two distinct jobs, peel one responsibility out into a class of its own.
+sidebar:
+  order: 4
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+export const extractClassDiagram = `classDiagram
+  class PersonBefore {
+    name
+    areaCode
+    number
+    telephoneNumber()
+  }
+  class PersonAfter {
+    name
+    telephone
+    telephoneNumber()
+  }
+  class TelephoneNumber {
+    areaCode
+    number
+    toString()
+  }
+  PersonAfter --> TelephoneNumber : has a
+  PersonBefore ..> PersonAfter : Extract Class`;
+
+## Intent
+
+A class has quietly taken on a second responsibility. Pull the fields and methods that serve that second job out into a brand-new class, and give the original class a reference to it. Each class now has one clear reason to change.
+
+## The smell
+
+This is the cure for the **Large Class** — and, more precisely, for a class with two responsibilities tangled together. The signs: a subset of fields that always change together, methods that only operate on that subset, or a name that has to use "and" to describe what the class does. When you can draw a clean line through the class's data, the half on each side wants to be its own type.
+
+## Before → After
+
+A `Person` that also stores and formats a telephone number. Before, the phone fields and the phone formatting live on `Person`. After, they form a `TelephoneNumber` class, and `Person` simply holds one.
+
+<Tabs syncKey="lang">
+  <TabItem label="TypeScript">
+    ```ts
+    // Before
+    class Person {
+      constructor(
+        public name: string,
+        public areaCode: string,
+        public number: string,
+      ) {}
+
+      telephoneNumber(): string {
+        return `(${this.areaCode}) ${this.number}`;
+      }
+    }
+
+    // After
+    class TelephoneNumber {
+      constructor(public areaCode: string, public number: string) {}
+
+      toString(): string {
+        return `(${this.areaCode}) ${this.number}`;
+      }
+    }
+
+    class Person {
+      constructor(public name: string, public telephone: TelephoneNumber) {}
+
+      telephoneNumber(): string {
+        return this.telephone.toString();
+      }
+    }
+    ```
+  </TabItem>
+  <TabItem label="Python">
+    ```python
+    # Before
+    class Person:
+        def __init__(self, name, area_code, number):
+            self.name = name
+            self.area_code = area_code
+            self.number = number
+
+        def telephone_number(self):
+            return f"({self.area_code}) {self.number}"
+
+    # After
+    class TelephoneNumber:
+        def __init__(self, area_code, number):
+            self.area_code = area_code
+            self.number = number
+
+        def __str__(self):
+            return f"({self.area_code}) {self.number}"
+
+    class Person:
+        def __init__(self, name, telephone):
+            self.name = name
+            self.telephone = telephone
+
+        def telephone_number(self):
+            return str(self.telephone)
+    ```
+  </TabItem>
+  <TabItem label="Go">
+    ```go
+    // Before
+    type Person struct {
+        Name     string
+        AreaCode string
+        Number   string
+    }
+
+    func (p Person) TelephoneNumber() string {
+        return fmt.Sprintf("(%s) %s", p.AreaCode, p.Number)
+    }
+
+    // After
+    type TelephoneNumber struct {
+        AreaCode string
+        Number   string
+    }
+
+    func (t TelephoneNumber) String() string {
+        return fmt.Sprintf("(%s) %s", t.AreaCode, t.Number)
+    }
+
+    type Person struct {
+        Name      string
+        Telephone TelephoneNumber
+    }
+
+    func (p Person) TelephoneNumber() string {
+        return p.Telephone.String()
+    }
+    ```
+  </TabItem>
+  <TabItem label="Rust">
+    ```rust
+    // Before
+    struct Person {
+        name: String,
+        area_code: String,
+        number: String,
+    }
+
+    impl Person {
+        fn telephone_number(&self) -> String {
+            format!("({}) {}", self.area_code, self.number)
+        }
+    }
+
+    // After
+    struct TelephoneNumber {
+        area_code: String,
+        number: String,
+    }
+
+    impl TelephoneNumber {
+        fn to_string(&self) -> String {
+            format!("({}) {}", self.area_code, self.number)
+        }
+    }
+
+    struct Person {
+        name: String,
+        telephone: TelephoneNumber,
+    }
+
+    impl Person {
+        fn telephone_number(&self) -> String {
+            self.telephone.to_string()
+        }
+    }
+    ```
+  </TabItem>
+</Tabs>
+
+<Mermaid code={extractClassDiagram} title="One Person splits into Person plus a TelephoneNumber it owns" />
+
+## Mechanics
+
+1. Decide how to split the responsibilities, and create a new empty class for the one you are extracting. If the old name no longer fits the remaining class, rename it.
+2. Add a link from the old class to the new one — usually a field holding an instance of the new class.
+3. Move the relevant fields across one at a time, using **Move Field**, keeping the suite green after each.
+4. Move the methods that belong with those fields across, using **Move Function**, starting from the lowest-level ones.
+5. Replace the old class's direct field access with calls through the new instance.
+6. **Run your tests** after every move. Each step is small enough that a red bar points at one change.
+7. Review the public surface of both classes and narrow it — the extracted class may be able to hide details the original had to expose.
+
+## When to use / trade-offs
+
+Extract a class when a subset of fields and methods forms an obvious cluster, when a class is hard to summarize without "and", or when one responsibility changes for entirely different reasons than the rest.
+
+The cost is one more class to name, construct, and navigate, plus a layer of delegation. If a class is *not* genuinely doing two jobs, extracting only adds ceremony. The inverse is **Inline Class**: if the new class never grows into its own responsibility, fold it back in.
+
+## Related
+
+- [Inline Class](/refactoring-from-zero-to-hero/en/moving-features/inline-class/)
+- [Move Field](/refactoring-from-zero-to-hero/en/moving-features/move-field/)
+- [Move Function](/refactoring-from-zero-to-hero/en/moving-features/move-function/)
+
+<Callout title="One reason to change">
+A healthy class has a single reason to change. If you can describe a class only by joining two phrases with "and" — "holds a person's identity *and* formats their phone number" — that "and" is the seam. Extract along it and each new class earns one clear responsibility.
+</Callout>
+
+export const quizExtractClass = [
+  {
+    q: 'Which smell does Extract Class primarily address?',
+    options: ['Long Function', 'Large Class with two responsibilities', 'Magic Numbers', 'Switch Statements'],
+    answer: 1,
+  },
+  {
+    q: 'What is a strong sign that a class should be split?',
+    options: [
+      'It has a constructor',
+      'A subset of its fields and methods always change together as a cluster',
+      'It is used in more than one file',
+      'It has a getter and a setter',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'Which refactorings do the heavy lifting inside the Extract Class mechanics?',
+    options: [
+      'Inline Variable and Split Phase',
+      'Move Field and Move Function',
+      'Extract Variable and Replace Temp with Query',
+      'Hide Delegate and Remove Middle Man',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'What is the inverse of Extract Class?',
+    options: ['Move Field', 'Hide Delegate', 'Inline Class', 'Extract Function'],
+    answer: 2,
+  },
+];
+
+<Quiz client:visible id="moving-features/extract-class" questions={quizExtractClass} />
+
+<ProgressTracker client:visible id="moving-features/extract-class" />

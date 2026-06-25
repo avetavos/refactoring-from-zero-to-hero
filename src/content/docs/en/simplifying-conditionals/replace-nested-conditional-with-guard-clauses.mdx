@@ -1,0 +1,245 @@
+---
+title: Replace Nested Conditional with Guard Clauses
+description: Flatten a deeply nested if/else by returning early for the special cases, leaving the main path unindented and obvious.
+sidebar:
+  order: 4
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+export const guardDiagram = `flowchart TD
+  subgraph Before["Before — nested"]
+    A{"is dead?"} -->|no| B{"is separated?"}
+    A -->|yes| AD["deadAmount"]
+    B -->|no| C{"is retired?"}
+    B -->|yes| BD["separatedAmount"]
+    C -->|no| CN["normalPay"]
+    C -->|yes| CD["retiredAmount"]
+  end
+  subgraph After["After — guards"]
+    G1["if dead return deadAmount"] --> G2["if separated return separatedAmount"]
+    G2 --> G3["if retired return retiredAmount"]
+    G3 --> G4["return normalPay"]
+  end
+  Before -.->|"Replace Nested Conditional with Guard Clauses"| After`;
+
+## Intent
+
+Take a function whose real work is buried inside a staircase of `if/else` blocks and pull each special case out to the top as a **guard clause** — a check that returns immediately. Once every exceptional case has exited early, the normal path is left at the base indentation level, where it reads as the function's true purpose.
+
+## The smell
+
+This is the cure for **nested conditionals** that make the happy path hard to find. When `if/else` blocks nest three or four deep, the line you actually care about sits far to the right, and you must hold every enclosing condition in your head to know when it runs. Guard clauses flip the emphasis: each early return says *"this odd case is handled, now forget about it,"* so by the time you reach the bottom, only the main scenario remains.
+
+## Before → After
+
+A payroll function returns different amounts for dead, separated, and retired employees, with normal pay as the default. Before, the cases nest. After, each is a guard.
+
+<Tabs syncKey="lang">
+  <TabItem label="TypeScript">
+    ```ts
+    // Before
+    function payAmount(employee: Employee): number {
+      let result: number;
+      if (employee.isDead) {
+        result = deadAmount();
+      } else {
+        if (employee.isSeparated) {
+          result = separatedAmount();
+        } else {
+          if (employee.isRetired) {
+            result = retiredAmount();
+          } else {
+            result = normalPay(employee);
+          }
+        }
+      }
+      return result;
+    }
+
+    // After
+    function payAmount(employee: Employee): number {
+      if (employee.isDead) return deadAmount();
+      if (employee.isSeparated) return separatedAmount();
+      if (employee.isRetired) return retiredAmount();
+      return normalPay(employee);
+    }
+    ```
+  </TabItem>
+  <TabItem label="Python">
+    ```python
+    # Before
+    def pay_amount(employee):
+        if employee.is_dead:
+            result = dead_amount()
+        else:
+            if employee.is_separated:
+                result = separated_amount()
+            else:
+                if employee.is_retired:
+                    result = retired_amount()
+                else:
+                    result = normal_pay(employee)
+        return result
+
+    # After
+    def pay_amount(employee):
+        if employee.is_dead:
+            return dead_amount()
+        if employee.is_separated:
+            return separated_amount()
+        if employee.is_retired:
+            return retired_amount()
+        return normal_pay(employee)
+    ```
+  </TabItem>
+  <TabItem label="Go">
+    ```go
+    // Before
+    func PayAmount(employee Employee) int {
+        var result int
+        if employee.IsDead {
+            result = deadAmount()
+        } else {
+            if employee.IsSeparated {
+                result = separatedAmount()
+            } else {
+                if employee.IsRetired {
+                    result = retiredAmount()
+                } else {
+                    result = normalPay(employee)
+                }
+            }
+        }
+        return result
+    }
+
+    // After
+    func PayAmount(employee Employee) int {
+        if employee.IsDead {
+            return deadAmount()
+        }
+        if employee.IsSeparated {
+            return separatedAmount()
+        }
+        if employee.IsRetired {
+            return retiredAmount()
+        }
+        return normalPay(employee)
+    }
+    ```
+  </TabItem>
+  <TabItem label="Rust">
+    ```rust
+    // Before
+    fn pay_amount(employee: &Employee) -> i64 {
+        let result;
+        if employee.is_dead {
+            result = dead_amount();
+        } else {
+            if employee.is_separated {
+                result = separated_amount();
+            } else {
+                if employee.is_retired {
+                    result = retired_amount();
+                } else {
+                    result = normal_pay(employee);
+                }
+            }
+        }
+        result
+    }
+
+    // After
+    fn pay_amount(employee: &Employee) -> i64 {
+        if employee.is_dead {
+            return dead_amount();
+        }
+        if employee.is_separated {
+            return separated_amount();
+        }
+        if employee.is_retired {
+            return retired_amount();
+        }
+        normal_pay(employee)
+    }
+    ```
+  </TabItem>
+</Tabs>
+
+<Mermaid code={guardDiagram} title="A nested if/else staircase becomes a flat sequence of guard clauses" />
+
+## Mechanics
+
+1. Pick the outermost condition that handles a special case. Replace its branch with an early return, and lift it to the top of the function.
+2. **Run your tests.** The result for that case must be identical.
+3. Move to the next-outermost condition and do the same, removing the `else` now that the case above returns.
+4. Continue until every special case is a guard and only the main path remains at the bottom, unindented.
+5. If a guard's condition reads awkwardly when inverted, consider extracting it with **Decompose Conditional** so the early return still reads cleanly.
+
+## When to use / trade-offs
+
+Reach for guard clauses when nesting hides the function's normal flow, especially when several branches are *exceptions* rather than equal alternatives. The refactoring shines when the cases are genuinely "handle and leave" — error checks, missing data, edge states.
+
+It is less appropriate when the branches are truly parallel choices of equal weight; forcing those into guards can imply a precedence that does not exist. Some teams also prefer a single exit point per function — if yours does, weigh that convention against the readability gain. In most modern code, the flatter version wins.
+
+## Related
+
+- [Decompose Conditional](/refactoring-from-zero-to-hero/en/simplifying-conditionals/decompose-conditional/)
+- [Consolidate Conditional Expression](/refactoring-from-zero-to-hero/en/simplifying-conditionals/consolidate-conditional/)
+- [Introduce Special Case](/refactoring-from-zero-to-hero/en/simplifying-conditionals/introduce-special-case/)
+
+<Callout title="Guards express 'this is not the main story'">
+A guard clause tells the reader the case is unusual and now dealt with. Reserve them for exceptions and edge conditions. If you turn equal alternatives into guards, you imply one matters less than the others — which can mislead the next maintainer.
+</Callout>
+
+export const quizGuard = [
+  {
+    q: 'What is a guard clause?',
+    options: [
+      'A condition that wraps the entire function body',
+      'A check at the top that returns early for a special case',
+      'A loop that validates input',
+      'A comment describing the precondition',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'After replacing nested conditionals with guards, where does the main path end up?',
+    options: [
+      'Deeply indented inside the last else',
+      'At the base indentation level, at the bottom of the function',
+      'Inside a separate class',
+      'Removed entirely',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'When are guard clauses LESS appropriate?',
+    options: [
+      'When the branches are exceptional cases',
+      'When the branches are truly parallel choices of equal weight',
+      'When there is missing data to handle',
+      'When an error must short-circuit the function',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'What should you run after lifting each special case to a guard?',
+    options: [
+      'A linter only',
+      'Your tests, to confirm the result for that case is unchanged',
+      'The build, then commit immediately',
+      'Nothing — guards cannot change behaviour',
+    ],
+    answer: 1,
+  },
+];
+
+<Quiz client:visible id="simplifying-conditionals/replace-nested-conditional-with-guard-clauses" questions={quizGuard} />
+
+<ProgressTracker client:visible id="simplifying-conditionals/replace-nested-conditional-with-guard-clauses" />

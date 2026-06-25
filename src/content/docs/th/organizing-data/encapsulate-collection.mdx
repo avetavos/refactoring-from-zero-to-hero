@@ -1,0 +1,231 @@
+---
+title: Encapsulate Collection
+description: อย่าส่งมอบฟิลด์คอลเลกชันที่เปลี่ยนแปลงได้ออกไปเด็ดขาด คืนค่าเป็นสำเนาหรือ view แบบอ่านอย่างเดียว และจัดเตรียมเมท็อด add กับ remove อย่างชัดเจน เพื่อให้เจ้าของยังควบคุมเนื้อหาของมันได้
+sidebar:
+  order: 4
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+export const collectionDiagram = `flowchart LR
+  subgraph Before["Before"]
+    A["caller"] -->|"gets raw list"| B[("items[]")]
+    A -->|"push() / splice() directly"| B
+  end
+  subgraph After["After"]
+    C["caller"] -->|"items() → read-only copy"| D[("items[] (private)")]
+    C -->|"addItem() / removeItem()"| D
+  end
+  Before -.->|"Encapsulate Collection"| After`;
+
+## เจตนา
+
+เมื่อออบเจ็กต์หนึ่งเป็นเจ้าของคอลเลกชัน — ลิสต์ เซ็ต แมป — อย่าเปิดเผยคอนเทนเนอร์ดิบ ๆ ออกไป ให้คืนค่าเป็นสำเนาหรือ view แบบอ่านอย่างเดียวจาก getter และจัดเตรียมเมท็อด `add` กับ `remove` เฉพาะสำหรับการเปลี่ยนแปลง เจ้าของจะกลายเป็นผู้มีอำนาจเพียงหนึ่งเดียวเหนือเนื้อหาของตัวเอง อิสระที่จะบังคับค่าคงตัว (invariant) ในทันทีที่มีอะไรถูกเพิ่มเข้าหรือลบออก
+
+## กลิ่นเหม็น
+
+กลิ่นเหม็นคือ getter ที่คืนค่าเป็น **คอลเลกชันสด ๆ ที่เปลี่ยนแปลงได้** ตัวมันเอง ออบเจ็กต์เจ้าของคิดว่ามันควบคุมเนื้อหาของตัวเอง แต่ความจริงแล้วผู้เรียกคนใดก็ตามสามารถถือการอ้างอิงไว้แล้ว `push`, `splice`, `clear` หรือจัดเรียงใหม่ลับหลังเจ้าของได้ ค่าคงตัวค่อย ๆ ผุพังอย่างเงียบ ๆ: คลาสที่สัญญาว่า "ยอดรวมของออเดอร์ตรงกับรายการสินค้าเสมอ" ไม่สามารถรักษาสัญญานั้นได้หากคนนอกสามารถเปลี่ยนแปลงลิสต์รายการสินค้าได้โดยตรง
+
+## ก่อน → หลัง
+
+`Order` ที่ลิสต์ `items` ถูกเปิดเผยแบบดิบ ๆ ทำให้ผู้เรียกเปลี่ยนแปลงมันได้ หลังจากนั้น ลิสต์เป็น private การอ่านคืนค่าเป็นสำเนาเชิงป้องกัน และการเปลี่ยนแปลงผ่านเมท็อดที่สามารถรักษายอดรวมที่ได้มา (derived total) ให้ถูกต้องได้
+
+<Tabs syncKey="lang">
+  <TabItem label="TypeScript">
+    ```ts
+    // Before
+    class Order {
+      items: LineItem[] = [];
+    }
+    const order = new Order();
+    order.items.push(item); // bypasses the owner entirely
+
+    // After
+    class Order {
+      #items: LineItem[] = [];
+
+      get items(): readonly LineItem[] {
+        return [...this.#items]; // defensive copy
+      }
+
+      addItem(item: LineItem): void {
+        this.#items.push(item);
+      }
+
+      removeItem(item: LineItem): void {
+        this.#items = this.#items.filter((i) => i !== item);
+      }
+
+      get total(): number {
+        return this.#items.reduce((sum, i) => sum + i.price, 0);
+      }
+    }
+    ```
+  </TabItem>
+  <TabItem label="Python">
+    ```python
+    # Before
+    class Order:
+        def __init__(self):
+            self.items = []
+    order = Order()
+    order.items.append(item)  # bypasses the owner entirely
+
+    # After
+    class Order:
+        def __init__(self):
+            self._items = []
+
+        @property
+        def items(self):
+            return tuple(self._items)  # read-only snapshot
+
+        def add_item(self, item):
+            self._items.append(item)
+
+        def remove_item(self, item):
+            self._items.remove(item)
+
+        @property
+        def total(self):
+            return sum(i.price for i in self._items)
+    ```
+  </TabItem>
+  <TabItem label="Go">
+    ```go
+    // Before
+    type Order struct {
+        Items []LineItem // exported: anyone can mutate
+    }
+    order.Items = append(order.Items, item) // bypasses the owner
+
+    // After
+    type Order struct {
+        items []LineItem // unexported
+    }
+
+    func (o *Order) Items() []LineItem {
+        out := make([]LineItem, len(o.items))
+        copy(out, o.items) // defensive copy
+        return out
+    }
+
+    func (o *Order) AddItem(item LineItem) {
+        o.items = append(o.items, item)
+    }
+
+    func (o *Order) Total() float64 {
+        var sum float64
+        for _, i := range o.items {
+            sum += i.Price
+        }
+        return sum
+    }
+    ```
+  </TabItem>
+  <TabItem label="Rust">
+    ```rust
+    // Before
+    pub struct Order {
+        pub items: Vec<LineItem>, // public: anyone can mutate
+    }
+    // order.items.push(item); // bypasses the owner
+
+    // After
+    pub struct Order {
+        items: Vec<LineItem>, // private
+    }
+
+    impl Order {
+        pub fn items(&self) -> &[LineItem] {
+            &self.items // read-only borrow, not a mutable handle
+        }
+
+        pub fn add_item(&mut self, item: LineItem) {
+            self.items.push(item);
+        }
+
+        pub fn remove_item(&mut self, index: usize) {
+            self.items.remove(index);
+        }
+
+        pub fn total(&self) -> f64 {
+            self.items.iter().map(|i| i.price).sum()
+        }
+    }
+    ```
+  </TabItem>
+</Tabs>
+
+<Mermaid code={collectionDiagram} title="ลิสต์ดิบที่เปลี่ยนแปลงได้กลายเป็นคอลเลกชันที่ถูกป้องกันด้วยเมท็อด add และ remove" />
+
+## กลไก
+
+1. เพิ่มเมท็อด `add` และ `remove` (หรือสิ่งเทียบเท่า) อย่างชัดเจนสำหรับคอลเลกชัน ภายในพวกมันเปลี่ยนแปลงฟิลด์ที่เป็น private
+2. หาทุกจุดภายนอกที่เปลี่ยนแปลงคอลเลกชันโดยตรง แล้วเปลี่ยนเส้นทางให้ผ่านเมท็อดใหม่ ทำทีละกลุ่มเล็ก ๆ
+3. **รันเทสต์ของคุณ** หลังจากแต่ละกลุ่ม
+4. เปลี่ยน getter ให้ไม่คืนค่าคอนเทนเนอร์สดอีกต่อไป คืนค่าเป็นสำเนา view แบบอ่านอย่างเดียว หรือ iterator — อะไรก็ตามที่ภาษาของคุณมีให้เพื่อป้องกันการเปลี่ยนแปลงจากภายนอก
+5. ทำให้ฟิลด์เองเป็น private หรือ unexported
+6. **รันเทสต์ของคุณ** อีกครั้ง เมื่อทุกการเปลี่ยนแปลงผ่านเมท็อดอยู่แล้ว ไม่ควรมีอะไรพัง — และตอนนี้เจ้าของก็สามารถบังคับค่าคงตัวในเมท็อดเหล่านั้นได้
+
+## เมื่อไรควรใช้ / ข้อแลกเปลี่ยน
+
+ใช้สิ่งนี้เมื่อใดก็ตามที่คลาสหนึ่งเป็นเจ้าของคอลเลกชันที่เป็นส่วนหนึ่งของสถานะของมัน และโดยเฉพาะอย่างยิ่งเมื่อคอลเลกชันมีส่วนร่วมในค่าคงตัว การห่อหุ้มมันช่วยให้เจ้าของตรวจสอบความถูกต้องของการเพิ่ม ปฏิเสธรายการซ้ำ รักษาค่าที่ได้มา (เช่น ยอดรวมที่เคลื่อนไหว) ให้ถูกต้อง และป้องกันการเสียหายอย่างเงียบ ๆ จากผู้เรียกที่อยู่ไกลออกไป
+
+ข้อแลกเปลี่ยนคือต้นทุนของการคัดลอกในทุกการอ่าน และอินเทอร์เฟซที่ใหญ่ขึ้นเล็กน้อย สำหรับคอลเลกชันขนาดเล็กที่อ่านนาน ๆ ครั้ง การคัดลอกเป็นประกันที่ไม่สำคัญ สำหรับคอลเลกชันที่ใหญ่มากหรืออยู่ใน hot-path ให้เลือกใช้ *view* แบบอ่านอย่างเดียวแทนสำเนาเต็มในที่ที่ภาษาของคุณรองรับ เพื่อให้คุณหลีกเลี่ยงการ allocate ได้ในขณะที่ยังคงปิดกั้นการเปลี่ยนแปลง
+
+## ที่เกี่ยวข้อง
+
+- [Encapsulate Variable](/refactoring-from-zero-to-hero/th/organizing-data/encapsulate-variable/)
+- [Replace Primitive with Object](/refactoring-from-zero-to-hero/th/organizing-data/replace-primitive-with-object/)
+- [Replace Magic Literal](/refactoring-from-zero-to-hero/th/organizing-data/replace-magic-literal/)
+
+<Callout title="getter ที่คืนค่าลิสต์สดคือการโกหก">
+หาก getter ของคุณส่งคอนเทนเนอร์จริงคืนกลับมา เมท็อด add และ remove ของคุณก็เป็นแค่ละครฉาก — ผู้เรียกสามารถเพิกเฉยต่อพวกมันและเปลี่ยนแปลงลิสต์โดยตรงได้ง่าย ๆ การห่อหุ้มจะคงอยู่ได้ก็ต่อเมื่อการอ่านคืนค่าเป็นสำเนาหรือ view แบบอ่านอย่างเดียวเท่านั้น เพื่อให้เมท็อดเป็นวิธี *เดียว* ที่จะเปลี่ยนเนื้อหาได้
+</Callout>
+
+export const quizCollection = [
+  {
+    q: 'กฎหลักของ Encapsulate Collection คืออะไร?',
+    options: [
+      'คืนค่าคอลเลกชันสดที่เปลี่ยนแปลงได้เสมอเพื่อความสะดวก',
+      'อย่าเปิดเผยคอลเลกชันดิบเด็ดขาด คืนค่าเป็นสำเนาหรือ view แบบอ่านอย่างเดียว และเสนอเมท็อด add/remove',
+      'ทำให้คอลเลกชันเป็นตัวแปร global',
+      'ลบฟิลด์คอลเลกชันออก',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'ทำไมการคืนค่าคอลเลกชันสดจาก getter จึงอันตราย?',
+    options: [
+      'มันช้ากว่าการคัดลอก',
+      'ผู้เรียกสามารถเปลี่ยนแปลงมันได้โดยตรง ข้ามผ่านเจ้าของและทำลายค่าคงตัว',
+      'มันใช้หน่วยความจำมากกว่า',
+      'มันไม่สามารถ serialize ได้',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'เมท็อด add และ remove ควรทำให้อะไรเป็นไปได้?',
+    options: [
+      'ให้เจ้าของบังคับค่าคงตัวเมื่อเนื้อหาเปลี่ยน',
+      'ซ่อนคอลเลกชันจากตัวเจ้าของเอง',
+      'ลบการตรวจสอบความถูกต้องทั้งหมด',
+      'เปิดเผยฟิลด์ออกสู่สาธารณะ',
+    ],
+    answer: 0,
+  },
+  {
+    q: 'สำหรับคอลเลกชันที่ใหญ่มากและอยู่ใน hot-path อะไรมักดีกว่าสำเนาเต็มในตอนอ่าน?',
+    options: ['การคืนค่าเป็น view แบบอ่านอย่างเดียว', 'การคืนค่าลิสต์สดที่เปลี่ยนแปลงได้', 'การคืนค่า null', 'การคืนค่า deep clone ทุกครั้ง'],
+    answer: 0,
+  },
+];
+
+<Quiz client:visible id="organizing-data/encapsulate-collection" questions={quizCollection} />
+
+<ProgressTracker client:visible id="organizing-data/encapsulate-collection" />

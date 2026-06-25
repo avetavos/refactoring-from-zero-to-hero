@@ -1,0 +1,206 @@
+---
+title: Small Steps and Tests
+description: The refactoring rhythm — a tiny behavior-preserving change, run the tests, commit — and why small steps plus a test safety net make restructuring safe.
+sidebar:
+  order: 4
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+export const rhythmDiagram = `flowchart TB
+  A["Make ONE tiny<br/>behavior-preserving change"] --> B["Run the tests"]
+  B -->|green| C["Commit"]
+  B -->|red| D["Undo the last step"]
+  D --> E["Take a smaller step"]
+  E --> A
+  C --> F{"Done?"}
+  F -->|no| A
+  F -->|yes| G["Stop"]`;
+
+## The rhythm
+
+Refactoring done well looks almost boring. You do not stare at a function and then retype it dramatically. You make one tiny change, confirm nothing broke, and save your progress. Then you do it again. The loop is:
+
+1. Make **one** small, behavior-preserving change.
+2. **Run the tests.**
+3. If they pass, **commit**. If they fail, **undo** and take a smaller step.
+
+<Mermaid code={rhythmDiagram} title="The refactoring rhythm — small change, test, commit, repeat until done" />
+
+## Why small steps?
+
+The size of your steps determines how far you can fall. If you change fifty lines and the tests go red, the bug could be in any of them — you are back to debugging. If you change *one* thing and the tests go red, you know exactly what caused it, because nothing else moved. Undo that single step and you are instantly back to a working program.
+
+Small steps feel slower. They are not. The time you "lose" taking many tiny steps is far less than the time you lose hunting a regression through a giant tangled diff. Small steps trade a feeling of speed for the reality of never being lost.
+
+## Why a test safety net?
+
+The whole definition of refactoring is *behavior preservation*. Tests are how you *prove* it. After each step, a green bar is your evidence that the change you just made was invisible to the outside world. Without tests, you are only *hoping* behavior was preserved — and hope is not a safety net.
+
+If the code you want to refactor has no tests, write some first. Even a few **characterization tests** — tests that simply pin down what the code does *today*, correct or not — give you the net you need to restructure with confidence.
+
+## A worked tiny-steps example
+
+We will turn an awkward conditional that returns a discount rate into a clear, flat structure. Watch the steps: introduce an explaining name, then flatten the nesting. Run the tests after *each* step (shown here as the final state, but you would commit twice).
+
+<Tabs syncKey="lang">
+  <TabItem label="TypeScript">
+    ```ts
+    // Before
+    function discount(total: number, member: boolean): number {
+      let rate = 0;
+      if (member) {
+        if (total > 100) {
+          rate = 0.2;
+        } else {
+          rate = 0.1;
+        }
+      }
+      return total * rate;
+    }
+
+    // After
+    function discount(total: number, member: boolean): number {
+      if (!member) return 0;
+      const rate = total > 100 ? 0.2 : 0.1;
+      return total * rate;
+    }
+    ```
+  </TabItem>
+  <TabItem label="Python">
+    ```python
+    # Before
+    def discount(total, member):
+        rate = 0
+        if member:
+            if total > 100:
+                rate = 0.2
+            else:
+                rate = 0.1
+        return total * rate
+
+    # After
+    def discount(total, member):
+        if not member:
+            return 0
+        rate = 0.2 if total > 100 else 0.1
+        return total * rate
+    ```
+  </TabItem>
+  <TabItem label="Go">
+    ```go
+    // Before
+    func Discount(total float64, member bool) float64 {
+        rate := 0.0
+        if member {
+            if total > 100 {
+                rate = 0.2
+            } else {
+                rate = 0.1
+            }
+        }
+        return total * rate
+    }
+
+    // After
+    func Discount(total float64, member bool) float64 {
+        if !member {
+            return 0
+        }
+        rate := 0.1
+        if total > 100 {
+            rate = 0.2
+        }
+        return total * rate
+    }
+    ```
+  </TabItem>
+  <TabItem label="Rust">
+    ```rust
+    // Before
+    fn discount(total: f64, member: bool) -> f64 {
+        let mut rate = 0.0;
+        if member {
+            if total > 100.0 {
+                rate = 0.2;
+            } else {
+                rate = 0.1;
+            }
+        }
+        total * rate
+    }
+
+    // After
+    fn discount(total: f64, member: bool) -> f64 {
+        if !member {
+            return 0.0;
+        }
+        let rate = if total > 100.0 { 0.2 } else { 0.1 };
+        total * rate
+    }
+    ```
+  </TabItem>
+</Tabs>
+
+The same inputs yield the same discount. Each intermediate state still compiled and passed — that is what let us keep moving without fear.
+
+## Related
+
+- [What is refactoring?](/refactoring-from-zero-to-hero/en/intro-and-principles/what-is-refactoring/)
+- [Reading code smells](/refactoring-from-zero-to-hero/en/intro-and-principles/reading-code-smells/)
+- [Replace Temp with Query](/refactoring-from-zero-to-hero/en/composing-methods/replace-temp-with-query/)
+
+<Callout title="Green bar to green bar">
+Treat every commit as a checkpoint where the tests are green. Move from one green bar to the next in steps small enough that, if anything breaks, undoing the last step costs you seconds — not an afternoon. That is the entire safety model of refactoring.
+</Callout>
+
+export const quizSteps = [
+  {
+    q: 'What are the three beats of the refactoring rhythm?',
+    options: [
+      'Design, build, deploy',
+      'Small change, run the tests, commit',
+      'Read, rewrite, release',
+      'Plan, estimate, schedule',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'Why prefer many small steps over one large change?',
+    options: [
+      'Small steps are always more fun',
+      'A failing test points at exactly one tiny change instead of a large diff',
+      'Large changes are forbidden by the compiler',
+      'Small steps skip the need for tests',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'What role do tests play during refactoring?',
+    options: [
+      'They add new behavior to the code',
+      'They prove behavior was preserved after each step',
+      'They make the code run faster',
+      'They replace the need for commits',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'If code you want to refactor has no tests, what should you do first?',
+    options: [
+      'Refactor anyway and hope for the best',
+      'Delete the code',
+      'Write characterization tests that pin down current behavior',
+      'Skip the refactoring permanently',
+    ],
+    answer: 2,
+  },
+];
+
+<Quiz client:visible id="intro-and-principles/small-steps-and-tests" questions={quizSteps} />
+
+<ProgressTracker client:visible id="intro-and-principles/small-steps-and-tests" />

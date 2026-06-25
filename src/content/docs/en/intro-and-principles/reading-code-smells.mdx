@@ -1,0 +1,166 @@
+---
+title: Reading Code Smells
+description: Code smells are the triggers that tell you what to refactor — a catalog overview mapped to the refactorings this course teaches, with a short example.
+sidebar:
+  order: 5
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+export const smellDiagram = `flowchart LR
+  S["Code smell<br/>(a hint, not a rule)"] --> J{"Worth it<br/>right now?"}
+  J -->|yes| R["Pick a matching<br/>refactoring"]
+  J -->|no| N["Note it,<br/>move on"]
+  R --> T["Small step → test → commit"]`;
+
+## Smells are triggers, not laws
+
+You now know *how* to refactor safely. The missing piece is knowing *what* to refactor and *when*. The answer is **code smells**: surface signs that something underneath may be poorly structured. The word *smell* is deliberate — a smell is a hint that invites a closer look, not a rule that demands action. Sometimes the smell is fine in context. The skill is learning to notice the smell and then decide.
+
+<Mermaid code={smellDiagram} title="A smell is a hint: notice it, judge whether it is worth fixing now, then take small steps" />
+
+## A catalog overview
+
+Here are the smells you will meet most often, each paired with the refactorings this course teaches to address it. Treat this as your map: when something feels wrong, name the smell, then look up the move.
+
+| Smell | What you notice | Where this course addresses it |
+| --- | --- | --- |
+| **Long Function** | A function that scrolls off the screen and does many things | [Composing Methods](/refactoring-from-zero-to-hero/en/composing-methods/) — [Extract Function](/refactoring-from-zero-to-hero/en/composing-methods/extract-function/) |
+| **Duplicated Code** | The same fragment appears in two or more places | [Extract Function](/refactoring-from-zero-to-hero/en/composing-methods/extract-function/) and [Moving Features](/refactoring-from-zero-to-hero/en/moving-features/) |
+| **Mysterious Name** | A variable or function whose name hides its purpose | [Extract Variable](/refactoring-from-zero-to-hero/en/composing-methods/extract-variable/) |
+| **Large Class** | A class hoarding too many fields and responsibilities | [Moving Features](/refactoring-from-zero-to-hero/en/moving-features/) |
+| **Long Parameter List** | A call with so many arguments you lose track | [Simplifying APIs](/refactoring-from-zero-to-hero/en/simplifying-apis/) |
+| **Feature Envy** | A method more interested in another object's data than its own | [Moving Features](/refactoring-from-zero-to-hero/en/moving-features/) |
+| **Primitive Obsession** | Bare strings and numbers standing in for real concepts | [Organizing Data](/refactoring-from-zero-to-hero/en/organizing-data/) |
+| **Shotgun Surgery** | One small change forces edits scattered across many files | [Moving Features](/refactoring-from-zero-to-hero/en/moving-features/) |
+| **Tangled Conditionals** | Deeply nested or repeated branching that hides the logic | [Simplifying Conditionals](/refactoring-from-zero-to-hero/en/simplifying-conditionals/) |
+| **Temporary Field / Inheritance Misuse** | State used only sometimes, or hierarchies that fight you | [Generalization & Inheritance](/refactoring-from-zero-to-hero/en/generalization-and-inheritance/) |
+
+## A short example smell
+
+Here is **Primitive Obsession**: a raw number is passed around to mean "money," but nothing stops a caller from mixing it up with a quantity or a temperature. The smell is the bare primitive standing in for a domain concept. The cure — wrapping it in a small type — lives in [Organizing Data](/refactoring-from-zero-to-hero/en/organizing-data/), but you should learn to *smell* it now.
+
+<Tabs syncKey="lang">
+  <TabItem label="TypeScript">
+    ```ts
+    // Smell: a bare number means "money" — easy to misuse
+    function total(price: number, shipping: number): number {
+      return price + shipping;
+    }
+
+    // Hint of the cure: give money its own type
+    type Money = { cents: number };
+
+    function totalMoney(price: Money, shipping: Money): Money {
+      return { cents: price.cents + shipping.cents };
+    }
+    ```
+  </TabItem>
+  <TabItem label="Python">
+    ```python
+    # Smell: a bare number means "money" — easy to misuse
+    def total(price, shipping):
+        return price + shipping
+
+    # Hint of the cure: give money its own type
+    from dataclasses import dataclass
+
+    @dataclass
+    class Money:
+        cents: int
+
+    def total_money(price: Money, shipping: Money) -> Money:
+        return Money(price.cents + shipping.cents)
+    ```
+  </TabItem>
+  <TabItem label="Go">
+    ```go
+    // Smell: a bare number means "money" — easy to misuse
+    func Total(price, shipping float64) float64 {
+        return price + shipping
+    }
+
+    // Hint of the cure: give money its own type
+    type Money struct{ Cents int }
+
+    func TotalMoney(price, shipping Money) Money {
+        return Money{Cents: price.Cents + shipping.Cents}
+    }
+    ```
+  </TabItem>
+  <TabItem label="Rust">
+    ```rust
+    // Smell: a bare number means "money" — easy to misuse
+    fn total(price: f64, shipping: f64) -> f64 {
+        price + shipping
+    }
+
+    // Hint of the cure: give money its own type
+    struct Money {
+        cents: i64,
+    }
+
+    fn total_money(price: Money, shipping: Money) -> Money {
+        Money { cents: price.cents + shipping.cents }
+    }
+    ```
+  </TabItem>
+</Tabs>
+
+The wrapped version makes it impossible to accidentally add money to a quantity — the compiler or the type now carries the meaning that the bare number left to chance.
+
+## Related
+
+- [Why and when to refactor](/refactoring-from-zero-to-hero/en/intro-and-principles/why-and-when/)
+- [Small steps and tests](/refactoring-from-zero-to-hero/en/intro-and-principles/small-steps-and-tests/)
+- [Composing Methods](/refactoring-from-zero-to-hero/en/composing-methods/)
+
+<Callout title="Name the smell before reaching for a move">
+Do not refactor on a vague feeling. When code bothers you, name the smell first — "this is a Long Function," "that is Duplicated Code." Naming it tells you which refactoring fits and keeps you honest about whether the change is worth doing right now.
+</Callout>
+
+export const quizSmells = [
+  {
+    q: 'What is a code smell?',
+    options: [
+      'A compiler error you must fix immediately',
+      'A surface hint that something may be poorly structured, inviting a closer look',
+      'A guaranteed bug in the program',
+      'A type of automated test',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'Which refactoring most directly addresses a Long Function?',
+    options: ['Primitive Obsession', 'Extract Function', 'Shotgun Surgery', 'Feature Envy'],
+    answer: 1,
+  },
+  {
+    q: 'Which smell is shown in the example?',
+    options: [
+      'Long Parameter List',
+      'Primitive Obsession — a bare number standing in for a domain concept',
+      'Large Class',
+      'Feature Envy',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'Why name the smell before choosing a refactoring?',
+    options: [
+      'Because the compiler requires a name',
+      'Naming it tells you which move fits and whether it is worth doing now',
+      'Because every smell has exactly one fix',
+      'To make the diff larger',
+    ],
+    answer: 1,
+  },
+];
+
+<Quiz client:visible id="intro-and-principles/reading-code-smells" questions={quizSmells} />
+
+<ProgressTracker client:visible id="intro-and-principles/reading-code-smells" />

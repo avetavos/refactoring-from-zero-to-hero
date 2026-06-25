@@ -1,0 +1,241 @@
+---
+title: Split Phase
+description: แยกโค้ดที่ทำงานสองอย่างที่ต่างกันออกเป็นสอง phase ที่เรียงลำดับและเชื่อมกันด้วยโครงสร้างข้อมูลกลางที่ชัดเจน
+sidebar:
+  order: 6
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+export const phaseDiagram = `flowchart LR
+  R["Raw input<br/>(string)"] --> P1["Phase 1: Parse"]
+  P1 --> I["Intermediate data<br/>(structured order)"]
+  I --> P2["Phase 2: Calculate"]
+  P2 --> O["Result<br/>(price)"]`;
+
+## เจตนา
+
+เมื่อโค้ดบล็อกหนึ่งทำสิ่งที่ต่างกันจริง ๆ สองอย่างตามลำดับ — เช่น *parse* ข้อมูลนำเข้าแล้ว *คำนวณ* ผลลัพธ์จากมัน — ให้แยกมันออกเป็นสอง phase phase แรกสร้างโครงสร้างข้อมูลกลางที่ชัดเจน phase ที่สองบริโภคเฉพาะโครงสร้างนั้น
+
+## smell
+
+นี่คือวิธีรักษา **tangled responsibilities** ภายในโค้ดช่วงเดียว การ parse และการคำนวณถูกสอดประสานกัน ดังนั้นการเปลี่ยน format ของ input ก็บังคับให้คุณต้องไปแตะคณิตศาสตร์ และการเปลี่ยนคณิตศาสตร์ก็บังคับให้คุณต้องคิดถึง string ทั้งสองความกังวลใช้ตัวแปรร่วมกัน และผู้อ่านไม่สามารถโฟกัสทีละอย่างได้เลย การตั้งชื่อโครงสร้างกลางขีดเส้นที่สะอาดระหว่างทั้งสอง
+
+## Before → After
+
+ฟังก์ชันหนึ่ง parse string `"name:qty:price"` ดิบและคำนวณยอดรวมในลมหายใจเดียว แยกมัน: parse ให้เป็น order object แล้วค่อยคิดราคา order
+
+<Tabs syncKey="lang">
+  <TabItem label="TypeScript">
+    ```ts
+    // Before
+    function orderTotal(raw: string): number {
+      const parts = raw.split(':');
+      const qty = Number(parts[1]);
+      const price = Number(parts[2]);
+      return qty > 100 ? qty * price * 0.9 : qty * price;
+    }
+
+    // After
+    interface ParsedOrder {
+      name: string;
+      qty: number;
+      price: number;
+    }
+
+    function parseOrder(raw: string): ParsedOrder {
+      const [name, qty, price] = raw.split(':');
+      return { name, qty: Number(qty), price: Number(price) };
+    }
+
+    function priceOrder(order: ParsedOrder): number {
+      const base = order.qty * order.price;
+      return order.qty > 100 ? base * 0.9 : base;
+    }
+
+    function orderTotal(raw: string): number {
+      return priceOrder(parseOrder(raw));
+    }
+    ```
+  </TabItem>
+  <TabItem label="Python">
+    ```python
+    # Before
+    def order_total(raw):
+        parts = raw.split(":")
+        qty = int(parts[1])
+        price = float(parts[2])
+        return qty * price * 0.9 if qty > 100 else qty * price
+
+    # After
+    from dataclasses import dataclass
+
+    @dataclass
+    class ParsedOrder:
+        name: str
+        qty: int
+        price: float
+
+    def parse_order(raw):
+        name, qty, price = raw.split(":")
+        return ParsedOrder(name, int(qty), float(price))
+
+    def price_order(order):
+        base = order.qty * order.price
+        return base * 0.9 if order.qty > 100 else base
+
+    def order_total(raw):
+        return price_order(parse_order(raw))
+    ```
+  </TabItem>
+  <TabItem label="Go">
+    ```go
+    // Before
+    func OrderTotal(raw string) float64 {
+        parts := strings.Split(raw, ":")
+        qty, _ := strconv.Atoi(parts[1])
+        price, _ := strconv.ParseFloat(parts[2], 64)
+        if qty > 100 {
+            return float64(qty) * price * 0.9
+        }
+        return float64(qty) * price
+    }
+
+    // After
+    type ParsedOrder struct {
+        Name  string
+        Qty   int
+        Price float64
+    }
+
+    func parseOrder(raw string) ParsedOrder {
+        parts := strings.Split(raw, ":")
+        qty, _ := strconv.Atoi(parts[1])
+        price, _ := strconv.ParseFloat(parts[2], 64)
+        return ParsedOrder{Name: parts[0], Qty: qty, Price: price}
+    }
+
+    func priceOrder(order ParsedOrder) float64 {
+        base := float64(order.Qty) * order.Price
+        if order.Qty > 100 {
+            return base * 0.9
+        }
+        return base
+    }
+
+    func OrderTotal(raw string) float64 {
+        return priceOrder(parseOrder(raw))
+    }
+    ```
+  </TabItem>
+  <TabItem label="Rust">
+    ```rust
+    // Before
+    fn order_total(raw: &str) -> f64 {
+        let parts: Vec<&str> = raw.split(':').collect();
+        let qty: i32 = parts[1].parse().unwrap();
+        let price: f64 = parts[2].parse().unwrap();
+        if qty > 100 {
+            qty as f64 * price * 0.9
+        } else {
+            qty as f64 * price
+        }
+    }
+
+    // After
+    struct ParsedOrder {
+        name: String,
+        qty: i32,
+        price: f64,
+    }
+
+    fn parse_order(raw: &str) -> ParsedOrder {
+        let parts: Vec<&str> = raw.split(':').collect();
+        ParsedOrder {
+            name: parts[0].to_string(),
+            qty: parts[1].parse().unwrap(),
+            price: parts[2].parse().unwrap(),
+        }
+    }
+
+    fn price_order(order: &ParsedOrder) -> f64 {
+        let base = order.qty as f64 * order.price;
+        if order.qty > 100 {
+            base * 0.9
+        } else {
+            base
+        }
+    }
+
+    fn order_total(raw: &str) -> f64 {
+        price_order(&parse_order(raw))
+    }
+    ```
+  </TabItem>
+</Tabs>
+
+<Mermaid code={phaseDiagram} title="สอง phase เชื่อมกันด้วยโครงสร้างกลางที่ชัดเจน" />
+
+## Mechanics
+
+1. extract phase ที่สอง (การคำนวณ) ออกมาเป็นฟังก์ชันของตัวเอง **รันเทสต์ของคุณ**
+2. introduce โครงสร้างข้อมูลกลางแล้วส่งมันเข้าไปเป็น argument ให้ฟังก์ชัน phase ที่สองนั้น
+3. ตรวจสอบแต่ละค่าที่ phase ที่สองอ่านจาก phase แรก ย้ายแต่ละค่าไปไว้บนโครงสร้างกลางทีละค่า โดยรันเทสต์หลังการย้ายแต่ละครั้ง
+4. extract phase แรก (การ parse) ออกมาเป็นฟังก์ชันของตัวเองที่คืนโครงสร้างกลาง
+5. ยืนยันว่าฟังก์ชันระดับบนสุดตอนนี้เป็นเพียง phase แรกป้อนเข้า phase ที่สอง แล้ว **รันชุดเทสต์ทั้งหมด**
+
+## เมื่อใดควรใช้ / ข้อแลกเปลี่ยน
+
+Split Phase เมื่อบล็อกหนึ่งจัดการสองขั้นตอนอย่างชัดเจน — parse แล้ว compute, validate แล้ว act, fetch แล้ว format — และขั้นตอนเหล่านั้นมีอะไรร่วมกันน้อยนอกเหนือจากการส่งต่อ โครงสร้างกลางกลายเป็น contract ที่มีชื่อระหว่างพวกมัน ดังนั้นแต่ละ phase เปลี่ยนแปลงได้อย่างอิสระและถูกเทสต์ได้ด้วยตัวมันเอง
+
+ราคาที่ต้องจ่ายคือ data type พิเศษหนึ่งอันและ indirection เล็ก ๆ ถ้าสอง "phase" พันกันแน่นหรือสั้นแบบไม่สำคัญ รอยต่อก็เป็นของปลอม — ปล่อยให้โค้ดเป็นชิ้นเดียวไว้
+
+## ที่เกี่ยวข้อง
+
+- [Extract Function](/refactoring-from-zero-to-hero/th/composing-methods/extract-function/)
+- [Replace Temp with Query](/refactoring-from-zero-to-hero/th/composing-methods/replace-temp-with-query/)
+
+<Callout title="โครงสร้างกลางคือหัวใจทั้งหมด">
+การแยกจะคุ้มค่าก็ต่อเมื่อข้อมูลที่ส่งผ่านระหว่าง phase นั้นชัดเจนและมีชื่อดี ถุงคลุมเครือของตัวแปรที่เหลือ ๆ ไม่ดีไปกว่าความยุ่งเหยิงที่คุณเริ่มต้นมา ออกแบบ type กลางให้อธิบายได้แม่นยำว่า phase หนึ่งสร้างอะไรและ phase สองต้องการอะไร — ไม่มากไปกว่านั้น
+</Callout>
+
+export const quizSplit = [
+  {
+    q: 'อะไรเชื่อมสอง phase เข้าด้วยกันหลังการ refactor แบบ Split Phase?',
+    options: [
+      'ตัวแปร global ที่ใช้ร่วมกัน',
+      'โครงสร้างข้อมูลกลางที่ชัดเจน',
+      'การเรียก network',
+      'บล็อก try/catch',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'คู่ใดเป็นตัวเลือกทั่วไปสำหรับ Split Phase?',
+    options: [
+      'การ logging และการ retry',
+      'การ parse input แล้วคำนวณผลลัพธ์จากมัน',
+      'ลูปสองอันที่เหมือนกัน',
+      'getter และ setter',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'เมื่อใดที่ Split Phase ไม่คุ้มค่าที่จะนำไปใช้?',
+    options: [
+      'เมื่อสองขั้นตอนมีอะไรร่วมกันน้อยนอกเหนือจากการส่งต่อ',
+      'เมื่อขั้นตอนต่าง ๆ พันกันแน่นหรือสั้นแบบไม่สำคัญ',
+      'เมื่อ format ของ input เปลี่ยนบ่อย',
+      'เมื่อการคำนวณซับซ้อน',
+    ],
+    answer: 1,
+  },
+];
+
+<Quiz client:visible id="composing-methods/split-phase" questions={quizSplit} />
+
+<ProgressTracker client:visible id="composing-methods/split-phase" />

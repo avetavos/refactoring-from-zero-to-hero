@@ -1,0 +1,92 @@
+---
+title: Intro & Principles
+description: What refactoring is, why it matters, and the disciplined rhythm — smell, small step, test, commit — that makes changing code safe.
+sidebar:
+  order: 1
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+export const loopDiagram = `flowchart LR
+  A["Spot a smell"] --> B["Make one<br/>small change"]
+  B --> C["Run the tests"]
+  C -->|green| D["Commit"]
+  C -->|red| E["Undo,<br/>try smaller"]
+  E --> B
+  D --> A`;
+
+## What this course is
+
+Code rarely arrives clean. It grows under deadlines, gets patched by people who have since moved on, and accumulates clever shortcuts that nobody dares touch. **Refactoring** is the discipline that lets you reshape that code into something you can read and change again — *without* altering what it does for the user.
+
+This first module is about the ideas behind the practice. The rest of the course is a catalog of specific moves, but moves without principles are just risky edits. By the end of these five lessons you will be able to say precisely what refactoring is, defend why it is worth your time, and follow a rhythm that keeps you safe while you do it.
+
+## The one rule that defines the discipline
+
+> Refactoring improves the *internal* structure of code without changing its *external* behavior.
+
+Everything in this course hangs off that sentence. If you change what the program does — fix a bug, add a feature, alter an output — that is valuable work, but it is not refactoring. Keeping the two activities separate is what makes both of them safe.
+
+## The rhythm you will learn
+
+Refactoring is not a single heroic rewrite. It is a tight loop of tiny, reversible steps, each one verified before you take the next. You spot a smell, make one small behavior-preserving change, run the tests, and commit. If the tests go red, you undo and try a smaller step. Then you do it again.
+
+<Mermaid code={loopDiagram} title="The refactoring loop: smell, small step, test, commit, repeat" />
+
+That loop is the heartbeat of everything that follows. Big, scary refactorings are just hundreds of these small safe steps strung together.
+
+## The module map
+
+| Lesson | What you will take away |
+| --- | --- |
+| [What is refactoring?](/refactoring-from-zero-to-hero/en/intro-and-principles/what-is-refactoring/) | A precise, behavior-preserving definition and the "two hats" rule |
+| [Why and when](/refactoring-from-zero-to-hero/en/intro-and-principles/why-and-when/) | The payoff, technical debt, the boy-scout rule, and when *not* to refactor |
+| [Small steps and tests](/refactoring-from-zero-to-hero/en/intro-and-principles/small-steps-and-tests/) | The loop in detail and why a test safety net makes it work |
+| [Reading code smells](/refactoring-from-zero-to-hero/en/intro-and-principles/reading-code-smells/) | The triggers that tell you *what* to refactor and which move to reach for |
+
+Once you finish here, you are ready for the practical catalog, starting with [Composing Methods](/refactoring-from-zero-to-hero/en/composing-methods/).
+
+<Callout title="Principles before moves">
+You can memorize a hundred named refactorings and still wreck a codebase. The principles in this module — behavior preservation, small steps, and a test safety net — are what turn those moves from dangerous edits into routine, boring, *safe* work. Boring is the goal.
+</Callout>
+
+export const quizIndex = [
+  {
+    q: 'What is the defining property of a refactoring?',
+    options: [
+      'It always makes the code run faster',
+      'It improves internal structure without changing external behavior',
+      'It adds at least one new feature',
+      'It rewrites the module from scratch',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'What is the heartbeat rhythm of refactoring described in this module?',
+    options: [
+      'Plan, design, implement, ship',
+      'Smell, small step, test, commit, repeat',
+      'Branch, merge, deploy, monitor',
+      'Read, document, archive',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'If a refactoring causes a test to go red, what is the recommended response?',
+    options: [
+      'Push it anyway and fix later',
+      'Delete the failing test',
+      'Undo the change and try a smaller step',
+      'Disable the test suite',
+    ],
+    answer: 2,
+  },
+];
+
+<Quiz client:visible id="intro-and-principles/index" questions={quizIndex} />
+
+<ProgressTracker client:visible id="intro-and-principles/index" />

@@ -1,0 +1,255 @@
+---
+title: Replace Type Code with Subclasses
+description: เมื่อฟิลด์ Type Code ขับเคลื่อนการแตกกิ่งแบบ switch ให้แทนที่ลอจิกเงื่อนไขด้วย polymorphism ที่กระจายอยู่ทั่วลำดับชั้นคลาสขนาดเล็ก — และรู้ว่าเมื่อใด State หรือ Strategy เหมาะกว่า
+sidebar:
+  order: 6
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+export const typeCodeDiagram = `flowchart TD
+  subgraph Before["Before — a type code"]
+    A["Employee<br/>type: 'engineer' | 'manager' | 'sales'"]
+    A --> B{"switch type"}
+    B --> C["pay logic for engineer"]
+    B --> D["pay logic for manager"]
+    B --> E["pay logic for sales"]
+  end
+  subgraph After["After — a hierarchy"]
+    F["Employee (abstract)<br/>payAmount()"]
+    F --> G["Engineer"]
+    F --> H["Manager"]
+    F --> I["Salesperson"]
+  end
+  Before -.->|"Replace Type Code with Subclasses"| After`;
+
+## เจตนา
+
+นำฟิลด์ที่ถือ *Type Code* — enum หรือสตริงอย่าง `"engineer"`, `"manager"`, `"sales"` — ที่ขับเคลื่อนพฤติกรรมเชิงเงื่อนไข แล้วแทนที่แต่ละกิ่งด้วย Subclass คลาสฐานที่ใช้ร่วมกันประกาศการดำเนินการ ส่วน Subclass แต่ละตัวจัดเตรียมเวอร์ชันของตัวเอง `switch` หายวับไป และการเพิ่มชนิดใหม่ก็หมายถึงการเพิ่มคลาสแทนที่จะแก้ไขทุกเงื่อนไข
+
+## กลิ่นเหม็น
+
+กลิ่นเหม็นคือ **Type Code ที่จับคู่กับลอจิก switching**: ฟิลด์เดียวที่ค่าของมันถูกตรวจสอบซ้ำ ๆ ด้วย `switch` หรือ `if` ที่ต่อกันเป็นลูกโซ่ซึ่งเลือกพฤติกรรม ปัญหาทบทวีคูณ `switch` เดียวกันบน Type Code เดียวกันมักจะปรากฏในหลายเมท็อด ดังนั้นทุกชนิดใหม่จึงหมายถึงการแก้ไขแต่ละเมท็อด และคอมไพเลอร์ก็ไม่ช่วยอะไรเมื่อคุณลืมไปสักอัน Polymorphism เปลี่ยนกิ่งที่กระจัดกระจายเหล่านั้นให้เป็น dispatch เดียวที่ภาษาทำให้คุณ
+
+## ก่อน → หลัง
+
+`Employee` ที่ค่าจ้างขึ้นอยู่กับสตริง `type` ซึ่งถูกตรวจสอบด้วย `switch` หลังจากนั้น พนักงานแต่ละชนิดเป็น Subclass ที่รู้กฎค่าจ้างของตัวเอง
+
+<Tabs syncKey="lang">
+  <TabItem label="TypeScript">
+    ```ts
+    // Before
+    class Employee {
+      constructor(public type: string, public base: number) {}
+      payAmount(): number {
+        switch (this.type) {
+          case 'engineer': return this.base;
+          case 'manager': return this.base * 1.2;
+          case 'sales': return this.base + 500;
+          default: throw new Error(`unknown type ${this.type}`);
+        }
+      }
+    }
+
+    // After
+    abstract class Employee {
+      constructor(public base: number) {}
+      abstract payAmount(): number;
+    }
+    class Engineer extends Employee {
+      payAmount(): number { return this.base; }
+    }
+    class Manager extends Employee {
+      payAmount(): number { return this.base * 1.2; }
+    }
+    class Salesperson extends Employee {
+      payAmount(): number { return this.base + 500; }
+    }
+    ```
+  </TabItem>
+  <TabItem label="Python">
+    ```python
+    # Before
+    class Employee:
+        def __init__(self, kind, base):
+            self.kind = kind
+            self.base = base
+        def pay_amount(self):
+            if self.kind == "engineer":
+                return self.base
+            elif self.kind == "manager":
+                return self.base * 1.2
+            elif self.kind == "sales":
+                return self.base + 500
+            raise ValueError(f"unknown type {self.kind}")
+
+    # After
+    from abc import ABC, abstractmethod
+
+    class Employee(ABC):
+        def __init__(self, base):
+            self.base = base
+        @abstractmethod
+        def pay_amount(self): ...
+
+    class Engineer(Employee):
+        def pay_amount(self):
+            return self.base
+
+    class Manager(Employee):
+        def pay_amount(self):
+            return self.base * 1.2
+
+    class Salesperson(Employee):
+        def pay_amount(self):
+            return self.base + 500
+    ```
+  </TabItem>
+  <TabItem label="Go">
+    ```go
+    // Before
+    type Employee struct {
+        Kind string
+        Base float64
+    }
+    func (e Employee) PayAmount() float64 {
+        switch e.Kind {
+        case "engineer":
+            return e.Base
+        case "manager":
+            return e.Base * 1.2
+        case "sales":
+            return e.Base + 500
+        default:
+            panic("unknown type " + e.Kind)
+        }
+    }
+
+    // After
+    type Employee interface {
+        PayAmount() float64
+    }
+
+    type Engineer struct{ Base float64 }
+    func (e Engineer) PayAmount() float64 { return e.Base }
+
+    type Manager struct{ Base float64 }
+    func (m Manager) PayAmount() float64 { return m.Base * 1.2 }
+
+    type Salesperson struct{ Base float64 }
+    func (s Salesperson) PayAmount() float64 { return s.Base + 500 }
+    ```
+  </TabItem>
+  <TabItem label="Rust">
+    ```rust
+    // Before
+    struct Employee {
+        kind: String,
+        base: f64,
+    }
+    impl Employee {
+        fn pay_amount(&self) -> f64 {
+            match self.kind.as_str() {
+                "engineer" => self.base,
+                "manager" => self.base * 1.2,
+                "sales" => self.base + 500.0,
+                other => panic!("unknown type {other}"),
+            }
+        }
+    }
+
+    // After
+    trait Employee {
+        fn pay_amount(&self) -> f64;
+    }
+
+    struct Engineer { base: f64 }
+    impl Employee for Engineer {
+        fn pay_amount(&self) -> f64 { self.base }
+    }
+
+    struct Manager { base: f64 }
+    impl Employee for Manager {
+        fn pay_amount(&self) -> f64 { self.base * 1.2 }
+    }
+
+    struct Salesperson { base: f64 }
+    impl Employee for Salesperson {
+        fn pay_amount(&self) -> f64 { self.base + 500.0 }
+    }
+    ```
+  </TabItem>
+</Tabs>
+
+<Mermaid code={typeCodeDiagram} title="switch ของ Type Code กลายเป็นลำดับชั้นคลาสที่มีหนึ่งเมท็อดต่อหนึ่ง Subclass" />
+
+## กลไก
+
+1. หาก Type Code ยังไม่ถูกห่อหุ้ม ให้ซ่อนมันไว้หลัง accessor ก่อน เพื่อให้ผู้เรียกไม่พึ่งพาฟิลด์ดิบ
+2. สร้าง Subclass สำหรับค่าหนึ่งค่าของ Type Code จัดเตรียม factory (หรือคอนสตรักเตอร์) ที่คืน Subclass ที่ถูกต้องสำหรับ Code ที่กำหนด เพื่อให้การสร้างอยู่ในจุดเดียว
+3. ย้ายพฤติกรรมสำหรับค่านั้น — กิ่งหนึ่งของ `switch` — เข้าไปเป็นเมท็อดที่ override บน Subclass
+4. **รันเทสต์ของคุณ**
+5. ทำซ้ำสำหรับค่า Type Code ที่เหลือแต่ละค่า โดยลบแต่ละกิ่งออกจากเงื่อนไขเดิมไปเรื่อย ๆ
+6. เมื่อกิ่งสุดท้ายหายไป ให้ลบ `switch` ที่ว่างเปล่าตอนนี้ออก และหากไม่มีอะไรอื่นต้องการมัน ให้ลบฟิลด์ Type Code เองด้วย การดำเนินการฐานตอนนี้เป็น abstract ซึ่งจัดเตรียมโดย Subclass ทั้งหมด
+
+## เมื่อไรควรใช้ / ข้อแลกเปลี่ยน
+
+ใช้ Subclasses เมื่อชนิดถูกตรึงไว้ตลอดอายุของออบเจ็กต์ และเมื่อมีหลายเมท็อดที่แตกกิ่งบน Code เดียวกัน Polymorphism ยุบกิ่งเหล่านั้นและให้คอมไพเลอร์รับประกันว่าทุก Subclass อิมพลีเมนต์การดำเนินการ ดังนั้นเคสที่ลืมไปจึงกลายเป็น error ตอน build แทนที่จะเป็นเรื่องเซอร์ไพรส์ตอนรันไทม์
+
+แต่ Subclasses ไม่ใช่เครื่องมือที่ถูกต้องเสมอไป หากชนิดของออบเจ็กต์ *เปลี่ยนระหว่างอายุของมัน* — ออเดอร์ที่ขยับจาก "pending" ไป "shipped" ไป "delivered" — คุณไม่สามารถสลับคลาสของมันได้ ดังนั้นจึงต้องหันไปใช้แพตเทิร์น **State**: ถือออบเจ็กต์สถานะแยกต่างหากที่เอนทิตีสามารถแทนที่ได้เมื่อมันเปลี่ยนผ่าน และหากคุณต้องการแค่ให้อัลกอริทึมหนึ่งแปรเปลี่ยน แทนที่จะเป็นพฤติกรรมทั้งตระกูล **Strategy** — การฉีดออบเจ็กต์พฤติกรรมเข้าไป — เบากว่าลำดับชั้นเต็มรูปแบบ เลือก Subclasses สำหรับตัวตนที่คงที่ State สำหรับตัวตนที่เปลี่ยนแปลง และ Strategy สำหรับอัลกอริทึมเดี่ยวที่สลับได้
+
+## ที่เกี่ยวข้อง
+
+- [Encapsulate Variable](/refactoring-from-zero-to-hero/th/organizing-data/encapsulate-variable/)
+- [Replace Magic Literal](/refactoring-from-zero-to-hero/th/organizing-data/replace-magic-literal/)
+- [Replace Primitive with Object](/refactoring-from-zero-to-hero/th/organizing-data/replace-primitive-with-object/)
+
+<Callout title="ชนิดคงที่ → subclass; ชนิดเปลี่ยนแปลง → State">
+คำถามที่ตัดสินคือชนิดสามารถเปลี่ยนได้หลังจากออบเจ็กต์ถือกำเนิดหรือไม่ บทบาทของพนักงานคงที่พอที่จะเป็นคลาสของมันได้ ส่วนสถานะของออเดอร์พลิกไปพลิกมาครั้งแล้วครั้งเล่า ดังนั้นมันจึงต้องเป็นข้อมูลที่ออบเจ็กต์ถือไว้ ไม่ใช่คลาสที่มัน *เป็น* ใช้ Subclasses สำหรับกรณีแรก และแพตเทิร์น State สำหรับกรณีหลัง
+</Callout>
+
+export const quizTypeCode = [
+  {
+    q: 'Replace Type Code with Subclasses กำจัดอะไรออกไป?',
+    options: [
+      'ฟิลด์ข้อมูลทั้งหมด',
+      'การแตกกิ่งแบบ switch หรือ if บน Type Code โดยแทนที่ด้วย polymorphism',
+      'ชุดเทสต์',
+      'คอนสตรักเตอร์',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'ทำไมคอมไพเลอร์จึงช่วยได้หลังจากการรีแฟคเตอร์นี้?',
+    options: [
+      'มันลบ Subclass ที่ไม่ได้ใช้ออก',
+      'มันสามารถรับประกันว่าทุก Subclass อิมพลีเมนต์การดำเนินการที่ต้องการ โดยดักเคสที่ตกหล่นตอน build',
+      'มันรันโปรแกรมเร็วขึ้น',
+      'มันเขียน switch ใหม่ให้โดยอัตโนมัติ',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'ออเดอร์ขยับจาก pending ไป shipped ไป delivered ระหว่างอายุของมัน แพตเทิร์นใดเหมาะที่สุด?',
+    options: ['Subclasses', 'แพตเทิร์น State', 'Replace Magic Literal', 'Encapsulate Collection'],
+    answer: 1,
+  },
+  {
+    q: 'เมื่อใดที่แพตเทิร์น Strategy เบากว่าลำดับชั้น Subclass เต็มรูปแบบ?',
+    options: [
+      'เมื่อคุณต้องการให้อัลกอริทึมเดี่ยวที่สลับได้เพียงตัวเดียวแปรเปลี่ยน แทนที่จะเป็นพฤติกรรมทั้งตระกูล',
+      'เมื่อชนิดไม่เคยเปลี่ยน',
+      'เมื่อมีค่า Type Code เพียงค่าเดียว',
+      'เมื่อคุณต้องการลบคลาสทิ้ง',
+    ],
+    answer: 0,
+  },
+];
+
+<Quiz client:visible id="organizing-data/replace-type-code-with-subclasses" questions={quizTypeCode} />
+
+<ProgressTracker client:visible id="organizing-data/replace-type-code-with-subclasses" />

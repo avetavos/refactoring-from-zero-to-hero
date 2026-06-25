@@ -1,0 +1,175 @@
+---
+title: What Is Refactoring?
+description: A precise definition of refactoring as behavior-preserving change, and how it differs from rewriting and from adding features — the "two hats" rule.
+sidebar:
+  order: 2
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+export const hatsDiagram = `flowchart TB
+  Start["I want to work on the code"] --> Q{"Which hat?"}
+  Q -->|"Adding behavior"| Feature["Feature hat:<br/>write new code,<br/>add tests"]
+  Q -->|"Cleaning structure"| Refactor["Refactor hat:<br/>keep behavior,<br/>tests stay green"]
+  Feature --> Switch["Switch hats —<br/>never wear both"]
+  Refactor --> Switch`;
+
+## A precise definition
+
+People use *refactoring* loosely to mean "cleaning up code." The discipline means something sharper:
+
+> A **refactoring** is a change to the code that improves its internal structure while preserving its observable behavior.
+
+Two halves matter equally. The change must *improve structure* — otherwise it is pointless churn. And it must *preserve behavior* — every input still produces the same output, every side effect still happens, no public contract shifts. A change that alters what callers can observe is not a refactoring, no matter how tidy the result looks.
+
+## Refactoring vs. rewriting vs. adding features
+
+These three activities feel similar from a chair, but they carry very different risks.
+
+- **Refactoring** reshapes existing, working code in small reversible steps. You always have a running program; you are never far from the last green state.
+- **Rewriting** throws the old code away and builds a replacement. You lose the accumulated bug fixes baked into the original, and you have no running program until the new one is done. Sometimes necessary, rarely cheap.
+- **Adding a feature** introduces *new* behavior. The program does something it could not do before, which means its observable behavior changes by design.
+
+Refactoring is the safe middle path: you keep the working code and improve it gradually, rather than gambling on a from-scratch replacement.
+
+## The two hats
+
+When you sit down to edit code, you are wearing one of two hats. The **feature hat** is for adding capability: you write new code and the tests for it. The **refactor hat** is for restructuring: you change *how* the code is shaped, and the existing tests must stay green the whole time because behavior must not move.
+
+The rule is simple and strict: wear only one hat at a time. If you are halfway through extracting a function and notice a missing feature, finish the refactor, commit, *then* switch hats. Mixing the two is how a "quick cleanup" turns into an afternoon of debugging — when a test breaks, you can no longer tell whether your restructuring or your new feature caused it.
+
+<Mermaid code={hatsDiagram} title="The two hats: keep restructuring and feature work strictly separate" />
+
+## A tiny before → after
+
+The smallest refactorings are often the most valuable. Here we do two: replace a magic number with a named constant, and rename a cryptic variable. Behavior is identical before and after — the output is the same — but the intent now reads off the page.
+
+<Tabs syncKey="lang">
+  <TabItem label="TypeScript">
+    ```ts
+    // Before
+    function price(q: number): number {
+      return q * 9.99 * 1.07;
+    }
+
+    // After
+    const UNIT_PRICE = 9.99;
+    const TAX_RATE = 1.07;
+
+    function price(quantity: number): number {
+      return quantity * UNIT_PRICE * TAX_RATE;
+    }
+    ```
+  </TabItem>
+  <TabItem label="Python">
+    ```python
+    # Before
+    def price(q):
+        return q * 9.99 * 1.07
+
+    # After
+    UNIT_PRICE = 9.99
+    TAX_RATE = 1.07
+
+    def price(quantity):
+        return quantity * UNIT_PRICE * TAX_RATE
+    ```
+  </TabItem>
+  <TabItem label="Go">
+    ```go
+    // Before
+    func Price(q float64) float64 {
+        return q * 9.99 * 1.07
+    }
+
+    // After
+    const (
+        UnitPrice = 9.99
+        TaxRate   = 1.07
+    )
+
+    func Price(quantity float64) float64 {
+        return quantity * UnitPrice * TaxRate
+    }
+    ```
+  </TabItem>
+  <TabItem label="Rust">
+    ```rust
+    // Before
+    fn price(q: f64) -> f64 {
+        q * 9.99 * 1.07
+    }
+
+    // After
+    const UNIT_PRICE: f64 = 9.99;
+    const TAX_RATE: f64 = 1.07;
+
+    fn price(quantity: f64) -> f64 {
+        quantity * UNIT_PRICE * TAX_RATE
+    }
+    ```
+  </TabItem>
+</Tabs>
+
+Nothing the function returns has changed. That is the whole point: a refactoring you can run before and after, and get byte-for-byte identical results, is a refactoring you can trust.
+
+## Related
+
+- [Why and when to refactor](/refactoring-from-zero-to-hero/en/intro-and-principles/why-and-when/)
+- [Small steps and tests](/refactoring-from-zero-to-hero/en/intro-and-principles/small-steps-and-tests/)
+- [Extract Variable](/refactoring-from-zero-to-hero/en/composing-methods/extract-variable/)
+
+<Callout title="One hat at a time">
+The fastest way to lose hours is to refactor and add a feature in the same edit. When the test bar turns red you will not know which change to blame. Keep behavior frozen while you restructure; change behavior only with the feature hat on.
+</Callout>
+
+export const quizWhat = [
+  {
+    q: 'Which change qualifies as a refactoring?',
+    options: [
+      'Adding a new API endpoint',
+      'Renaming a variable so the output stays identical',
+      'Fixing a bug that changes a returned value',
+      'Rewriting the module in a different language',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'What distinguishes refactoring from rewriting?',
+    options: [
+      'Refactoring throws the old code away',
+      'Refactoring reshapes existing working code in small reversible steps',
+      'Rewriting always preserves behavior',
+      'They are exactly the same thing',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'What does the "two hats" rule tell you to do?',
+    options: [
+      'Always refactor before writing any feature',
+      'Add features and refactor in the same commit for speed',
+      'Wear only one hat at a time — never mix refactoring and feature work',
+      'Wear two hats so you finish twice as fast',
+    ],
+    answer: 2,
+  },
+  {
+    q: 'In the before/after example, how do you know it was a true refactoring?',
+    options: [
+      'The function got shorter',
+      'The function name changed',
+      'It returns identical results before and after the change',
+      'A new constant was introduced',
+    ],
+    answer: 2,
+  },
+];
+
+<Quiz client:visible id="intro-and-principles/what-is-refactoring" questions={quizWhat} />
+
+<ProgressTracker client:visible id="intro-and-principles/what-is-refactoring" />

@@ -1,0 +1,256 @@
+---
+title: Inline Class
+description: When a class no longer pulls its weight, fold its fields and methods back into the class that uses it — the inverse of Extract Class.
+sidebar:
+  order: 5
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+export const inlineClassDiagram = `classDiagram
+  class ShipmentBefore {
+    trackingInfo
+    status()
+  }
+  class TrackingInformation {
+    shippingCompany
+    trackingNumber
+    display()
+  }
+  class ShipmentAfter {
+    shippingCompany
+    trackingNumber
+    status()
+    trackingDisplay()
+  }
+  ShipmentBefore --> TrackingInformation : has a
+  TrackingInformation ..> ShipmentAfter : Inline Class`;
+
+## Intent
+
+Take a class that has shrunk to almost nothing — a couple of fields and a method or two that no longer justify a separate type — and merge it into the class that holds it. The behaviour is unchanged; you have simply removed a layer that stopped earning its keep.
+
+## The smell
+
+This is the inverse of **Extract Class**, and the cure for a class that has become a needless middle layer. The signs: a class with one field and a trivial method, a type that exists only to be wrapped by one caller, or a former responsibility that earlier refactorings have hollowed out. If reading the code means hopping to a tiny class and straight back, that hop is pure overhead.
+
+## Before → After
+
+A `TrackingInformation` class that holds two fields and formats them, used by a single `Shipment`. Before, the data and its one method sit in a separate type. After, they fold into `Shipment`.
+
+<Tabs syncKey="lang">
+  <TabItem label="TypeScript">
+    ```ts
+    // Before
+    class TrackingInformation {
+      constructor(public shippingCompany: string, public trackingNumber: string) {}
+
+      display(): string {
+        return `${this.shippingCompany}: ${this.trackingNumber}`;
+      }
+    }
+
+    class Shipment {
+      constructor(public trackingInfo: TrackingInformation) {}
+
+      status(): string {
+        return `Shipped via ${this.trackingInfo.display()}`;
+      }
+    }
+
+    // After
+    class Shipment {
+      constructor(public shippingCompany: string, public trackingNumber: string) {}
+
+      private trackingDisplay(): string {
+        return `${this.shippingCompany}: ${this.trackingNumber}`;
+      }
+
+      status(): string {
+        return `Shipped via ${this.trackingDisplay()}`;
+      }
+    }
+    ```
+  </TabItem>
+  <TabItem label="Python">
+    ```python
+    # Before
+    class TrackingInformation:
+        def __init__(self, shipping_company, tracking_number):
+            self.shipping_company = shipping_company
+            self.tracking_number = tracking_number
+
+        def display(self):
+            return f"{self.shipping_company}: {self.tracking_number}"
+
+    class Shipment:
+        def __init__(self, tracking_info):
+            self.tracking_info = tracking_info
+
+        def status(self):
+            return f"Shipped via {self.tracking_info.display()}"
+
+    # After
+    class Shipment:
+        def __init__(self, shipping_company, tracking_number):
+            self.shipping_company = shipping_company
+            self.tracking_number = tracking_number
+
+        def _tracking_display(self):
+            return f"{self.shipping_company}: {self.tracking_number}"
+
+        def status(self):
+            return f"Shipped via {self._tracking_display()}"
+    ```
+  </TabItem>
+  <TabItem label="Go">
+    ```go
+    // Before
+    type TrackingInformation struct {
+        ShippingCompany string
+        TrackingNumber  string
+    }
+
+    func (t TrackingInformation) Display() string {
+        return fmt.Sprintf("%s: %s", t.ShippingCompany, t.TrackingNumber)
+    }
+
+    type Shipment struct {
+        TrackingInfo TrackingInformation
+    }
+
+    func (s Shipment) Status() string {
+        return fmt.Sprintf("Shipped via %s", s.TrackingInfo.Display())
+    }
+
+    // After
+    type Shipment struct {
+        ShippingCompany string
+        TrackingNumber  string
+    }
+
+    func (s Shipment) trackingDisplay() string {
+        return fmt.Sprintf("%s: %s", s.ShippingCompany, s.TrackingNumber)
+    }
+
+    func (s Shipment) Status() string {
+        return fmt.Sprintf("Shipped via %s", s.trackingDisplay())
+    }
+    ```
+  </TabItem>
+  <TabItem label="Rust">
+    ```rust
+    // Before
+    struct TrackingInformation {
+        shipping_company: String,
+        tracking_number: String,
+    }
+
+    impl TrackingInformation {
+        fn display(&self) -> String {
+            format!("{}: {}", self.shipping_company, self.tracking_number)
+        }
+    }
+
+    struct Shipment {
+        tracking_info: TrackingInformation,
+    }
+
+    impl Shipment {
+        fn status(&self) -> String {
+            format!("Shipped via {}", self.tracking_info.display())
+        }
+    }
+
+    // After
+    struct Shipment {
+        shipping_company: String,
+        tracking_number: String,
+    }
+
+    impl Shipment {
+        fn tracking_display(&self) -> String {
+            format!("{}: {}", self.shipping_company, self.tracking_number)
+        }
+
+        fn status(&self) -> String {
+            format!("Shipped via {}", self.tracking_display())
+        }
+    }
+    ```
+  </TabItem>
+</Tabs>
+
+<Mermaid code={inlineClassDiagram} title="A thin TrackingInformation folds back into Shipment" />
+
+## Mechanics
+
+1. On the absorbing class, declare the public methods of the class you are about to inline, and have each simply delegate to the inner instance for now.
+2. Update every caller of the soon-to-be-removed class to go through the absorbing class instead.
+3. **Run your tests** to confirm the delegation behaves identically.
+4. Move the inner class's fields and methods into the absorbing class one at a time, using **Move Field** and **Move Function**.
+5. Replace each delegating method body with the real logic now living locally.
+6. **Run your tests** after each move so a failure points at a single step.
+7. Delete the now-empty class once nothing references it.
+
+## When to use / trade-offs
+
+Inline a class when it has shrunk to a single field with trivial behaviour, when it exists only to wrap one caller, or when an earlier extraction never grew into a genuine responsibility and now just adds indirection.
+
+The cost is that the absorbing class gets bigger, so do not inline a type that is still doing real, separable work — that is the road back to a Large Class. The inverse is **Extract Class**: if the merged class later sprouts a second responsibility, split it out again.
+
+## Related
+
+- [Extract Class](/refactoring-from-zero-to-hero/en/moving-features/extract-class/)
+- [Move Field](/refactoring-from-zero-to-hero/en/moving-features/move-field/)
+- [Move Function](/refactoring-from-zero-to-hero/en/moving-features/move-function/)
+
+<Callout title="Inline only what has gone hollow">
+Inline Class is not a vote against small classes — small, focused classes are a strength. Inline only the ones that have *lost* their reason to exist: a single field, a trivial method, no independent future. If a class still has a job, leave it standing.
+</Callout>
+
+export const quizInlineClass = [
+  {
+    q: 'When is Inline Class the right move?',
+    options: [
+      'When a class has many methods',
+      'When a class has shrunk to a trivial fragment that no longer earns its keep',
+      'Whenever two classes reference each other',
+      'When a class has a long name',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'Inline Class is the inverse of which refactoring?',
+    options: ['Move Field', 'Extract Class', 'Hide Delegate', 'Remove Middle Man'],
+    answer: 1,
+  },
+  {
+    q: 'What is a risk of inlining a class that is still doing real work?',
+    options: [
+      'The compiler will reject it',
+      'The absorbing class grows back toward being a Large Class',
+      'The tests will run slower',
+      'The fields lose their types',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'What is the recommended first step when inlining a class?',
+    options: [
+      'Delete the class immediately',
+      'Declare its methods on the absorbing class and have them delegate inward',
+      'Inline every caller at once',
+      'Rename the class first',
+    ],
+    answer: 1,
+  },
+];
+
+<Quiz client:visible id="moving-features/inline-class" questions={quizInlineClass} />
+
+<ProgressTracker client:visible id="moving-features/inline-class" />

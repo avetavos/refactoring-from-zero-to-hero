@@ -1,0 +1,229 @@
+---
+title: Introduce Special Case
+description: แทนการตรวจสอบ null-หรือ-พิเศษ ที่ซ้ำ ๆ ด้วยอ็อบเจกต์ special-case ที่ตอบกลับด้วยค่าดีฟอลต์ที่สมเหตุสมผล เพื่อให้ผู้เรียกหยุดถามว่า "มันหายไปไหม?"
+sidebar:
+  order: 6
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+export const specialCaseDiagram = `flowchart LR
+  subgraph Before["Before"]
+    A["customer == null<br/>? 'occupant'<br/>: customer.name"]
+    B["customer == null<br/>? 'basic'<br/>: customer.plan"]
+  end
+  subgraph After["After"]
+    C["customer.name"]
+    D["customer.plan"]
+    E["UnknownCustomer<br/>name = 'occupant'<br/>plan = 'basic'"]
+  end
+  Before -.->|"Introduce Special Case"| After`;
+
+## เจตนา
+
+เอาค่าที่บางครั้งหายไป — และการตรวจสอบ null ที่ซ้ำอยู่ทุกที่ที่ค่านั้นถูกใช้ — แล้วแทนกรณีที่หายไปด้วยอ็อบเจกต์จริงที่รู้คำตอบดีฟอลต์ที่ถูกต้อง กรณีพิเศษ (**special case**) นี้ (มักเป็น **null object**) ทำตามอินเทอร์เฟซเดียวกัน ดังนั้นผู้เรียกก็แค่ใช้มัน สาขา "จะเป็นอย่างไรถ้ามันไม่มี?" หายไปจากทุกจุดที่เรียก และไปอยู่ในคลาสเดียวแทน
+
+## กลิ่นโค้ด
+
+นี่คือวิธีแก้สำหรับ **การตรวจสอบกรณีพิเศษที่ซ้ำ ๆ** ซึ่งโดยทั่วไปคือ `if (x == null)` เมื่อฟิลด์หนึ่งสามารถหายไปได้ ทุกเมธอดที่แตะต้องมันก็งอกการ์ดตัวเดียวกัน แต่ละตัวแทนค่าดีฟอลต์ของตัวเอง — ชื่อตรงนี้ แพลนตรงนั้น จำนวนเงินค่าบริการที่อื่น ความรู้ว่า "ลูกค้าที่หายไปหมายความว่าอะไร" เลอะเทอะกระจายไปทั่วฐานโค้ด และดีฟอลต์ใหม่ใด ๆ ก็ต้องเพิ่มในที่อีกแห่งหนึ่ง อ็อบเจกต์ special-case รวบรวมค่าดีฟอลต์ทั้งหมดเหล่านั้นไว้ในชนิดเดียวที่ตอบกลับตามปกติ
+
+## Before → After
+
+โค้ดแสดงผลอ่านชื่อและแพลนของลูกค้า โดยใช้ค่าดีฟอลต์สำหรับลูกค้าที่ไม่รู้จัก ก่อนหน้านี้ ทุกจุดตรวจสอบ null หลังจากนั้น `UnknownCustomer` ให้ค่าดีฟอลต์มา
+
+<Tabs syncKey="lang">
+  <TabItem label="TypeScript">
+    ```ts
+    // Before
+    function customerName(site: Site): string {
+      return site.customer === null ? 'occupant' : site.customer.name;
+    }
+
+    function billingPlan(site: Site): string {
+      return site.customer === null ? 'basic' : site.customer.plan;
+    }
+
+    // After
+    class UnknownCustomer implements Customer {
+      readonly name = 'occupant';
+      readonly plan = 'basic';
+      readonly isUnknown = true;
+    }
+
+    function customerName(site: Site): string {
+      return site.customer.name;
+    }
+
+    function billingPlan(site: Site): string {
+      return site.customer.plan;
+    }
+    ```
+  </TabItem>
+  <TabItem label="Python">
+    ```python
+    # Before
+    def customer_name(site):
+        return "occupant" if site.customer is None else site.customer.name
+
+    def billing_plan(site):
+        return "basic" if site.customer is None else site.customer.plan
+
+    # After
+    class UnknownCustomer:
+        name = "occupant"
+        plan = "basic"
+        is_unknown = True
+
+    def customer_name(site):
+        return site.customer.name
+
+    def billing_plan(site):
+        return site.customer.plan
+    ```
+  </TabItem>
+  <TabItem label="Go">
+    ```go
+    // Before
+    func CustomerName(site Site) string {
+        if site.Customer == nil {
+            return "occupant"
+        }
+        return site.Customer.Name
+    }
+
+    func BillingPlan(site Site) string {
+        if site.Customer == nil {
+            return "basic"
+        }
+        return site.Customer.Plan
+    }
+
+    // After
+    func UnknownCustomer() *Customer {
+        return &Customer{Name: "occupant", Plan: "basic", IsUnknown: true}
+    }
+
+    func CustomerName(site Site) string {
+        return site.Customer.Name
+    }
+
+    func BillingPlan(site Site) string {
+        return site.Customer.Plan
+    }
+    ```
+  </TabItem>
+  <TabItem label="Rust">
+    ```rust
+    // Before
+    fn customer_name(site: &Site) -> String {
+        match &site.customer {
+            None => "occupant".to_string(),
+            Some(c) => c.name.clone(),
+        }
+    }
+
+    fn billing_plan(site: &Site) -> String {
+        match &site.customer {
+            None => "basic".to_string(),
+            Some(c) => c.plan.clone(),
+        }
+    }
+
+    // After
+    impl Customer {
+        fn unknown() -> Customer {
+            Customer {
+                name: "occupant".to_string(),
+                plan: "basic".to_string(),
+                is_unknown: true,
+            }
+        }
+    }
+
+    fn customer_name(site: &Site) -> String {
+        site.customer.name.clone()
+    }
+
+    fn billing_plan(site: &Site) -> String {
+        site.customer.plan.clone()
+    }
+    ```
+  </TabItem>
+</Tabs>
+
+<Mermaid code={specialCaseDiagram} title="การตรวจสอบ null ที่กระจัดกระจายยุบรวมเป็นอ็อบเจกต์ special-case ตัวเดียวพร้อมค่าดีฟอลต์" />
+
+## กลไก
+
+1. เพิ่มพร็อพเพอร์ตีหรือเมธอดที่ให้ผู้เรียกถามได้ว่าค่าหนึ่งเป็นกรณีพิเศษหรือไม่ (ตัวอย่างเช่น `isUnknown`) และทำให้อ็อบเจกต์ปกติตอบ `false`
+2. สร้างอ็อบเจกต์ special-case — ซับคลาส, struct, หรือ factory — ที่ทำตามอินเทอร์เฟซเดียวกันและ return ค่าดีฟอลต์ที่ตกลงกันไว้สำหรับแต่ละ accessor
+3. จัดให้แหล่งที่มาของค่าส่งอ็อบเจกต์ special-case กลับมาแทน null เมื่อค่านั้นหายไป
+4. แทนแต่ละจุด `if (x == null)` ด้วยการใช้ค่านั้นโดยตรง ทีละจุด **รันเทสต์ของคุณ** หลังแต่ละครั้ง
+5. เมื่อการตรวจสอบที่ชัดแจ้งตัวสุดท้ายหายไป ให้ลบโค้ดจัดการ null ที่ตายไปแล้วทิ้ง
+
+## เมื่อไรควรใช้ / ข้อแลกเปลี่ยน
+
+หยิบ Introduce Special Case มาใช้เมื่อการตรวจสอบค่าที่หายไป *ตัวเดียวกัน* ซึ่งมีดีฟอลต์ *ตัวเดียวกัน* เกิดซ้ำข้ามหลายจุดที่เรียก การรวมศูนย์ค่าดีฟอลต์เหล่านั้นไว้ในอ็อบเจกต์เดียวขจัดความซ้ำซ้อน และให้ชื่อกับที่อยู่แก่กรณีที่หายไป
+
+มันไม่ใช่เครื่องมือที่ถูกต้องเสมอ หากค่าที่หายไปหมายความถึงสิ่งที่ต่างกันในที่ต่างกัน — ดีฟอลต์ตรงนี้ ข้อผิดพลาดตรงนั้น — อ็อบเจกต์ special-case ตัวเดียวก็ไม่สามารถรองรับได้ทั้งหมด และการบังคับให้ใช้ตัวเดียวจะซ่อนความแตกต่างที่สำคัญ สำหรับค่าที่ถูกตรวจสอบเพียงหนึ่งหรือสองจุด guard clause ธรรมดาง่ายกว่า ใช้ special case เมื่อ *ความสม่ำเสมอ* ของดีฟอลต์คือสิ่งที่ทำให้มันคุ้มค่าที่จะเป็นชนิดข้อมูล
+
+## ที่เกี่ยวข้อง
+
+- [Replace Nested Conditional with Guard Clauses](/refactoring-from-zero-to-hero/th/simplifying-conditionals/replace-nested-conditional-with-guard-clauses/)
+- [Replace Conditional with Polymorphism](/refactoring-from-zero-to-hero/th/simplifying-conditionals/replace-conditional-with-polymorphism/)
+- [Consolidate Conditional Expression](/refactoring-from-zero-to-hero/th/simplifying-conditionals/consolidate-conditional/)
+
+<Callout title="null object ตอบกลับ มันไม่ระเบิด">
+จุดสำคัญของอ็อบเจกต์ special-case คือผู้เรียกสามารถปฏิบัติต่อมันเหมือนค่าอื่น ๆ — ถามชื่อมัน ถามแพลนมัน — และได้ค่าดีฟอลต์ที่สมเหตุสมผลแทนการแครชหรือการแตกสาขา หากค่าดีฟอลต์ต่างกันในแต่ละจุดที่เรียก แสดงว่ากรณีที่หายไปไม่สม่ำเสมอพอสำหรับอ็อบเจกต์เดียว ก็คงการตรวจสอบที่ชัดแจ้งไว้ตรงนั้น
+</Callout>
+
+export const quizSpecialCase = [
+  {
+    q: 'Introduce Special Case แทนอะไร?',
+    options: [
+      'ฟังก์ชันยาวที่มีตัวช่วยหลายตัว',
+      'การตรวจสอบ null-หรือ-พิเศษ ที่ซ้ำ ๆ ด้วยอ็อบเจกต์ที่ return ค่าดีฟอลต์ที่สมเหตุสมผล',
+      'ลูปที่มีการเรียกซ้ำ (recursive call)',
+      'ลำดับชั้นคลาสที่มี switch ตัวเดียว',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'อ็อบเจกต์ special-case ควรทำตัวอย่างไรเมื่อผู้เรียกใช้มัน?',
+    options: [
+      'โยน exception เพื่อส่งสัญญาณว่าค่าหายไป',
+      'ตอบกลับเหมือนค่าปกติทั่วไป โดย return ค่าดีฟอลต์ที่ตกลงกันไว้',
+      'return null จากทุก accessor',
+      'บังคับให้ผู้เรียกตรวจสอบ isUnknown ก่อน',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'เมื่อไรที่อ็อบเจกต์ special-case ตัวเดียวเป็นทางเลือกที่ผิด?',
+    options: [
+      'เมื่อต้องการดีฟอลต์เดียวกันทุกที่',
+      'เมื่อค่าที่หายไปหมายความถึงสิ่งที่ต่างกันในที่ต่างกัน',
+      'เมื่อมีหลายจุดที่เรียกตรวจสอบค่านั้น',
+      'เมื่อค่านั้นทำตามอินเทอร์เฟซ',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'อะไรมาแทนแต่ละจุด "if value is null" หลังการ refactor?',
+    options: [
+      'การใช้ค่านั้นโดยตรง เพราะกรณีพิเศษให้ค่าดีฟอลต์มา',
+      'การเรียก factory ที่ทุกจุด',
+      'guard clause ตัวใหม่ที่มีดีฟอลต์ต่างกัน',
+      'switch บนชนิดของค่า',
+    ],
+    answer: 0,
+  },
+];
+
+<Quiz client:visible id="simplifying-conditionals/introduce-special-case" questions={quizSpecialCase} />
+
+<ProgressTracker client:visible id="simplifying-conditionals/introduce-special-case" />

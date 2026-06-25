@@ -1,0 +1,144 @@
+---
+title: Extract Variable
+description: ตั้งชื่อให้ sub-expression ด้วยตัวแปร local เพื่อให้ expression หรือเงื่อนไขที่ซับซ้อนอธิบายตัวเองได้
+sidebar:
+  order: 4
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+## เจตนา
+
+นำชิ้นส่วนหนึ่งของ expression ที่ใหญ่กว่ามากำหนดค่าให้ตัวแปร local ที่มีชื่อดี แล้วใช้ชื่อนั้นแทน sub-expression เดิม รู้จักกันในอีกชื่อว่า Introduce Explaining Variable
+
+## smell
+
+นี่คือวิธีรักษา **cryptic one-liner** — expression ที่หนาแน่นจนคุณต้องแยกแยะมันในหัวทุกครั้งที่อ่าน เงื่อนไข boolean ที่ถักทอจากการเปรียบเทียบสามครั้ง หรือสูตรราคาที่มีเลขคณิตปริศนา ซ่อนความหมายของมันไว้ในเครื่องหมายวรรคตอน การตั้งชื่อแต่ละส่วนเปลี่ยนบรรทัดนั้นให้เป็นสิ่งที่คุณอ่านออกเสียงได้
+
+## Before → After
+
+การตรวจสอบการจัดส่งฝังความหมายของมันไว้ใน expression แบบ boolean เพียงตัวเดียว การตั้งชื่อให้แต่ละส่วนเผยให้เห็นกฎ
+
+<Tabs syncKey="lang">
+  <TabItem label="TypeScript">
+    ```ts
+    // Before
+    function isEligibleForFreeShipping(order: Order): boolean {
+      return order.total > 50 && order.country === 'TH' && !order.isGift;
+    }
+
+    // After
+    function isEligibleForFreeShipping(order: Order): boolean {
+      const overThreshold = order.total > 50;
+      const domestic = order.country === 'TH';
+      const giftExcluded = !order.isGift;
+      return overThreshold && domestic && giftExcluded;
+    }
+    ```
+  </TabItem>
+  <TabItem label="Python">
+    ```python
+    # Before
+    def is_eligible_for_free_shipping(order):
+        return order.total > 50 and order.country == "TH" and not order.is_gift
+
+    # After
+    def is_eligible_for_free_shipping(order):
+        over_threshold = order.total > 50
+        domestic = order.country == "TH"
+        gift_excluded = not order.is_gift
+        return over_threshold and domestic and gift_excluded
+    ```
+  </TabItem>
+  <TabItem label="Go">
+    ```go
+    // Before
+    func IsEligibleForFreeShipping(order Order) bool {
+        return order.Total > 50 && order.Country == "TH" && !order.IsGift
+    }
+
+    // After
+    func IsEligibleForFreeShipping(order Order) bool {
+        overThreshold := order.Total > 50
+        domestic := order.Country == "TH"
+        giftExcluded := !order.IsGift
+        return overThreshold && domestic && giftExcluded
+    }
+    ```
+  </TabItem>
+  <TabItem label="Rust">
+    ```rust
+    // Before
+    fn is_eligible_for_free_shipping(order: &Order) -> bool {
+        order.total > 50.0 && order.country == "TH" && !order.is_gift
+    }
+
+    // After
+    fn is_eligible_for_free_shipping(order: &Order) -> bool {
+        let over_threshold = order.total > 50.0;
+        let domestic = order.country == "TH";
+        let gift_excluded = !order.is_gift;
+        over_threshold && domestic && gift_excluded
+    }
+    ```
+  </TabItem>
+</Tabs>
+
+## Mechanics
+
+1. ตรวจสอบว่า sub-expression ไม่มี side effect — การ extract อันที่ทำให้ state เปลี่ยนแปลงอาจเปลี่ยนพฤติกรรม
+2. ประกาศตัวแปร local แบบ immutable แล้วกำหนดค่า sub-expression ให้มัน
+3. ตั้งชื่อตัวแปรที่บอกว่าค่านั้น *หมายความว่าอะไร* ไม่ใช่บอกว่ามันคำนวณอย่างไร
+4. แทนที่ sub-expression เดิมด้วยตัวแปรใหม่
+5. **รันเทสต์ของคุณ**
+6. ถ้า sub-expression เดียวกันปรากฏมากกว่าหนึ่งครั้งในขอบเขต ให้แทนที่ทุกการปรากฏแล้วเทสต์อีกครั้ง
+
+## เมื่อใดควรใช้ / ข้อแลกเปลี่ยน
+
+ใช้มันเพื่อ debug (ตัวแปร local ที่มีชื่อตรวจสอบได้ง่าย) เพื่อแยกสูตรยาว ๆ ออกเป็นชิ้นที่ review ได้ และเพื่อทำให้เงื่อนไขอธิบายตัวเองได้ ภายในฟังก์ชันเดียว ตัวแปร local ก็เพียงพอ เมื่อคำอธิบายเดียวกันมีประโยชน์ทั่วทั้ง object ให้เลือก **Replace Temp with Query** หรือ extract method ออกมาแทน
+
+สิ่งที่ตรงกันข้ามคือ **Inline Variable**: เมื่อชื่อของตัวแปรไม่ได้เพิ่มอะไรเหนือ expression ที่มันถืออยู่ ให้แทนที่ด้วย expression กลับเข้าไปแล้วทิ้งตัวแปร
+
+## ที่เกี่ยวข้อง
+
+- [Replace Temp with Query](/refactoring-from-zero-to-hero/th/composing-methods/replace-temp-with-query/)
+- [Extract Function](/refactoring-from-zero-to-hero/th/composing-methods/extract-function/)
+
+<Callout title="สิ่งที่ตรงกันข้าม: Inline Variable">
+Extract Variable เพิ่มชื่อ ส่วน Inline Variable กำจัดชื่อที่ไม่คุ้มค่าอีกต่อไป ถ้าคุณอ่าน `const x = order.total` แล้ว `x` ถูกใช้เพียงครั้งเดียวด้านล่างทันที ชื่อนั้นก็เป็นเพียง noise — inline มันเสีย ชื่อควรซื้อความชัดเจน ไม่ใช่พิธีการ
+</Callout>
+
+export const quizVariable = [
+  {
+    q: 'เป้าหมายของ Extract Variable คืออะไร?',
+    options: [
+      'ทำให้ฟังก์ชันสั้นลงด้วยการลบบรรทัด',
+      'ตั้งชื่อให้ sub-expression เพื่ออธิบายความหมายของมัน',
+      'ปรับปรุงประสิทธิภาพขณะรัน',
+      'แปลงฟังก์ชันให้เป็น method',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'คุณต้องตรวจสอบอะไรก่อน extract sub-expression เข้าไปในตัวแปร?',
+    options: [
+      'ว่ามันคืนค่า string',
+      'ว่ามันไม่มี side effect',
+      'ว่ามันถูกใช้เพียงครั้งเดียว',
+      'ว่ามันยาวกว่าสิบตัวอักษร',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'อะไรคือสิ่งที่ตรงกันข้ามกับ Extract Variable?',
+    options: ['Inline Variable', 'Split Phase', 'Inline Function', 'Extract Function'],
+    answer: 0,
+  },
+];
+
+<Quiz client:visible id="composing-methods/extract-variable" questions={quizVariable} />
+
+<ProgressTracker client:visible id="composing-methods/extract-variable" />

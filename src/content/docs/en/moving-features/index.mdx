@@ -1,0 +1,77 @@
+---
+title: Moving Features
+description: Put each piece of behaviour and data where it belongs — move functions and fields between classes and modules, then split or merge classes to match responsibility.
+sidebar:
+  order: 1
+---
+
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+export const overviewDiagram = `flowchart TD
+  A["A feature sits in the wrong place"] --> B{"What is misplaced?"}
+  B -->|"A function leans on another context"| C["Move Function"]
+  B -->|"A field is used elsewhere more"| D["Move Field"]
+  B -->|"One class does two jobs"| E["Extract Class"]
+  B -->|"A class no longer earns its keep"| F["Inline Class"]
+  B -->|"Callers navigate an object chain"| G["Hide Delegate"]
+  C --> H["Each module owns the right work"]
+  D --> H
+  E --> H
+  F --> H
+  G --> H`;
+
+## Intent
+
+The **moving features** family is about *location*. The composing-methods moves reshape the inside of a function; these moves decide which class or module a function, a field, or a whole cluster of behaviour should live in. The program does the same thing afterwards — but each piece of work now sits next to the data and the collaborators it actually uses.
+
+## The smell
+
+Software decisions made on day one rarely survive contact with day one hundred. A function that once belonged on `Order` slowly grows to read mostly from `Customer`. A field added to a record gets touched everywhere except that record. A small class quietly absorbs a second responsibility until it is two classes wearing one name. When behaviour and the data it depends on drift apart, every change means hopping between files. The moves in this module pull them back together.
+
+<Mermaid code={overviewDiagram} title="Choosing a moving-features move by what is misplaced" />
+
+## What this module covers
+
+Five refactorings, each reversible:
+
+- **Move Function** — when a function references another object's data and methods more than its own (Feature Envy), relocate it to the class it envies.
+- **Move Field** — when a field is read and written from a different record more than its current home, move it to where it is used.
+- **Extract Class** — when one class has grown to do two distinct jobs (a Large Class), peel one responsibility into a new class.
+- **Inline Class** — the inverse: when a class no longer pulls its weight, fold it back into the class that uses it.
+- **Hide Delegate** (and its inverse, **Remove Middle Man**) — encapsulate a delegation so callers stop walking object chains, honouring the Law of Demeter.
+
+Each lesson shows the same before-and-after in TypeScript, Python, Go, and Rust, then walks through safe, ordered mechanics — running your tests between every step.
+
+<Callout title="Move, do not rewrite">
+Every move here preserves observable behaviour. You are relocating code, not redesigning it. Do the relocation in small steps with a green test suite, and only *after* it is settled should you consider changing what the relocated code does.
+</Callout>
+
+export const quizIndex = [
+  {
+    q: 'What do "moving features" refactorings primarily change?',
+    options: [
+      'The observable behaviour of the program',
+      'Which class or module a function, field, or responsibility lives in',
+      'The internal statements inside a single function',
+      'The compiler optimization level',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'Which smell does Move Function most directly address?',
+    options: ['Long Function', 'Feature Envy', 'Duplicated Code', 'Primitive Obsession'],
+    answer: 1,
+  },
+  {
+    q: 'Inline Class is the inverse of which refactoring in this module?',
+    options: ['Move Field', 'Hide Delegate', 'Extract Class', 'Move Function'],
+    answer: 2,
+  },
+];
+
+<Quiz client:visible id="moving-features/index" questions={quizIndex} />
+
+<ProgressTracker client:visible id="moving-features/index" />

@@ -1,0 +1,230 @@
+---
+title: Decompose Conditional
+description: Extract the test, the then-branch, and the else-branch of a complicated conditional into well-named functions so the structure reads like plain language.
+sidebar:
+  order: 2
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+export const decomposeDiagram = `flowchart LR
+  subgraph Before["Before"]
+    A["if (date before summer<br/>or date after summer)<br/>charge = qty * winterRate + flat<br/>else<br/>charge = qty * summerRate"]
+  end
+  subgraph After["After"]
+    B["if notSummer(date)"]
+    B --> C["winterCharge(qty)"]
+    B --> D["summerCharge(qty)"]
+  end
+  Before -.->|"Decompose Conditional"| After`;
+
+## Intent
+
+Take a conditional whose *test* and *branches* are each a clump of detail, and replace each clump with a call to a function named after its intent. The `if` then reads as a sentence — *if it is not summer, use the winter charge, otherwise the summer charge* — and the messy arithmetic moves out of the way.
+
+## The smell
+
+This is the cure for a **complicated conditional** — the kind where you cannot tell, without parsing the expression, *why* a branch is taken. The test is a tangle of date comparisons; the branches are formulas with magic numbers. The control flow you care about (which case applies) is drowned in the computation. When the condition and each branch carry their own name, the decision becomes obvious and the math is tucked into helpers you can read on demand.
+
+## Before → After
+
+A billing function charges a winter rate outside summer and a summer rate inside it. Before, the test and both branches are inline arithmetic. After, each part is a named helper.
+
+<Tabs syncKey="lang">
+  <TabItem label="TypeScript">
+    ```ts
+    // Before
+    function charge(date: Date, quantity: number): number {
+      let result: number;
+      if (date.getMonth() < 5 || date.getMonth() > 8) {
+        result = quantity * 12 + 100;
+      } else {
+        result = quantity * 8;
+      }
+      return result;
+    }
+
+    // After
+    function charge(date: Date, quantity: number): number {
+      return notSummer(date) ? winterCharge(quantity) : summerCharge(quantity);
+    }
+
+    function notSummer(date: Date): boolean {
+      return date.getMonth() < 5 || date.getMonth() > 8;
+    }
+
+    function winterCharge(quantity: number): number {
+      return quantity * 12 + 100;
+    }
+
+    function summerCharge(quantity: number): number {
+      return quantity * 8;
+    }
+    ```
+  </TabItem>
+  <TabItem label="Python">
+    ```python
+    # Before
+    def charge(date, quantity):
+        if date.month < 6 or date.month > 9:
+            result = quantity * 12 + 100
+        else:
+            result = quantity * 8
+        return result
+
+    # After
+    def charge(date, quantity):
+        return winter_charge(quantity) if not_summer(date) else summer_charge(quantity)
+
+    def not_summer(date):
+        return date.month < 6 or date.month > 9
+
+    def winter_charge(quantity):
+        return quantity * 12 + 100
+
+    def summer_charge(quantity):
+        return quantity * 8
+    ```
+  </TabItem>
+  <TabItem label="Go">
+    ```go
+    // Before
+    func Charge(date time.Time, quantity int) int {
+        var result int
+        if date.Month() < time.June || date.Month() > time.September {
+            result = quantity*12 + 100
+        } else {
+            result = quantity * 8
+        }
+        return result
+    }
+
+    // After
+    func Charge(date time.Time, quantity int) int {
+        if notSummer(date) {
+            return winterCharge(quantity)
+        }
+        return summerCharge(quantity)
+    }
+
+    func notSummer(date time.Time) bool {
+        return date.Month() < time.June || date.Month() > time.September
+    }
+
+    func winterCharge(quantity int) int {
+        return quantity*12 + 100
+    }
+
+    func summerCharge(quantity int) int {
+        return quantity * 8
+    }
+    ```
+  </TabItem>
+  <TabItem label="Rust">
+    ```rust
+    // Before
+    fn charge(month: u32, quantity: i64) -> i64 {
+        let result;
+        if month < 6 || month > 9 {
+            result = quantity * 12 + 100;
+        } else {
+            result = quantity * 8;
+        }
+        result
+    }
+
+    // After
+    fn charge(month: u32, quantity: i64) -> i64 {
+        if not_summer(month) {
+            winter_charge(quantity)
+        } else {
+            summer_charge(quantity)
+        }
+    }
+
+    fn not_summer(month: u32) -> bool {
+        month < 6 || month > 9
+    }
+
+    fn winter_charge(quantity: i64) -> i64 {
+        quantity * 12 + 100
+    }
+
+    fn summer_charge(quantity: i64) -> i64 {
+        quantity * 8
+    }
+    ```
+  </TabItem>
+</Tabs>
+
+<Mermaid code={decomposeDiagram} title="A tangled if becomes a named test plus two named branches" />
+
+## Mechanics
+
+1. Apply **Extract Function** to the condition: lift the whole boolean test into a function whose name answers *why* this branch is taken (`notSummer`), not *how* it is computed.
+2. Apply **Extract Function** to the then-branch. Name it after the result it produces (`winterCharge`).
+3. Apply **Extract Function** to the else-branch in the same way (`summerCharge`).
+4. **Run your tests** after each extraction. Behaviour must be unchanged.
+5. With all three parts named, the original `if` is short enough to leave as-is or to collapse into a single expression if your language has a clean conditional expression.
+
+## When to use / trade-offs
+
+Reach for Decompose Conditional whenever the *test* of an `if` is hard to read, or whenever a branch is a block of computation that obscures the decision being made. It pairs naturally with **Extract Function**, which is the tool it leans on three times.
+
+The cost is the same as any extraction: three short hops from the `if` to its helpers. That is almost always worth paying, because a reader scanning for control flow can now read the decision without diving into the arithmetic. If a branch is already a single trivial expression, leave it inline — naming `quantity * 8` adds nothing.
+
+## Related
+
+- [Extract Function](/refactoring-from-zero-to-hero/en/composing-methods/extract-function/)
+- [Consolidate Conditional Expression](/refactoring-from-zero-to-hero/en/simplifying-conditionals/consolidate-conditional/)
+- [Replace Nested Conditional with Guard Clauses](/refactoring-from-zero-to-hero/en/simplifying-conditionals/replace-nested-conditional-with-guard-clauses/)
+
+<Callout title="Name the test after the question, not the comparison">
+A condition named `monthIsLessThan6OrGreaterThan9` just restates the operators. Name it `notSummer` and the `if` answers a business question. If the calendar logic later changes, the name still fits — only the helper's body moves.
+</Callout>
+
+export const quizDecompose = [
+  {
+    q: 'Which three parts of a conditional does Decompose Conditional extract?',
+    options: [
+      'The loop, the counter, and the accumulator',
+      'The test, the then-branch, and the else-branch',
+      'The imports, the body, and the return',
+      'The class, the method, and the field',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'What should the extracted condition function be named after?',
+    options: [
+      'The comparison operators it uses',
+      'Why the branch is taken — the question being asked',
+      'The variable it reads first',
+      'The number of clauses it contains',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'Which existing refactoring does Decompose Conditional rely on?',
+    options: ['Inline Function', 'Extract Function', 'Split Phase', 'Replace Temp with Query'],
+    answer: 1,
+  },
+  {
+    q: 'When should you leave a branch inline instead of extracting it?',
+    options: [
+      'When it spans many lines',
+      'When it is already a single trivial expression that a name would not clarify',
+      'When it calls another function',
+      'Always — never extract branches',
+    ],
+    answer: 1,
+  },
+];
+
+<Quiz client:visible id="simplifying-conditionals/decompose-conditional" questions={quizDecompose} />
+
+<ProgressTracker client:visible id="simplifying-conditionals/decompose-conditional" />

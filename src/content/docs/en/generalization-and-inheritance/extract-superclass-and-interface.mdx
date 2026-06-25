@@ -1,0 +1,290 @@
+---
+title: Extract Superclass & Interface
+description: Two classes have grown alike — lift their common features into a shared parent, or extract just the shared protocol into an interface or trait.
+sidebar:
+  order: 3
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+export const extractDiagram = `classDiagram
+  class Party {
+    +name string
+    +monthlyCharge() number
+  }
+  class Department
+  class Employee
+  Party <|-- Department
+  Party <|-- Employee
+  class Billable {
+    <<interface>>
+    +monthlyCharge() number
+  }
+  Billable <|.. Party`;
+
+## Intent
+
+**Extract Superclass** spots two classes that have independently grown to share fields and behaviour, and introduces a new common parent to hold the overlap — then pulls the shared members up into it. **Extract Interface** is the lighter cousin: when classes share only a *protocol* (a set of method signatures clients depend on) but no implementation, you extract that protocol into an interface — a trait in Rust, a structural interface in Go — so callers can depend on the contract rather than the concrete type.
+
+## The smell
+
+Two classes with a suspicious overlap of fields and methods are a quiet form of **Duplicated Code** — neither knows the other exists, yet both maintain a `name`, a `monthlyCharge`, an address. Extract Superclass gives that overlap a home. When the overlap is purely behavioural — several unrelated classes that all need to be *billed*, or *rendered*, or *compared* — and they share no data, an interface captures the contract without forcing a false data hierarchy.
+
+## Before → After
+
+A `Department` and an `Employee` both carry a name and compute a monthly charge. We extract a `Party` superclass for the shared parts, and a `Billable` interface for the shared protocol.
+
+<Tabs syncKey="lang">
+  <TabItem label="TypeScript">
+    ```ts
+    // Before — two classes independently grew the same shape
+    class Department {
+      constructor(public name: string, public staffCount: number) {}
+      monthlyCharge(): number {
+        return this.staffCount * 100;
+      }
+    }
+
+    class Employee {
+      constructor(public name: string, public salary: number) {}
+      monthlyCharge(): number {
+        return this.salary / 12;
+      }
+    }
+
+    // After — shared protocol as an interface, shared field via a superclass
+    interface Billable {
+      monthlyCharge(): number;
+    }
+
+    abstract class Party implements Billable {
+      constructor(public name: string) {}
+      abstract monthlyCharge(): number;
+    }
+
+    class Department extends Party {
+      constructor(name: string, public staffCount: number) {
+        super(name);
+      }
+      monthlyCharge(): number {
+        return this.staffCount * 100;
+      }
+    }
+
+    class Employee extends Party {
+      constructor(name: string, public salary: number) {
+        super(name);
+      }
+      monthlyCharge(): number {
+        return this.salary / 12;
+      }
+    }
+    ```
+  </TabItem>
+  <TabItem label="Python">
+    ```python
+    from abc import ABC, abstractmethod
+
+    # Before — two classes independently grew the same shape
+    class Department:
+        def __init__(self, name, staff_count):
+            self.name = name
+            self.staff_count = staff_count
+
+        def monthly_charge(self):
+            return self.staff_count * 100
+
+    class Employee:
+        def __init__(self, name, salary):
+            self.name = name
+            self.salary = salary
+
+        def monthly_charge(self):
+            return self.salary / 12
+
+    # After — abstract base holds the shared field and the shared protocol
+    class Party(ABC):
+        def __init__(self, name):
+            self.name = name
+
+        @abstractmethod
+        def monthly_charge(self):
+            ...
+
+    class Department(Party):
+        def __init__(self, name, staff_count):
+            super().__init__(name)
+            self.staff_count = staff_count
+
+        def monthly_charge(self):
+            return self.staff_count * 100
+
+    class Employee(Party):
+        def __init__(self, name, salary):
+            super().__init__(name)
+            self.salary = salary
+
+        def monthly_charge(self):
+            return self.salary / 12
+    ```
+  </TabItem>
+  <TabItem label="Go">
+    ```go
+    // Go has no superclass. "Extract interface" is natural and idiomatic:
+    // declare the shared protocol as an interface that both structs satisfy
+    // structurally. "Extract superclass" becomes embedding a small shared
+    // struct that holds the common fields.
+
+    // Shared protocol — extracted as an interface
+    type Billable interface {
+        MonthlyCharge() float64
+    }
+
+    // Shared data — extracted into an embeddable base struct
+    type Party struct {
+        Name string
+    }
+
+    type Department struct {
+        Party
+        StaffCount int
+    }
+
+    func (d Department) MonthlyCharge() float64 {
+        return float64(d.StaffCount) * 100
+    }
+
+    type Employee struct {
+        Party
+        Salary float64
+    }
+
+    func (e Employee) MonthlyCharge() float64 {
+        return e.Salary / 12
+    }
+
+    // Any Department or Employee value can now be used as a Billable.
+    func totalCharge(items []Billable) float64 {
+        total := 0.0
+        for _, it := range items {
+            total += it.MonthlyCharge()
+        }
+        return total
+    }
+    ```
+  </TabItem>
+  <TabItem label="Rust">
+    ```rust
+    // Rust has no superclass. "Extract interface" maps directly to extracting
+    // a trait that both types implement. "Extract superclass" becomes sharing
+    // a common struct by composition (a held `party` field).
+
+    struct Party {
+        name: String,
+    }
+
+    // Extracted protocol — a trait
+    trait Billable {
+        fn monthly_charge(&self) -> f64;
+    }
+
+    struct Department {
+        party: Party,
+        staff_count: u32,
+    }
+    impl Billable for Department {
+        fn monthly_charge(&self) -> f64 {
+            self.staff_count as f64 * 100.0
+        }
+    }
+
+    struct Employee {
+        party: Party,
+        salary: f64,
+    }
+    impl Billable for Employee {
+        fn monthly_charge(&self) -> f64 {
+            self.salary / 12.0
+        }
+    }
+
+    // Callers depend on the trait, not the concrete type.
+    fn total_charge(items: &[&dyn Billable]) -> f64 {
+        items.iter().map(|it| it.monthly_charge()).sum()
+    }
+    ```
+  </TabItem>
+</Tabs>
+
+<Mermaid code={extractDiagram} title="Department and Employee gain a shared Party parent and a Billable contract" />
+
+## Mechanics
+
+1. Confirm the overlap. List the fields and methods the two classes share. If they share state and behaviour, lean toward a superclass; if they share only signatures, lean toward an interface or trait.
+2. Create the empty superclass (or interface / trait). In Go and Rust, create the shared struct and the interface or trait.
+3. For a superclass: make the two classes extend it. Then **Pull Up** the shared fields and methods one at a time, **running your tests** after each.
+4. For an interface: declare the shared method signatures, then make each class declare that it implements the interface (automatic in Go's structural typing; explicit `impl` in Rust).
+5. Point client code at the new abstraction — accept the interface or superclass type wherever it does not need the concrete one.
+6. **Run your tests** after each move.
+
+## When to use / trade-offs
+
+Extract Superclass when two classes share real implementation you are tired of maintaining twice. Extract Interface when many types must be treated uniformly by clients but share no data — for instance, anything "billable", "serializable", or "comparable".
+
+The trade-off: a superclass couples its children together and is a one-shot in single-inheritance languages, so spend it carefully. An interface costs nothing structurally but adds a layer of indirection. In Go and Rust, Extract Interface (interface/trait) is the *default* tool and Extract Superclass is replaced by composing a shared struct — there is no class parent to extract.
+
+## Related
+
+- [Pull Up & Push Down](/refactoring-from-zero-to-hero/en/generalization-and-inheritance/pull-up-and-push-down/)
+- [Replace Inheritance with Delegation](/refactoring-from-zero-to-hero/en/generalization-and-inheritance/replace-inheritance-with-delegation/)
+- [Collapse Hierarchy](/refactoring-from-zero-to-hero/en/generalization-and-inheritance/collapse-hierarchy/)
+
+<Callout title="Superclass for shared data, interface for shared shape">
+If the two classes share state and logic you would otherwise maintain twice, a superclass earns its keep. If they only need to be *used the same way* by callers, reach for an interface or trait — it captures the contract without committing you to a data hierarchy you may later regret. Go and Rust make the interface route the path of least resistance.
+</Callout>
+
+export const quizExtractSuper = [
+  {
+    q: 'When should you prefer Extract Interface over Extract Superclass?',
+    options: [
+      'When the classes share both fields and method bodies',
+      'When the classes share only a protocol (method signatures) and no implementation',
+      'When you want to delete one of the classes',
+      'When the classes are in different files',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'In Go, how is "extract interface" expressed?',
+    options: [
+      'By extending a base class',
+      'By declaring an interface the structs satisfy structurally',
+      'By copying methods into a global function',
+      'It is impossible in Go',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'In Rust, what plays the role of an extracted interface?',
+    options: ['A macro', 'A trait that types implement', 'A superclass', 'A static variable'],
+    answer: 1,
+  },
+  {
+    q: 'What is a key cost of extracting a superclass in a single-inheritance language?',
+    options: [
+      'It always slows the program down',
+      'It couples the children together and uses up the one inheritance slot',
+      'It removes all methods from the subclasses',
+      'It prevents writing tests',
+    ],
+    answer: 1,
+  },
+];
+
+<Quiz client:visible id="generalization-and-inheritance/extract-superclass-and-interface" questions={quizExtractSuper} />
+
+<ProgressTracker client:visible id="generalization-and-inheritance/extract-superclass-and-interface" />

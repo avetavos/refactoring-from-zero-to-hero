@@ -1,0 +1,256 @@
+---
+title: Hide Delegate and Remove Middle Man
+description: ห่อหุ้มการมอบหมายเพื่อให้ผู้เรียกเลิกเดินไล่ตามสายของอ็อบเจกต์ — และสิ่งตรงข้ามคือการถอดเมธอดที่มอบหมายออกเมื่อมันไม่คุ้มกับการมีอยู่
+sidebar:
+  order: 6
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+export const hideDelegateDiagram = `flowchart LR
+  subgraph Before["Before — caller walks the chain"]
+    A["client"] --> B["person.department"]
+    B --> C[".manager"]
+  end
+  subgraph After["After — Hide Delegate"]
+    D["client"] --> E["person.manager()"]
+    E -.->|"internally"| F["department.manager"]
+  end
+  Before -.->|"Hide Delegate"| After
+  After -.->|"Remove Middle Man"| Before`;
+
+## Intent
+
+**Hide Delegate**: เมื่อ client เอื้อมผ่านอ็อบเจกต์หนึ่งเพื่อเรียกเมธอดบนอ็อบเจกต์ที่สอง — `person.department.manager` — ให้อ็อบเจกต์แรกมีเมธอดของตัวเองที่ซ่อนการกระโดดนั้น เพื่อให้ client เพียงเรียก `person.manager()` client เลิกพึ่งพิงโครงสร้างที่อยู่เบื้องหลัง `person`
+
+**Remove Middle Man** คือสิ่งตรงข้าม: เมื่ออ็อบเจกต์หนึ่งทำเพียงเล็กน้อยนอกจากส่งต่อการเรียกครั้งแล้วครั้งเล่าไปยัง delegate ของมัน ให้ปล่อยให้ client คุยกับ delegate โดยตรงและลบเมธอดที่ส่งต่อทิ้ง
+
+## The smell
+
+Hide Delegate รักษา **Inappropriate Intimacy** กับภายในของคลาส และเป็นใบหน้าเชิงปฏิบัติของ **Law of Demeter**: คุยกับเพื่อนของคุณ ไม่ใช่เพื่อนของเพื่อนของคุณ สายอย่าง `a.getB().getC().doIt()` ทำให้ผู้เรียก couple กับสองความสัมพันธ์ที่มันไม่มีธุระต้องรู้ smell ที่กลับกันคือ **Middle Man**: คลาสที่เมธอดเกือบทั้งหมดอ่านว่า "return delegate.something()" — ส่งต่อมากเสียจนตัวห่อไม่ได้เพิ่มอะไรเลย
+
+## Before → After
+
+`Person` ที่ผู้จัดการของพวกเขาถูกค้นพบผ่าน `Department` ของพวกเขา ก่อนหน้านี้ client นำทางผ่านสาย หลังจากนั้น `Person` ซ่อน delegate ไว้หลังเมธอด `manager()` (ใช้ Remove Middle Man เพื่อย้อนกลับไปอีกทางเมื่อตัวห่อหยุดคุ้มกับการมีอยู่)
+
+<Tabs syncKey="lang">
+  <TabItem label="TypeScript">
+    ```ts
+    // Before — client walks person.department.manager
+    class Department {
+      constructor(public manager: string) {}
+    }
+
+    class Person {
+      constructor(public name: string, public department: Department) {}
+    }
+
+    const managerName = person.department.manager;
+
+    // After — Hide Delegate
+    class Department {
+      constructor(private _manager: string) {}
+      get manager(): string {
+        return this._manager;
+      }
+    }
+
+    class Person {
+      constructor(public name: string, private department: Department) {}
+      manager(): string {
+        return this.department.manager;
+      }
+    }
+
+    const managerName = person.manager();
+    ```
+  </TabItem>
+  <TabItem label="Python">
+    ```python
+    # Before — client walks person.department.manager
+    class Department:
+        def __init__(self, manager):
+            self.manager = manager
+
+    class Person:
+        def __init__(self, name, department):
+            self.name = name
+            self.department = department
+
+    manager_name = person.department.manager
+
+    # After — Hide Delegate
+    class Department:
+        def __init__(self, manager):
+            self._manager = manager
+
+        @property
+        def manager(self):
+            return self._manager
+
+    class Person:
+        def __init__(self, name, department):
+            self.name = name
+            self._department = department
+
+        def manager(self):
+            return self._department.manager
+
+    manager_name = person.manager()
+    ```
+  </TabItem>
+  <TabItem label="Go">
+    ```go
+    // Before — client walks person.Department.Manager
+    type Department struct {
+        Manager string
+    }
+
+    type Person struct {
+        Name       string
+        Department Department
+    }
+
+    managerName := person.Department.Manager
+
+    // After — Hide Delegate
+    type Department struct {
+        manager string
+    }
+
+    func (d Department) Manager() string {
+        return d.manager
+    }
+
+    type Person struct {
+        Name       string
+        department Department
+    }
+
+    func (p Person) Manager() string {
+        return p.department.Manager()
+    }
+
+    managerName := person.Manager()
+    ```
+  </TabItem>
+  <TabItem label="Rust">
+    ```rust
+    // Before — client walks person.department.manager
+    struct Department {
+        manager: String,
+    }
+
+    struct Person {
+        name: String,
+        department: Department,
+    }
+
+    let manager_name = &person.department.manager;
+
+    // After — Hide Delegate
+    struct Department {
+        manager: String,
+    }
+
+    impl Department {
+        fn manager(&self) -> &str {
+            &self.manager
+        }
+    }
+
+    struct Person {
+        name: String,
+        department: Department,
+    }
+
+    impl Person {
+        fn manager(&self) -> &str {
+            self.department.manager()
+        }
+    }
+
+    let manager_name = person.manager();
+    ```
+  </TabItem>
+</Tabs>
+
+<Mermaid code={hideDelegateDiagram} title="Hide Delegate ห่อสายไว้; Remove Middle Man แกะมันออก" />
+
+## Mechanics
+
+**Hide Delegate**
+
+1. สำหรับแต่ละเมธอดบน delegate ที่ client เอื้อมไปหา ให้เพิ่มเมธอดที่มอบหมายอย่างเรียบง่ายบน server (อ็อบเจกต์ที่ client ถืออยู่แล้ว)
+2. อัปเดต client ให้เรียกเมธอด server ใหม่แทนการเดินไล่ตามสาย
+3. **รันเทสต์ของคุณ** หลังแต่ละเมธอดที่คุณเปลี่ยนทิศทาง
+4. เมื่อไม่มี client นำทางไปยัง delegate โดยตรง คุณก็สามารถซ่อน accessor ที่เปิดเผยมันได้
+
+**Remove Middle Man** (สิ่งตรงข้าม)
+
+1. เพิ่ม accessor บน server ที่คืนค่า delegate เอง
+2. สำหรับแต่ละเมธอดที่มอบหมายซึ่งไม่เพิ่มคุณค่า ให้แทนที่ผู้เรียกของมันด้วยการเรียกโดยตรงผ่าน accessor นั้น
+3. **รันเทสต์ของคุณ** ขณะที่คุณทำไป
+4. ลบเมธอดที่มอบหมายเมื่อพวกมันไม่มีผู้เรียกเหลืออยู่
+
+## When to use / trade-offs
+
+ซ่อน delegate เมื่อ client เอื้อมผ่านอ็อบเจกต์หนึ่งไปยังเพื่อนบ้านของมัน เมื่อคุณต้องการอิสระในการเปลี่ยนความสัมพันธ์ที่อยู่เบื้องหลังอ็อบเจกต์โดยไม่ทำให้ผู้เรียกทุกตัวพัง หรือเมื่อสายยาวขึ้นจนอ่านเหมือนคำสั่งนำทาง
+
+ความเสี่ยงคือการเลยเถิด: ซ่อนทุก delegate แล้ว server ก็จะเต็มไปด้วยเมธอดที่ส่งต่อจนมัน *กลายเป็น* Middle Man นั่นเองคือจังหวะที่คุณหยิบ **Remove Middle Man** มาใช้และปล่อยให้ client คุยกับ delegate อีกครั้ง การย้ายทั้งสองเป็นปุ่มหมุน — หมุนไปทางการห่อหุ้มเมื่อโครงสร้างผันผวน หมุนไปทางความตรงไปตรงมาเมื่อตัวห่อเป็นเพียงสัญญาณรบกวน
+
+## Related
+
+- [Move Function](/refactoring-from-zero-to-hero/th/moving-features/move-function/)
+- [Extract Class](/refactoring-from-zero-to-hero/th/moving-features/extract-class/)
+- [Inline Class](/refactoring-from-zero-to-hero/th/moving-features/inline-class/)
+
+<Callout title="ปุ่มหมุน ไม่ใช่กฎ">
+Hide Delegate และ Remove Middle Man ชี้ไปในทิศทางตรงข้ามกัน และนั่นคือบทเรียน: การห่อหุ้มมีต้นทุน ซ่อน delegate เมื่อความสัมพันธ์ที่อยู่เบื้องหลังมันอาจเปลี่ยนแปลง; นำ middle man ออกเมื่อการส่งต่อไม่ได้อะไรเลย ปรับปุ่มหมุนให้ตรงกับความเสถียรที่แท้จริงของโครงสร้าง
+</Callout>
+
+export const quizHideDelegate = [
+  {
+    q: 'Hide Delegate ช่วยให้คุณเคารพหลักการใด?',
+    options: ['Single Responsibility Principle', 'Law of Demeter', 'Open/Closed Principle', 'Liskov Substitution Principle'],
+    answer: 1,
+  },
+  {
+    q: 'Hide Delegate ทำอะไรให้กับ client?',
+    options: [
+      'มันทำให้ client เดินไล่ตามสายของอ็อบเจกต์ที่ยาวขึ้น',
+      'มันซ่อนสายไว้หลังเมธอดบนอ็อบเจกต์ที่ client ถืออยู่แล้ว',
+      'มันลบอ็อบเจกต์ delegate',
+      'มันรวมสองคลาสเข้าเป็นหนึ่ง',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'เมื่อใดที่คุณควรหยิบ Remove Middle Man มาใช้?',
+    options: [
+      'เมื่อ client เอื้อมผ่านอ็อบเจกต์ไปยังเพื่อนบ้านของมัน',
+      'เมื่อ server เต็มไปด้วยเมธอดที่เพียงส่งต่อไปยัง delegate',
+      'เมื่อคลาสมีสองความรับผิดชอบ',
+      'เมื่อฟิลด์อาศัยอยู่ใน record ที่ผิด',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'อะไรคือความสัมพันธ์ระหว่าง Hide Delegate และ Remove Middle Man?',
+    options: [
+      'พวกมันเป็นการ refactor เดียวกัน',
+      'พวกมันเป็นสิ่งตรงข้ามกัน — อันหนึ่งเพิ่มการห่อหุ้ม อีกอันถอดการส่งต่อที่ไม่จำเป็นออก',
+      'Remove Middle Man ต้องตามหลัง Hide Delegate เสมอ',
+      'พวกมันทั้งคู่แยกคลาสออกเป็นสอง',
+    ],
+    answer: 1,
+  },
+];
+
+<Quiz client:visible id="moving-features/hide-delegate-and-remove-middle-man" questions={quizHideDelegate} />
+
+<ProgressTracker client:visible id="moving-features/hide-delegate-and-remove-middle-man" />

@@ -1,0 +1,173 @@
+---
+title: Rename Function/Variable
+description: When a name misleads or under-explains, rename it and update every caller — because a name is the cheapest documentation you will ever write.
+sidebar:
+  order: 2
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+## Intent
+
+Change the name of a function or variable so it states what the thing actually is or does. The new name should let a reader understand the call without opening the body. Then update every caller to use it. Nothing about behaviour changes — only the words.
+
+## The smell
+
+A name that misleads is worse than no name at all. A function called `getCustomer` that quietly creates a customer if one is missing, a variable named `data` that holds a single price, a flag named `check` that actually *performs* a deletion — each one forces the reader to ignore the name and study the body instead. That is the failure mode a good name exists to prevent. When you find yourself reading the implementation just to learn what something is called, rename it.
+
+## Before → After
+
+A function whose name says far less than it does, plus a vague local variable. After, both names carry their meaning.
+
+<Tabs syncKey="lang">
+  <TabItem label="TypeScript">
+    ```ts
+    // Before
+    function calc(d: number): number {
+      const x = d * 0.0085;
+      return d + x;
+    }
+
+    const result = calc(1200);
+
+    // After
+    function applyDailyInterest(balance: number): number {
+      const interest = balance * 0.0085;
+      return balance + interest;
+    }
+
+    const balanceWithInterest = applyDailyInterest(1200);
+    ```
+  </TabItem>
+  <TabItem label="Python">
+    ```python
+    # Before
+    def calc(d):
+        x = d * 0.0085
+        return d + x
+
+    result = calc(1200)
+
+    # After
+    def apply_daily_interest(balance):
+        interest = balance * 0.0085
+        return balance + interest
+
+    balance_with_interest = apply_daily_interest(1200)
+    ```
+  </TabItem>
+  <TabItem label="Go">
+    ```go
+    // Before
+    func Calc(d float64) float64 {
+        x := d * 0.0085
+        return d + x
+    }
+
+    result := Calc(1200)
+
+    // After
+    func ApplyDailyInterest(balance float64) float64 {
+        interest := balance * 0.0085
+        return balance + interest
+    }
+
+    balanceWithInterest := ApplyDailyInterest(1200)
+    ```
+  </TabItem>
+  <TabItem label="Rust">
+    ```rust
+    // Before
+    fn calc(d: f64) -> f64 {
+        let x = d * 0.0085;
+        d + x
+    }
+
+    let result = calc(1200.0);
+
+    // After
+    fn apply_daily_interest(balance: f64) -> f64 {
+        let interest = balance * 0.0085;
+        balance + interest
+    }
+
+    let balance_with_interest = apply_daily_interest(1200.0);
+    ```
+  </TabItem>
+</Tabs>
+
+## Mechanics
+
+1. Decide on the new name. Say it out loud: does it describe the result, not the mechanics? Would a stranger understand the call site without reading the body?
+2. If the function is part of a published API, consider keeping the old name as a thin wrapper that delegates to the new one, so existing callers do not break.
+3. Rename the declaration. Lean on your editor's rename-symbol refactoring if it is reliable, but verify the scope it touched.
+4. Update every caller — and every comment or string that referred to the old name.
+5. **Run your tests.** A rename should never change behaviour, so a green suite confirms you only moved words.
+6. Once all callers use the new name, delete any temporary wrapper from step 2.
+
+## When to use / trade-offs
+
+Rename whenever a name made you pause, whenever you had to read the body to learn what something was, or whenever the code's behaviour drifted away from what the name first promised. It is the lowest-risk refactoring there is and one of the highest-value, because a clear name is read far more often than it is written.
+
+The cost is mechanical churn across callers and, for public APIs, a possible breaking change. Mitigate it with automated rename tooling and, where a contract is at stake, a deprecation period. The risk is almost always worth it: every reader you save from a confusing name pays you back.
+
+## Related
+
+- [Parameterize Function](/refactoring-from-zero-to-hero/en/simplifying-apis/parameterize-function/)
+- [Remove Flag Argument](/refactoring-from-zero-to-hero/en/simplifying-apis/remove-flag-argument/)
+- [Extract Function](/refactoring-from-zero-to-hero/en/composing-methods/extract-function/)
+
+<Callout title="A name is a tiny, free comment">
+A comment can rot silently while the code beside it changes. A name travels with the thing it describes, so it tends to stay honest. Spend the extra few seconds naming a function after its outcome, and you spare every future reader a trip into the body.
+</Callout>
+
+export const quizRename = [
+  {
+    q: 'Why is a misleading name considered worse than a vague one?',
+    options: [
+      'It compiles more slowly',
+      'It actively points the reader to the wrong conclusion, forcing them to study the body',
+      'It uses more memory at runtime',
+      'It cannot be changed later',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'When renaming a function that is part of a published API, what reduces the risk of breaking callers?',
+    options: [
+      'Deleting the old function immediately',
+      'Keeping the old name as a thin wrapper that delegates to the new one for a deprecation period',
+      'Renaming only the variables inside it',
+      'Adding a new global flag',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'After a pure rename, what should your test suite show?',
+    options: [
+      'New failures that prove the change took effect',
+      'No change — behaviour is identical, so the suite stays green',
+      'Faster execution time',
+      'A warning that the name changed',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'What makes Rename one of the highest-value refactorings?',
+    options: [
+      'It removes the need for tests',
+      'A clear name is read far more often than it is written',
+      'It deletes unused code',
+      'It improves runtime performance',
+    ],
+    answer: 1,
+  },
+];
+
+<Quiz client:visible id="simplifying-apis/rename-function" questions={quizRename} />
+
+<ProgressTracker client:visible id="simplifying-apis/rename-function" />

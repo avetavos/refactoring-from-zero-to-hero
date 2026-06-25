@@ -1,0 +1,227 @@
+---
+title: Encapsulate Variable
+description: ห่อหุ้มการเข้าถึงข้อมูลโดยตรงไว้หลังฟังก์ชัน accessor เพื่อให้คุณมีจุดเดียวสำหรับตรวจสอบความถูกต้อง ดักจับ หรือเปลี่ยนวิธีแทนค่าในภายหลัง
+sidebar:
+  order: 2
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+export const encapsulateDiagram = `flowchart LR
+  subgraph Before["Before"]
+    A["caller A"] --> D[("data field<br/>read & written directly")]
+    B["caller B"] --> D
+    C["caller C"] --> D
+  end
+  subgraph After["After"]
+    A2["caller A"] --> G["get() / set()"]
+    B2["caller B"] --> G
+    C2["caller C"] --> G
+    G --> D2[("data field")]
+  end
+  Before -.->|"Encapsulate Variable"| After`;
+
+## เจตนา
+
+นำข้อมูลชิ้นหนึ่งที่ผู้เรียกเข้าถึงโดยตรง มาส่งทุกการเข้าถึงผ่านฟังก์ชัน accessor คู่หนึ่ง — getter และ setter เมื่อทุกการอ่านและการเขียนไหลผ่านจุดเดียว จุดนั้นก็กลายเป็นจุดเกาะเกี่ยว (hook) คุณสามารถตรวจสอบความถูกต้องของอินพุต บันทึก log การเปลี่ยนแปลง คำนวณค่าแบบ lazy หรือสลับวิธีแทนค่าที่อยู่เบื้องหลังทั้งหมด โดยที่ไม่มีผู้เรียกคนใดต้องรับรู้
+
+## กลิ่นเหม็น
+
+ตัวกระตุ้นคือ **ข้อมูลที่เปลี่ยนแปลงได้และถูกใช้ร่วมกันอย่างกว้างขวาง**: ฟิลด์หนึ่ง ตัวแปรระดับโมดูล หรือตัวแปร global ที่หลายส่วนของโค้ดอ่านและเขียนได้ตามใจ ตราบใดที่การเข้าถึงกระจัดกระจาย คุณจะไม่สามารถเปลี่ยนอะไรเกี่ยวกับวิธีที่ข้อมูลถูกจัดเก็บหรือป้องกันได้เลย โดยไม่ต้องไล่ตามหาทุก ๆ การอ้างอิง ไม่มีรอยต่อ (seam) จุดเดียวให้เพิ่มกฎอย่าง "ค่านี้ห้ามติดลบ" หรือ "ทำให้สตริงเป็นมาตรฐานตอนรับเข้ามา" การห่อหุ้มจะสร้างรอยต่อนั้นขึ้นมา
+
+## ก่อน → หลัง
+
+ออบเจ็กต์ config ที่ฟิลด์ `taxRate` ถูกอ่านและกำหนดค่าโดยตรงทั่วทั้งโค้ดเบส หลังจากนั้น ฟิลด์ดังกล่าวเป็น private อยู่หลัง accessor เพื่อให้ setter สามารถปฏิเสธค่าที่ไม่สมเหตุสมผลได้
+
+<Tabs syncKey="lang">
+  <TabItem label="TypeScript">
+    ```ts
+    // Before
+    export const config = {
+      taxRate: 0.07,
+    };
+    // ...elsewhere, scattered and unguarded:
+    config.taxRate = 1.5; // nobody stops this
+    const r = config.taxRate;
+
+    // After
+    class Config {
+      #taxRate = 0.07;
+
+      get taxRate(): number {
+        return this.#taxRate;
+      }
+
+      set taxRate(value: number) {
+        if (value < 0 || value > 1) {
+          throw new RangeError('taxRate must be between 0 and 1');
+        }
+        this.#taxRate = value;
+      }
+    }
+
+    export const config = new Config();
+    const r = config.taxRate;
+    ```
+  </TabItem>
+  <TabItem label="Python">
+    ```python
+    # Before
+    class Config:
+        def __init__(self):
+            self.tax_rate = 0.07
+    # ...elsewhere, scattered and unguarded:
+    config = Config()
+    config.tax_rate = 1.5  # nobody stops this
+    r = config.tax_rate
+
+    # After
+    class Config:
+        def __init__(self):
+            self._tax_rate = 0.07
+
+        @property
+        def tax_rate(self):
+            return self._tax_rate
+
+        @tax_rate.setter
+        def tax_rate(self, value):
+            if not 0 <= value <= 1:
+                raise ValueError("tax_rate must be between 0 and 1")
+            self._tax_rate = value
+
+    config = Config()
+    r = config.tax_rate
+    ```
+  </TabItem>
+  <TabItem label="Go">
+    ```go
+    // Before
+    type Config struct {
+        TaxRate float64 // exported, written anywhere
+    }
+    // ...elsewhere:
+    cfg.TaxRate = 1.5 // nobody stops this
+    r := cfg.TaxRate
+
+    // After
+    type Config struct {
+        taxRate float64 // unexported: only accessors reach it
+    }
+
+    func (c *Config) TaxRate() float64 {
+        return c.taxRate
+    }
+
+    func (c *Config) SetTaxRate(value float64) error {
+        if value < 0 || value > 1 {
+            return fmt.Errorf("taxRate must be between 0 and 1, got %v", value)
+        }
+        c.taxRate = value
+        return nil
+    }
+    ```
+  </TabItem>
+  <TabItem label="Rust">
+    ```rust
+    // Before
+    pub struct Config {
+        pub tax_rate: f64, // public: written anywhere
+    }
+    // ...elsewhere:
+    // cfg.tax_rate = 1.5; // nobody stops this
+
+    // After
+    pub struct Config {
+        tax_rate: f64, // private: only accessors reach it
+    }
+
+    impl Config {
+        pub fn tax_rate(&self) -> f64 {
+            self.tax_rate
+        }
+
+        pub fn set_tax_rate(&mut self, value: f64) -> Result<(), String> {
+            if !(0.0..=1.0).contains(&value) {
+                return Err(format!("tax_rate must be between 0 and 1, got {value}"));
+            }
+            self.tax_rate = value;
+            Ok(())
+        }
+    }
+    ```
+  </TabItem>
+</Tabs>
+
+<Mermaid code={encapsulateDiagram} title="การเข้าถึงโดยตรงกลายเป็นการเข้าถึงผ่าน accessor คู่เดียว" />
+
+## กลไก
+
+1. สร้าง getter และ setter (หรือฟังก์ชัน accessor) ที่อ่านและเขียนตัวแปร ในตอนแรกพวกมันแค่ return และ assign เท่านั้น ไม่ทำอย่างอื่น
+2. หาทุก ๆ การอ้างอิงถึงตัวแปรดิบ แทนที่การอ่านแต่ละครั้งด้วยการเรียก getter และการเขียนแต่ละครั้งด้วยการเรียก setter ทำทีละกลุ่มเล็ก ๆ
+3. **รันเทสต์ของคุณ** หลังจากแต่ละกลุ่ม
+4. จำกัดการเข้าถึงตัวแปรเอง — ทำให้ฟิลด์เป็น private, unexported หรือเข้าถึงไม่ได้จากภายนอกด้วยวิธีอื่น — เพื่อให้ accessor เป็นทางเข้าทางเดียว
+5. **รันเทสต์ของคุณ** อีกครั้ง ไม่ควรมีอะไรพัง เพราะทุกจุดผ่าน accessor อยู่แล้ว
+6. ตอนนี้คุณมีรอยต่อแล้ว เพิ่มการตรวจสอบความถูกต้อง การ log หรือการคำนวณแบบ lazy ภายใน accessor ในฐานะการเปลี่ยนแปลงที่แยกออกมาและตั้งใจทำ
+
+## เมื่อไรควรใช้ / ข้อแลกเปลี่ยน
+
+หยิบ Encapsulate Variable มาใช้เมื่อข้อมูลเปลี่ยนแปลงได้และถูกใช้ร่วมกัน เมื่อคุณต้องการเพิ่มกฎเกี่ยวกับค่าที่ถูกต้อง หรือเมื่อคุณสงสัยว่าวิธีแทนค่าในการจัดเก็บอาจเปลี่ยนไป มันเป็นเงื่อนไขเบื้องต้นสำหรับท่าต่อ ๆ ไปอีกหลายท่า: คุณไม่สามารถสลับวิธีแทนค่าได้อย่างปลอดภัยจนกว่าทุกการเข้าถึงจะไหลผ่านจุดเดียว
+
+ต้นทุนคือชั้นของการอ้อม (indirection) และพิธีรีตองเล็กน้อย สำหรับค่าที่เป็น local จริง ๆ ไม่เปลี่ยนแปลง หรือใช้ครั้งเดียว พิธีรีตองนั้นไม่ได้ช่วยอะไร — ปล่อยให้มันเปลือยเปล่าไว้ การห่อหุ้มจะคุ้มค่าก็ต่อเมื่อข้อมูลถูกใช้ร่วมกันและมีอายุยืนยาวเท่านั้น **Encapsulate Collection** ที่เกี่ยวข้องกันนำแนวคิดเดียวกันนี้ไปใช้กับฟิลด์ลิสต์และแมป ซึ่งการเปิดเผยคอนเทนเนอร์ดิบ ๆ นั้นอันตรายเป็นพิเศษ
+
+## ที่เกี่ยวข้อง
+
+- [Replace Magic Literal](/refactoring-from-zero-to-hero/th/organizing-data/replace-magic-literal/)
+- [Encapsulate Collection](/refactoring-from-zero-to-hero/th/organizing-data/encapsulate-collection/)
+- [Replace Primitive with Object](/refactoring-from-zero-to-hero/th/organizing-data/replace-primitive-with-object/)
+
+<Callout title="getter คือการเตรียมพร้อมรับอนาคตของคุณ">
+ในวินาทีที่ทุกการเข้าถึงไหลผ่าน accessor คุณได้ซื้อทางเลือกหนึ่งที่อาจจะไม่เคยได้ใช้เลย — และนั่นก็ไม่เป็นไร ประเด็นไม่ได้อยู่ที่ว่าคุณ *จะ* เพิ่มการตรวจสอบความถูกต้อง แต่อยู่ที่ว่าเมื่อถึงวันที่คุณต้องทำ จะมีจุดให้เพิ่มเพียงจุดเดียวเป๊ะ แทนที่จะเป็นสี่สิบจุด
+</Callout>
+
+export const quizEncapsulate = [
+  {
+    q: 'เป้าหมายหลักของ Encapsulate Variable คืออะไร?',
+    options: [
+      'เพื่อทำให้ตัวแปรทำงานเร็วขึ้น',
+      'เพื่อส่งทุกการเข้าถึงผ่านจุดเดียว เพื่อให้คุณสามารถตรวจสอบความถูกต้องหรือเปลี่ยนวิธีแทนค่าได้ภายหลัง',
+      'เพื่อลบตัวแปรทิ้งทั้งหมด',
+      'เพื่อทำให้ตัวแปรเป็น global',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'หลังจากแนะนำ accessor เข้ามาแล้ว ขั้นตอนต่อไปที่สำคัญคืออะไร?',
+    options: [
+      'ทำให้ตัวแปรเป็น public เพื่อให้ใครก็ตามยังเข้าถึงได้',
+      'จำกัดการเข้าถึงตัวแปรโดยตรง เพื่อให้ accessor เป็นทางเข้าทางเดียว',
+      'ลบ getter ออก',
+      'เพิ่มตัวแปรเข้าไปในทุกโมดูล',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'ข้อมูลชนิดใดที่สมควรใช้ Encapsulate Variable มากที่สุด?',
+    options: ['ตัวแปรชั่วคราวที่เป็น local จริง ๆ ใช้ครั้งเดียว', 'ข้อมูลที่เปลี่ยนแปลงได้และถูกใช้ร่วมกันอย่างกว้างขวาง', 'ค่าคงที่ ณ เวลา compile ที่ใช้เพียงครั้งเดียว', 'ฟิลด์ที่ไม่ได้ใช้งาน'],
+    answer: 1,
+  },
+  {
+    q: 'รอยต่อการเข้าถึงจุดเดียวเปิดทางให้ทำอะไรได้อย่างเป็นประโยชน์ที่สุด?',
+    options: [
+      'การเพิ่มการตรวจสอบความถูกต้อง การ log หรือการเปลี่ยนวิธีแทนค่าในจุดเดียว',
+      'การเปลี่ยนชื่อทั้งโปรเจกต์',
+      'การลบชุดเทสต์ออก',
+      'การทำให้โปรแกรมเป็น single-threaded',
+    ],
+    answer: 0,
+  },
+];
+
+<Quiz client:visible id="organizing-data/encapsulate-variable" questions={quizEncapsulate} />
+
+<ProgressTracker client:visible id="organizing-data/encapsulate-variable" />

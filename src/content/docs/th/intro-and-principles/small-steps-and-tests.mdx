@@ -1,0 +1,206 @@
+---
+title: ก้าวเล็ก ๆ และ test
+description: จังหวะของ refactoring — เปลี่ยนเล็กจิ๋วที่รักษาพฤติกรรมไว้ รัน test commit — และเหตุผลที่ก้าวเล็ก ๆ บวกกับตาข่ายความปลอดภัยจาก test ทำให้การปรับโครงสร้างปลอดภัย
+sidebar:
+  order: 4
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+export const rhythmDiagram = `flowchart TB
+  A["Make ONE tiny<br/>behavior-preserving change"] --> B["Run the tests"]
+  B -->|green| C["Commit"]
+  B -->|red| D["Undo the last step"]
+  D --> E["Take a smaller step"]
+  E --> A
+  C --> F{"Done?"}
+  F -->|no| A
+  F -->|yes| G["Stop"]`;
+
+## จังหวะ
+
+Refactoring ที่ทำได้ดีดูแทบจะน่าเบื่อ คุณไม่ได้จ้องฟังก์ชันแล้วพิมพ์มันใหม่อย่างเร้าใจ คุณทำการเปลี่ยนเล็กจิ๋วหนึ่งครั้ง ยืนยันว่าไม่มีอะไรพัง แล้วบันทึกความคืบหน้าของคุณ จากนั้นทำซ้ำอีกครั้ง ลูปคือ:
+
+1. ทำการเปลี่ยน **หนึ่ง** อย่างที่เล็กและรักษาพฤติกรรมไว้
+2. **รัน test**
+3. ถ้าผ่าน ให้ **commit** ถ้าล้มเหลว ให้ **undo** แล้วก้าวให้เล็กลง
+
+<Mermaid code={rhythmDiagram} title="จังหวะของ refactoring — เปลี่ยนเล็ก ๆ ทดสอบ commit ทำซ้ำจนเสร็จ" />
+
+## ทำไมต้องก้าวเล็ก ๆ?
+
+ขนาดของก้าวที่คุณก้าวกำหนดว่าคุณจะตกได้ไกลแค่ไหน ถ้าคุณเปลี่ยนห้าสิบบรรทัดแล้ว test กลายเป็นสีแดง บั๊กก็อาจอยู่ในบรรทัดไหนก็ได้ — คุณก็กลับไป debug ใหม่ ถ้าคุณเปลี่ยน *หนึ่ง* อย่างแล้ว test กลายเป็นสีแดง คุณรู้ทันทีว่าอะไรเป็นต้นเหตุ เพราะไม่มีอะไรอื่นขยับเลย undo ก้าวเดียวนั้น แล้วคุณก็กลับไปสู่โปรแกรมที่ทำงานได้ในทันที
+
+ก้าวเล็ก ๆ รู้สึกช้ากว่า แต่จริง ๆ แล้วไม่ใช่ เวลาที่คุณ "เสีย" ไปกับการก้าวจิ๋ว ๆ หลายก้าวนั้นน้อยกว่าเวลาที่คุณเสียไปกับการตามล่า regression ในก้อน diff ที่ใหญ่และพันกันยุ่งเหยิงมาก ก้าวเล็ก ๆ แลกความรู้สึกว่าเร็วกับความเป็นจริงของการไม่เคยหลงทาง
+
+## ทำไมต้องมีตาข่ายความปลอดภัยจาก test?
+
+นิยามทั้งหมดของ refactoring คือ *การรักษาพฤติกรรม* test คือวิธีที่คุณ *พิสูจน์* มัน หลังจากแต่ละก้าว แถบสีเขียวคือหลักฐานของคุณว่าการเปลี่ยนแปลงที่คุณเพิ่งทำนั้นมองไม่เห็นจากโลกภายนอก หากไม่มี test คุณก็เพียง *หวัง* ว่าพฤติกรรมจะถูกรักษาไว้ — และความหวังไม่ใช่ตาข่ายความปลอดภัย
+
+ถ้าโค้ดที่คุณต้องการ refactor ไม่มี test เลย จงเขียนมันขึ้นมาก่อน แม้แต่ **characterization test** เพียงไม่กี่ตัว — test ที่เพียงตรึงสิ่งที่โค้ดทำอยู่ *วันนี้* ไม่ว่าจะถูกหรือไม่ — ก็ให้ตาข่ายที่คุณต้องการในการปรับโครงสร้างอย่างมั่นใจ
+
+## ตัวอย่างก้าวเล็ก ๆ ที่ลงมือทำจริง
+
+เราจะเปลี่ยน conditional ที่อึดอัดซึ่งคืนค่าอัตราส่วนลด ให้เป็นโครงสร้างที่ชัดเจนและแบนราบ จับตาดูแต่ละก้าว: นำชื่อที่อธิบายความหมายเข้ามา แล้วทำให้การซ้อนกันแบนลง รัน test หลัง *แต่ละ* ก้าว (แสดงไว้ตรงนี้เป็นสถานะสุดท้าย แต่ที่จริงคุณจะ commit สองครั้ง)
+
+<Tabs syncKey="lang">
+  <TabItem label="TypeScript">
+    ```ts
+    // Before
+    function discount(total: number, member: boolean): number {
+      let rate = 0;
+      if (member) {
+        if (total > 100) {
+          rate = 0.2;
+        } else {
+          rate = 0.1;
+        }
+      }
+      return total * rate;
+    }
+
+    // After
+    function discount(total: number, member: boolean): number {
+      if (!member) return 0;
+      const rate = total > 100 ? 0.2 : 0.1;
+      return total * rate;
+    }
+    ```
+  </TabItem>
+  <TabItem label="Python">
+    ```python
+    # Before
+    def discount(total, member):
+        rate = 0
+        if member:
+            if total > 100:
+                rate = 0.2
+            else:
+                rate = 0.1
+        return total * rate
+
+    # After
+    def discount(total, member):
+        if not member:
+            return 0
+        rate = 0.2 if total > 100 else 0.1
+        return total * rate
+    ```
+  </TabItem>
+  <TabItem label="Go">
+    ```go
+    // Before
+    func Discount(total float64, member bool) float64 {
+        rate := 0.0
+        if member {
+            if total > 100 {
+                rate = 0.2
+            } else {
+                rate = 0.1
+            }
+        }
+        return total * rate
+    }
+
+    // After
+    func Discount(total float64, member bool) float64 {
+        if !member {
+            return 0
+        }
+        rate := 0.1
+        if total > 100 {
+            rate = 0.2
+        }
+        return total * rate
+    }
+    ```
+  </TabItem>
+  <TabItem label="Rust">
+    ```rust
+    // Before
+    fn discount(total: f64, member: bool) -> f64 {
+        let mut rate = 0.0;
+        if member {
+            if total > 100.0 {
+                rate = 0.2;
+            } else {
+                rate = 0.1;
+            }
+        }
+        total * rate
+    }
+
+    // After
+    fn discount(total: f64, member: bool) -> f64 {
+        if !member {
+            return 0.0;
+        }
+        let rate = if total > 100.0 { 0.2 } else { 0.1 };
+        total * rate
+    }
+    ```
+  </TabItem>
+</Tabs>
+
+อินพุตเดียวกันให้ส่วนลดเดียวกัน แต่ละสถานะระหว่างทางยังคอมไพล์ได้และผ่าน test — นั่นคือสิ่งที่ทำให้เราเดินหน้าต่อไปได้โดยไม่ต้องกลัว
+
+## ที่เกี่ยวข้อง
+
+- [refactoring คืออะไร?](/refactoring-from-zero-to-hero/th/intro-and-principles/what-is-refactoring/)
+- [การอ่าน code smell](/refactoring-from-zero-to-hero/th/intro-and-principles/reading-code-smells/)
+- [Replace Temp with Query](/refactoring-from-zero-to-hero/th/composing-methods/replace-temp-with-query/)
+
+<Callout title="จากแถบเขียวสู่แถบเขียว">
+จงปฏิบัติต่อทุก commit เสมือนเป็นจุดตรวจที่ test เป็นสีเขียว ขยับจากแถบเขียวหนึ่งไปยังอันถัดไปด้วยก้าวที่เล็กพอจนหากมีอะไรพัง การ undo ก้าวล่าสุดจะกินเวลาคุณแค่ไม่กี่วินาที — ไม่ใช่ทั้งบ่าย นั่นคือโมเดลความปลอดภัยทั้งหมดของ refactoring
+</Callout>
+
+export const quizSteps = [
+  {
+    q: 'สามจังหวะของจังหวะ refactoring คืออะไร?',
+    options: [
+      'ออกแบบ สร้าง deploy',
+      'เปลี่ยนเล็ก ๆ รัน test commit',
+      'อ่าน เขียนใหม่ ปล่อยออก',
+      'วางแผน ประเมิน จัดตาราง',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'ทำไมจึงควรเลือกก้าวเล็ก ๆ หลายก้าวมากกว่าการเปลี่ยนครั้งใหญ่ครั้งเดียว?',
+    options: [
+      'ก้าวเล็ก ๆ สนุกกว่าเสมอ',
+      'test ที่ล้มเหลวชี้ไปที่การเปลี่ยนเล็ก ๆ เพียงอันเดียวแทนที่จะเป็น diff ก้อนใหญ่',
+      'การเปลี่ยนครั้งใหญ่ถูกห้ามโดย compiler',
+      'ก้าวเล็ก ๆ ข้ามความจำเป็นในการมี test',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'test มีบทบาทอะไรระหว่างการ refactoring?',
+    options: [
+      'มันเพิ่มพฤติกรรมใหม่ให้กับโค้ด',
+      'มันพิสูจน์ว่าพฤติกรรมถูกรักษาไว้หลังแต่ละก้าว',
+      'มันทำให้โค้ดรันเร็วขึ้น',
+      'มันแทนที่ความจำเป็นในการ commit',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'ถ้าโค้ดที่คุณต้องการ refactor ไม่มี test คุณควรทำอะไรก่อน?',
+    options: [
+      'refactor ไปเลยแล้วหวังให้ดีที่สุด',
+      'ลบโค้ดทิ้ง',
+      'เขียน characterization test ที่ตรึงพฤติกรรมปัจจุบันเอาไว้',
+      'ข้ามการ refactoring ไปอย่างถาวร',
+    ],
+    answer: 2,
+  },
+];
+
+<Quiz client:visible id="intro-and-principles/small-steps-and-tests" questions={quizSteps} />
+
+<ProgressTracker client:visible id="intro-and-principles/small-steps-and-tests" />

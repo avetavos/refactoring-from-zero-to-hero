@@ -1,0 +1,307 @@
+---
+title: Move Function
+description: เมื่อฟังก์ชันพึ่งพิงข้อมูลของอ็อบเจกต์อื่นมากกว่าของตัวเอง ให้ย้ายมันไปยังคลาสที่มันควรอยู่จริง ๆ
+sidebar:
+  order: 2
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+export const moveFnDiagram = `flowchart LR
+  subgraph Before["Before"]
+    A["Account"]
+    A --> B["overdraftCharge()<br/>reads plan.tier<br/>reads plan.dailyRate"]
+    C["AccountPlan"]
+  end
+  subgraph After["After"]
+    D["Account"]
+    E["AccountPlan"]
+    E --> F["overdraftCharge()<br/>reads own tier<br/>reads own dailyRate"]
+    D -.->|"delegates"| F
+  end
+  Before -.->|"Move Function"| After`;
+
+## Intent
+
+นำฟังก์ชันที่เมื่ออ่านแล้วพูดถึง *อ็อบเจกต์อื่น* เป็นส่วนใหญ่ — ฟิลด์ของมัน เมธอดของมัน กฎของมัน — แล้วย้ายฟังก์ชันนั้นไปยังอ็อบเจกต์ดังกล่าว บ้านใหม่เป็นเจ้าของข้อมูลที่ฟังก์ชันต้องใช้ ฟังก์ชันจึงเรียบง่ายขึ้น และการ coupling ระหว่างสองคลาสก็ลดลง
+
+## The smell
+
+นี่คือยารักษา **Feature Envy**: เมธอดที่ดูเหมือนสนใจคลาสอื่นมากกว่าคลาสที่มันอาศัยอยู่ สัญญาณบ่งชี้คือรายการพารามิเตอร์และตัวบอดี้ ถ้าฟังก์ชันรับอาร์กิวเมนต์ `plan` แล้วอ่าน `plan.tier`, `plan.dailyRate` และ `plan.discount` ในขณะที่แทบไม่แตะอ็อบเจกต์ของตัวเอง แสดงว่ามันอิจฉา `plan` ย้ายมันไปที่นั่น แล้วการเอื้อมข้ามไปเรียกก็จะกลายเป็นการเข้าถึงฟิลด์ธรรมดา
+
+## Before → After
+
+ค่าธรรมเนียมเบิกเกินบัญชี (overdraft charge) ที่อาศัยอยู่บน `Account` แต่คำนวณเกือบทั้งหมดจาก `plan` ของบัญชี ก่อนหน้านี้ ฟังก์ชันเอื้อมเข้าไปใน plan เพื่อเอาทุกอย่าง หลังจากนั้น มันอาศัยอยู่บน plan ซึ่งเป็นที่ที่ข้อมูลอยู่อยู่แล้ว
+
+<Tabs syncKey="lang">
+  <TabItem label="TypeScript">
+    ```ts
+    // Before
+    class AccountPlan {
+      constructor(public tier: string, public dailyRate: number) {}
+    }
+
+    class Account {
+      constructor(private plan: AccountPlan, private daysOverdrawn: number) {}
+
+      overdraftCharge(): number {
+        if (this.plan.tier === "premium") {
+          let base = 10;
+          if (this.daysOverdrawn > 7) {
+            base += (this.daysOverdrawn - 7) * this.plan.dailyRate * 0.85;
+          }
+          return base;
+        }
+        return this.daysOverdrawn * this.plan.dailyRate;
+      }
+    }
+
+    // After
+    class AccountPlan {
+      constructor(public tier: string, public dailyRate: number) {}
+
+      overdraftCharge(daysOverdrawn: number): number {
+        if (this.tier === "premium") {
+          let base = 10;
+          if (daysOverdrawn > 7) {
+            base += (daysOverdrawn - 7) * this.dailyRate * 0.85;
+          }
+          return base;
+        }
+        return daysOverdrawn * this.dailyRate;
+      }
+    }
+
+    class Account {
+      constructor(private plan: AccountPlan, private daysOverdrawn: number) {}
+
+      overdraftCharge(): number {
+        return this.plan.overdraftCharge(this.daysOverdrawn);
+      }
+    }
+    ```
+  </TabItem>
+  <TabItem label="Python">
+    ```python
+    # Before
+    class AccountPlan:
+        def __init__(self, tier, daily_rate):
+            self.tier = tier
+            self.daily_rate = daily_rate
+
+    class Account:
+        def __init__(self, plan, days_overdrawn):
+            self.plan = plan
+            self.days_overdrawn = days_overdrawn
+
+        def overdraft_charge(self):
+            if self.plan.tier == "premium":
+                base = 10
+                if self.days_overdrawn > 7:
+                    base += (self.days_overdrawn - 7) * self.plan.daily_rate * 0.85
+                return base
+            return self.days_overdrawn * self.plan.daily_rate
+
+    # After
+    class AccountPlan:
+        def __init__(self, tier, daily_rate):
+            self.tier = tier
+            self.daily_rate = daily_rate
+
+        def overdraft_charge(self, days_overdrawn):
+            if self.tier == "premium":
+                base = 10
+                if days_overdrawn > 7:
+                    base += (days_overdrawn - 7) * self.daily_rate * 0.85
+                return base
+            return days_overdrawn * self.daily_rate
+
+    class Account:
+        def __init__(self, plan, days_overdrawn):
+            self.plan = plan
+            self.days_overdrawn = days_overdrawn
+
+        def overdraft_charge(self):
+            return self.plan.overdraft_charge(self.days_overdrawn)
+    ```
+  </TabItem>
+  <TabItem label="Go">
+    ```go
+    // Before
+    type AccountPlan struct {
+        Tier      string
+        DailyRate float64
+    }
+
+    type Account struct {
+        Plan          AccountPlan
+        DaysOverdrawn int
+    }
+
+    func (a Account) OverdraftCharge() float64 {
+        if a.Plan.Tier == "premium" {
+            base := 10.0
+            if a.DaysOverdrawn > 7 {
+                base += float64(a.DaysOverdrawn-7) * a.Plan.DailyRate * 0.85
+            }
+            return base
+        }
+        return float64(a.DaysOverdrawn) * a.Plan.DailyRate
+    }
+
+    // After
+    type AccountPlan struct {
+        Tier      string
+        DailyRate float64
+    }
+
+    func (p AccountPlan) OverdraftCharge(daysOverdrawn int) float64 {
+        if p.Tier == "premium" {
+            base := 10.0
+            if daysOverdrawn > 7 {
+                base += float64(daysOverdrawn-7) * p.DailyRate * 0.85
+            }
+            return base
+        }
+        return float64(daysOverdrawn) * p.DailyRate
+    }
+
+    type Account struct {
+        Plan          AccountPlan
+        DaysOverdrawn int
+    }
+
+    func (a Account) OverdraftCharge() float64 {
+        return a.Plan.OverdraftCharge(a.DaysOverdrawn)
+    }
+    ```
+  </TabItem>
+  <TabItem label="Rust">
+    ```rust
+    // Before
+    struct AccountPlan {
+        tier: String,
+        daily_rate: f64,
+    }
+
+    struct Account {
+        plan: AccountPlan,
+        days_overdrawn: i64,
+    }
+
+    impl Account {
+        fn overdraft_charge(&self) -> f64 {
+            if self.plan.tier == "premium" {
+                let mut base = 10.0;
+                if self.days_overdrawn > 7 {
+                    base += (self.days_overdrawn - 7) as f64 * self.plan.daily_rate * 0.85;
+                }
+                base
+            } else {
+                self.days_overdrawn as f64 * self.plan.daily_rate
+            }
+        }
+    }
+
+    // After
+    struct AccountPlan {
+        tier: String,
+        daily_rate: f64,
+    }
+
+    impl AccountPlan {
+        fn overdraft_charge(&self, days_overdrawn: i64) -> f64 {
+            if self.tier == "premium" {
+                let mut base = 10.0;
+                if days_overdrawn > 7 {
+                    base += (days_overdrawn - 7) as f64 * self.daily_rate * 0.85;
+                }
+                base
+            } else {
+                days_overdrawn as f64 * self.daily_rate
+            }
+        }
+    }
+
+    struct Account {
+        plan: AccountPlan,
+        days_overdrawn: i64,
+    }
+
+    impl Account {
+        fn overdraft_charge(&self) -> f64 {
+            self.plan.overdraft_charge(self.days_overdrawn)
+        }
+    }
+    ```
+  </TabItem>
+</Tabs>
+
+<Mermaid code={moveFnDiagram} title="ฟังก์ชันที่อิจฉา plan ย้ายไปอยู่บน plan" />
+
+## Mechanics
+
+1. ตรวจสอบทุกสิ่งที่ฟังก์ชันใช้ในบ้านปัจจุบันของมัน และยืนยันว่าส่วนใหญ่เป็นของคลาสปลายทาง ทำรายการสิ่งไม่กี่อย่างที่ยังมาจากต้นทาง
+2. ตรวจสอบว่าองค์ประกอบฝั่งต้นทางเหล่านั้นควรเดินทางไปกับฟังก์ชัน หรือถูกส่งเข้ามาเป็นพารามิเตอร์
+3. คัดลอกฟังก์ชันเข้าไปในคลาสปลายทาง และปรับบอดี้ให้ใช้ฟิลด์ของปลายทางเองโดยตรง
+4. คอมไพล์และแก้ไขการอ้างอิงต่าง ๆ — ปลายทางอาจต้องมีพารามิเตอร์ใหม่สำหรับข้อมูลต้นทางที่ยังเหลืออยู่
+5. เปลี่ยนฟังก์ชันเดิมให้เป็นตัวมอบหมาย (delegator) บาง ๆ ที่เรียกบ้านใหม่ หรือเปลี่ยนผู้เรียกมันโดยตรง
+6. **รันเทสต์ของคุณ** พฤติกรรมต้องไม่เปลี่ยนแปลง
+7. เมื่อผู้เรียกทุกตัวผ่านตำแหน่งใหม่แล้ว ให้ลบ delegator ออกหากมันไม่คุ้มกับการมีอยู่อีกต่อไป
+
+## When to use / trade-offs
+
+ย้ายฟังก์ชันเมื่อมันเอื้อมข้ามไปยังอ็อบเจกต์อื่นอย่างสม่ำเสมอ เมื่อหลายฟังก์ชันบนคลาสหนึ่งจะเรียบง่ายขึ้นหากจัดกลุ่มไว้บนอีกคลาส หรือเมื่อการย้ายมันทำให้คุณลบพารามิเตอร์ที่มีไว้เพื่อขนข้อมูลเข้ามาเท่านั้นได้
+
+ต้นทุนคือผู้เรียกอาจจำเป็นต้องมี reference ไปยังอ็อบเจกต์ปลายทาง และฟังก์ชันที่ถูกย้ายอย่างกระตือรือร้นเกินไปอาจทำให้ตรรกะที่เกี่ยวข้องกระจัดกระจาย สิ่งตรงข้ามก็คือการย้ายมันกลับ: หากภายหลังการเปลี่ยนแปลงทำให้ฟังก์ชันกลับพึ่งพิงบริบท *เดิม* ของมันมากกว่า ก็ Move Function มันกลับบ้านอีกครั้ง
+
+## Related
+
+- [Move Field](/refactoring-from-zero-to-hero/th/moving-features/move-field/)
+- [Extract Class](/refactoring-from-zero-to-hero/th/moving-features/extract-class/)
+- [Hide Delegate and Remove Middle Man](/refactoring-from-zero-to-hero/th/moving-features/hide-delegate-and-remove-middle-man/)
+
+<Callout title="เดินตามข้อมูล">
+สัญญาณที่ดีที่สุดอย่างเดียวว่าฟังก์ชันควรอยู่ที่ไหนคือข้อมูลที่มันแตะต้อง นับฟิลด์ที่มันอ่าน: อ็อบเจกต์ใดเป็นเจ้าของฟิลด์เหล่านั้นมากที่สุด อ็อบเจกต์นั้นคือบ้านที่แท้จริงของฟังก์ชัน ย้ายพฤติกรรมไปหาข้อมูล ไม่ใช่ย้ายข้อมูลไปหาพฤติกรรม
+</Callout>
+
+export const quizMoveFn = [
+  {
+    q: 'Move Function แก้ code smell ใดได้ตรงที่สุด?',
+    options: ['Long Parameter List', 'Feature Envy', 'Shotgun Surgery', 'Dead Code'],
+    answer: 1,
+  },
+  {
+    q: 'อะไรคือสัญญาณที่ชัดเจนที่สุดว่าฟังก์ชันควรอยู่บนคลาสอื่น?',
+    options: [
+      'มันมีชื่อยาว',
+      'มันอ่านข้อมูลและเมธอดของอ็อบเจกต์อื่นมากกว่าของตัวเอง',
+      'มันถูกเรียกเพียงครั้งเดียว',
+      'มันคืนค่า boolean',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'หลังจากย้ายฟังก์ชันแล้ว มักเกิดอะไรขึ้นกับเมธอดเดิม?',
+    options: [
+      'มันถูกทำซ้ำคำต่อคำ',
+      'มันกลายเป็น delegator บาง ๆ หรือถูกลบเมื่อผู้เรียกถูกอัปเดตแล้ว',
+      'มันถูกแปลงเป็นฟังก์ชัน global',
+      'มันต้องคงสภาพเดิมไว้ทุกประการ',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'อะไรคือสิ่งตรงข้ามของ Move Function?',
+    options: ['Inline Class', 'Extract Class', 'การย้ายฟังก์ชันกลับไปยังบริบทเดิมของมัน', 'Hide Delegate'],
+    answer: 2,
+  },
+];
+
+<Quiz client:visible id="moving-features/move-function" questions={quizMoveFn} />
+
+<ProgressTracker client:visible id="moving-features/move-function" />

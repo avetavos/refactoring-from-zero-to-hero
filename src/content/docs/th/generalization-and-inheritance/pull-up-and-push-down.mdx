@@ -1,0 +1,256 @@
+---
+title: Pull Up & Push Down
+description: ย้ายสมาชิกที่ใช้ร่วมกันขึ้นไปไว้ที่ superclass เพื่อกำจัดโค้ดซ้ำ หรือผลักสมาชิกลงไปยัง subclass ที่ต้องใช้มันจริง ๆ
+sidebar:
+  order: 2
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+export const pullDiagram = `classDiagram
+  class Employee {
+    +annualCost() number
+  }
+  class Salaried
+  class Contractor
+  Employee <|-- Salaried
+  Employee <|-- Contractor
+  note for Employee "annualCost pulled up here once"`;
+
+## เจตนา
+
+**Pull Up** หยิบเมท็อดหรือฟิลด์ที่เหมือนกันใน subclass สองตัวหรือมากกว่า แล้วยกมันขึ้นไปไว้ที่ superclass ร่วม เพื่อให้ logic อยู่ในที่เดียวเป๊ะ ๆ ส่วน **Push Down** ทำตรงกันข้าม: สมาชิกที่นั่งอยู่ใน superclass แต่มีเพียงบาง subclass เท่านั้นที่ใช้จริง จะถูกย้ายลงไปอยู่ใน subclass เหล่านั้นเท่านั้น เพื่อให้พ่อแม่เลิกสัญญาว่าจะมีพฤติกรรมที่ลูกส่วนใหญ่ไม่ต้องการ
+
+## กลิ่นไม่ดี
+
+Pull Up คือยาแก้ **Duplicated Code** ที่กระจายอยู่ในพี่น้อง — บอดี้ของ `annualCost` เดียวกันถูกคัดลอกวางลงไปทั้งใน `Salaried` และ `Contractor` แล้วค่อย ๆ เคลื่อนออกจากกันอย่างแนบเนียนเมื่อเวลาผ่านไป ส่วน Push Down โจมตีกลิ่นตรงข้าม: superclass ที่รกไปด้วยสมาชิกซึ่งเป็น **Refused Bequest** — subclass ครึ่งหนึ่ง inherit ฟิลด์ `commission` ที่มันไม่เคยแตะ ทำให้ฟิลด์นั้นทำให้ทุกคนที่อ่านพ่อแม่เข้าใจผิด ทั้งสองกรณีคือลำดับชั้นที่กล่าวอ้างสิ่งที่ไม่ตรงกับความจริง
+
+## ก่อน → หลัง
+
+subclass พนักงานสองตัวต่างก็มีการคำนวณ `annualCost` ที่เหมือนกัน เราดึงมันขึ้นไป (ฟิลด์ `commission` ที่มีเพียง contractor ต้องใช้ก็ถูกผลักลงด้วยจิตวิญญาณเดียวกัน)
+
+<Tabs syncKey="lang">
+  <TabItem label="TypeScript">
+    ```ts
+    // Before — annualCost duplicated in both subclasses
+    abstract class Employee {
+      constructor(public monthlyPay: number) {}
+    }
+
+    class Salaried extends Employee {
+      annualCost(): number {
+        return this.monthlyPay * 12;
+      }
+    }
+
+    class Contractor extends Employee {
+      annualCost(): number {
+        return this.monthlyPay * 12;
+      }
+    }
+
+    // After — pulled up once; commission pushed down to Contractor only
+    abstract class Employee {
+      constructor(public monthlyPay: number) {}
+      annualCost(): number {
+        return this.monthlyPay * 12;
+      }
+    }
+
+    class Salaried extends Employee {}
+
+    class Contractor extends Employee {
+      constructor(monthlyPay: number, public commission: number) {
+        super(monthlyPay);
+      }
+      annualCost(): number {
+        return super.annualCost() + this.commission;
+      }
+    }
+    ```
+  </TabItem>
+  <TabItem label="Python">
+    ```python
+    # Before — annual_cost duplicated in both subclasses
+    class Employee:
+        def __init__(self, monthly_pay):
+            self.monthly_pay = monthly_pay
+
+    class Salaried(Employee):
+        def annual_cost(self):
+            return self.monthly_pay * 12
+
+    class Contractor(Employee):
+        def annual_cost(self):
+            return self.monthly_pay * 12
+
+    # After — pulled up once; commission pushed down to Contractor only
+    class Employee:
+        def __init__(self, monthly_pay):
+            self.monthly_pay = monthly_pay
+
+        def annual_cost(self):
+            return self.monthly_pay * 12
+
+    class Salaried(Employee):
+        pass
+
+    class Contractor(Employee):
+        def __init__(self, monthly_pay, commission):
+            super().__init__(monthly_pay)
+            self.commission = commission
+
+        def annual_cost(self):
+            return super().annual_cost() + self.commission
+    ```
+  </TabItem>
+  <TabItem label="Go">
+    ```go
+    // Go has no inheritance — the shared method lives on an embedded base
+    // struct, and both employee kinds embed it. "Pull up" becomes "move the
+    // method onto the embedded type"; "push down" becomes "add a field only
+    // to the kind that needs it".
+
+    // Before — AnnualCost duplicated on each kind
+    type Salaried struct{ MonthlyPay float64 }
+
+    func (s Salaried) AnnualCost() float64 { return s.MonthlyPay * 12 }
+
+    type Contractor struct{ MonthlyPay float64 }
+
+    func (c Contractor) AnnualCost() float64 { return c.MonthlyPay * 12 }
+
+    // After — shared method pulled up onto an embedded base
+    type Employee struct{ MonthlyPay float64 }
+
+    func (e Employee) AnnualCost() float64 { return e.MonthlyPay * 12 }
+
+    type Salaried struct{ Employee }
+
+    type Contractor struct {
+        Employee
+        Commission float64 // pushed down: only contractors carry it
+    }
+
+    func (c Contractor) AnnualCost() float64 {
+        return c.Employee.AnnualCost() + c.Commission
+    }
+    ```
+  </TabItem>
+  <TabItem label="Rust">
+    ```rust
+    // Rust has no inheritance — shared behaviour lives in a default trait
+    // method, and each kind holds the common data by composition. "Pull up"
+    // becomes "give the trait a default method"; "push down" becomes "store a
+    // field only on the kind that needs it".
+
+    struct Base {
+        monthly_pay: f64,
+    }
+
+    trait Employee {
+        fn base(&self) -> &Base;
+        // Pulled up: one default implementation shared by all kinds.
+        fn annual_cost(&self) -> f64 {
+            self.base().monthly_pay * 12.0
+        }
+    }
+
+    struct Salaried {
+        base: Base,
+    }
+    impl Employee for Salaried {
+        fn base(&self) -> &Base { &self.base }
+    }
+
+    struct Contractor {
+        base: Base,
+        commission: f64, // pushed down: only contractors carry it
+    }
+    impl Employee for Contractor {
+        fn base(&self) -> &Base { &self.base }
+        fn annual_cost(&self) -> f64 {
+            self.base.monthly_pay * 12.0 + self.commission
+        }
+    }
+    ```
+  </TabItem>
+</Tabs>
+
+<Mermaid code={pullDiagram} title="annualCost ถูกยกขึ้นไปไว้ที่พ่อแม่ Employee ที่ใช้ร่วมกัน" />
+
+## กลไก
+
+1. ยืนยันว่าสมาชิกเหมือนกันจริง ๆ (Pull Up) หรือถูกใช้โดยเพียงบางส่วนของ subclass จริง ๆ (Push Down) ถ้าสองสำเนาต่างกันเล็กน้อย ให้รวมมันก่อนด้วย refactoring ย่อย ๆ จนกว่าจะตรงกัน
+2. สำหรับ **Pull Up**: สร้างสมาชิกบน superclass (หรือ embedded base / trait default ใน Go และ Rust) คัดลอกบอดี้ของ subclass หนึ่งตัวลงไปในนั้น
+3. ลบสมาชิกออกจากแต่ละ subclass ทีละตัว **แล้วรันเทสต์** หลังการลบแต่ละครั้ง
+4. สำหรับ **Push Down**: คัดลอกสมาชิกลงไปในแต่ละ subclass ที่ต้องใช้มัน แล้วลบมันออกจาก superclass
+5. ปรับ subclass ใดก็ตามที่ยังต้องการพฤติกรรมเฉพาะให้เรียกขึ้นไปยังเวอร์ชันที่ใช้ร่วมกันแล้วต่อยอดมัน
+6. **รันเทสต์** พฤติกรรมต้องไม่เปลี่ยนในทุกขั้นตอน
+
+## เมื่อไรควรใช้ / ข้อแลกเปลี่ยน
+
+ทำ Pull Up ทุกครั้งที่คุณเจอเมท็อดหรือฟิลด์เดียวกันซ้ำกันในพี่น้อง — มันคือหนึ่งในวิธีลบโค้ดที่น่าพอใจที่สุด ทำ Push Down ทุกครั้งที่ superclass โฆษณาสมาชิกที่ subclass ส่วนใหญ่เพิกเฉยหรือ override ทิ้ง interface ของพ่อแม่ควรสะท้อนสิ่งที่ลูก *ทั้งหมด* มีร่วมกันจริง ๆ
+
+ข้อแลกเปลี่ยนคือ coupling: การดึงขึ้นผูก subclass เข้ากับนิยามที่ใช้ร่วมกัน ดังนั้นเมื่อมันแตกต่างกันในภายหลังก็จะบังคับให้คุณต้องผลักมันกลับลงไปหรือ override ใน Go และ Rust เจตนาเดียวกันถูกแสดงผ่าน embedding และ trait default แทน inheritance — ซึ่งเก็บ logic ที่ใช้ร่วมกันไว้ในที่เดียวโดยไม่กล่าวอ้างความสัมพันธ์ "is-a" ที่ผิด
+
+## เกี่ยวข้อง
+
+- [Extract Superclass & Interface](/refactoring-from-zero-to-hero/th/generalization-and-inheritance/extract-superclass-and-interface/)
+- [Collapse Hierarchy](/refactoring-from-zero-to-hero/th/generalization-and-inheritance/collapse-hierarchy/)
+- [Replace Inheritance with Delegation](/refactoring-from-zero-to-hero/th/generalization-and-inheritance/replace-inheritance-with-delegation/)
+
+<Callout title="ดึงขึ้นเฉพาะสิ่งที่ใช้ร่วมกันจริง ๆ เท่านั้น">
+ความผิดพลาดที่ชวนหลงคือดึงเมท็อดที่ *เกือบ* จะเหมือนกันขึ้นไปแล้วเพิ่ม flag เพื่อกลบความแตกต่าง นั่นเป็นการแลกโค้ดซ้ำกับ conditional ในพ่อแม่ — มักเป็นข้อตกลงที่แย่กว่า ดึงขึ้นเฉพาะเมื่อบอดี้ตรงกันเป๊ะ ๆ ถ้ามันแค่คล้ายกัน ให้รวมมันอย่างซื่อตรงก่อน แล้วค่อยยกขึ้น
+</Callout>
+
+export const quizPull = [
+  {
+    q: 'เมื่อไรคือจังหวะที่เหมาะจะทำ Pull Up?',
+    options: [
+      'เมื่อ subclass หนึ่งมีเมท็อดเฉพาะที่ไม่มีพี่น้องคนไหนมีร่วมด้วย',
+      'เมื่อ subclass สองตัวหรือมากกว่ามีสมาชิกที่เหมือนกัน',
+      'เมื่อ superclass เล็กเกินไป',
+      'เมื่อคุณต้องการเพิ่ม subclass ใหม่',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'Push Down จัดการกับกลิ่นไม่ดีใด?',
+    options: [
+      'Long Function',
+      'Refused Bequest — สมาชิกของ superclass ที่มีเพียงบาง subclass ใช้',
+      'Primitive Obsession',
+      'Feature Envy',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'Go และ Rust แสดง "pull up" โดยไม่มี inheritance ได้อย่างไร?',
+    options: [
+      'ไม่สามารถใช้สมาชิกร่วมกันได้เลย',
+      'ผ่าน embedded base method (Go) และ default trait method (Rust)',
+      'โดยคัดลอกโค้ดลงไปในทุก type',
+      'โดยใช้ global mutable state',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'อะไรคือความเสี่ยงของการดึงสมาชิกสองตัวที่เพียงเกือบจะเหมือนกันขึ้นไป?',
+    options: [
+      'มันคอมไพล์ไม่ผ่านเสมอ',
+      'คุณจะลงเอยด้วยการเพิ่ม flag หรือ conditional ในพ่อแม่ เป็นการแลกโค้ดซ้ำกับการแตกกิ่ง',
+      'มันลบ subclass ทิ้ง',
+      'ไม่มีอะไร — มันปลอดภัยเสมอ',
+    ],
+    answer: 1,
+  },
+];
+
+<Quiz client:visible id="generalization-and-inheritance/pull-up-and-push-down" questions={quizPull} />
+
+<ProgressTracker client:visible id="generalization-and-inheritance/pull-up-and-push-down" />

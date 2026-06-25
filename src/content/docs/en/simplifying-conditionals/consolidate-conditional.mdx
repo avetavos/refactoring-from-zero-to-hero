@@ -1,0 +1,230 @@
+---
+title: Consolidate Conditional Expression
+description: When several separate checks all lead to the same result, combine them into one condition and give it a name that explains why.
+sidebar:
+  order: 3
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+export const consolidateDiagram = `flowchart LR
+  subgraph Before["Before"]
+    A["if seniority < 2 return 0<br/>if monthsDisabled > 12 return 0<br/>if isPartTime return 0"]
+  end
+  subgraph After["After"]
+    B["if isNotEligible(emp)<br/>return 0"]
+  end
+  Before -.->|"Consolidate Conditional Expression"| After`;
+
+## Intent
+
+Take a run of separate conditionals that each guard the *same* outcome and fold them into one combined condition, then extract that condition into a named function. Three scattered checks with the same `return 0` become a single `if (isNotEligible(employee)) return 0`, and the reason for the result is captured in the name.
+
+## The smell
+
+This is the cure for a **sequence of conditionals with identical results**. Each check on its own looks innocent, but together they hide a single idea behind three lines of plumbing. The reader has to notice that all three produce the same value before understanding that they are really one question — *is this person ineligible?* Consolidating makes that one question explicit, and a named helper tells the next reader *why* without making them reverse-engineer it.
+
+## Before → After
+
+A disability-benefit amount returns zero for several disqualifying conditions. Before, each disqualifier is its own `if`. After, they are one named check.
+
+<Tabs syncKey="lang">
+  <TabItem label="TypeScript">
+    ```ts
+    // Before
+    function disabilityAmount(employee: Employee): number {
+      if (employee.seniority < 2) return 0;
+      if (employee.monthsDisabled > 12) return 0;
+      if (employee.isPartTime) return 0;
+      // ... compute the real amount
+      return baseAmount(employee);
+    }
+
+    // After
+    function disabilityAmount(employee: Employee): number {
+      if (isNotEligible(employee)) return 0;
+      // ... compute the real amount
+      return baseAmount(employee);
+    }
+
+    function isNotEligible(employee: Employee): boolean {
+      return (
+        employee.seniority < 2 ||
+        employee.monthsDisabled > 12 ||
+        employee.isPartTime
+      );
+    }
+    ```
+  </TabItem>
+  <TabItem label="Python">
+    ```python
+    # Before
+    def disability_amount(employee):
+        if employee.seniority < 2:
+            return 0
+        if employee.months_disabled > 12:
+            return 0
+        if employee.is_part_time:
+            return 0
+        # ... compute the real amount
+        return base_amount(employee)
+
+    # After
+    def disability_amount(employee):
+        if is_not_eligible(employee):
+            return 0
+        # ... compute the real amount
+        return base_amount(employee)
+
+    def is_not_eligible(employee):
+        return (
+            employee.seniority < 2
+            or employee.months_disabled > 12
+            or employee.is_part_time
+        )
+    ```
+  </TabItem>
+  <TabItem label="Go">
+    ```go
+    // Before
+    func DisabilityAmount(employee Employee) int {
+        if employee.Seniority < 2 {
+            return 0
+        }
+        if employee.MonthsDisabled > 12 {
+            return 0
+        }
+        if employee.IsPartTime {
+            return 0
+        }
+        // ... compute the real amount
+        return baseAmount(employee)
+    }
+
+    // After
+    func DisabilityAmount(employee Employee) int {
+        if isNotEligible(employee) {
+            return 0
+        }
+        // ... compute the real amount
+        return baseAmount(employee)
+    }
+
+    func isNotEligible(employee Employee) bool {
+        return employee.Seniority < 2 ||
+            employee.MonthsDisabled > 12 ||
+            employee.IsPartTime
+    }
+    ```
+  </TabItem>
+  <TabItem label="Rust">
+    ```rust
+    // Before
+    fn disability_amount(employee: &Employee) -> i64 {
+        if employee.seniority < 2 {
+            return 0;
+        }
+        if employee.months_disabled > 12 {
+            return 0;
+        }
+        if employee.is_part_time {
+            return 0;
+        }
+        // ... compute the real amount
+        base_amount(employee)
+    }
+
+    // After
+    fn disability_amount(employee: &Employee) -> i64 {
+        if is_not_eligible(employee) {
+            return 0;
+        }
+        // ... compute the real amount
+        base_amount(employee)
+    }
+
+    fn is_not_eligible(employee: &Employee) -> bool {
+        employee.seniority < 2
+            || employee.months_disabled > 12
+            || employee.is_part_time
+    }
+    ```
+  </TabItem>
+</Tabs>
+
+<Mermaid code={consolidateDiagram} title="Three checks with one result become a single named condition" />
+
+## Mechanics
+
+1. Confirm that the conditionals truly share a result and have no side effects between them. If one check mutates state the next relies on, do not merge.
+2. Combine the tests with `||` when they all lead to the same branch (or `&&` when the structure is nested checks that must all pass). Keep the combined condition next to the shared result.
+3. **Run your tests.** The behaviour must match the chain of separate `if`s exactly, including short-circuit order.
+4. Apply **Extract Function** to the combined condition, naming it after the question it answers (`isNotEligible`).
+5. Run your tests again.
+
+## When to use / trade-offs
+
+Reach for Consolidate Conditional Expression whenever you see consecutive checks that funnel into the same outcome. It is most valuable as a setup move: once the checks are one named function, you can reuse that function, and it often clears the way for **Replace Nested Conditional with Guard Clauses**.
+
+Do not consolidate when the checks are genuinely independent decisions that happen to share a value today but may diverge tomorrow — merging them would couple unrelated rules. And never merge across a side effect; the combined expression's short-circuiting could skip work the original chain performed.
+
+## Related
+
+- [Decompose Conditional](/refactoring-from-zero-to-hero/en/simplifying-conditionals/decompose-conditional/)
+- [Replace Nested Conditional with Guard Clauses](/refactoring-from-zero-to-hero/en/simplifying-conditionals/replace-nested-conditional-with-guard-clauses/)
+- [Extract Function](/refactoring-from-zero-to-hero/en/composing-methods/extract-function/)
+
+<Callout title="Consolidate only when the result is genuinely the same">
+The trigger is identical outcomes, not similar-looking conditions. If two checks return different values, leave them apart — forcing them together hides a real difference. Merge for clarity, never to cut line count.
+</Callout>
+
+export const quizConsolidate = [
+  {
+    q: 'What is the precondition for consolidating a sequence of conditionals?',
+    options: [
+      'They must use the same comparison operator',
+      'They must all lead to the same result and be free of side effects between them',
+      'They must each return a different value',
+      'They must be inside a loop',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'After combining the conditions, what is the recommended next step?',
+    options: [
+      'Inline the function that called them',
+      'Extract the combined condition into a named function',
+      'Delete the shared result',
+      'Convert it to a switch statement',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'When should you NOT consolidate two checks?',
+    options: [
+      'When they share a result today but represent independent rules that may diverge',
+      'When they are next to each other',
+      'When they read a struct field',
+      'When the function is short',
+    ],
+    answer: 0,
+  },
+  {
+    q: 'Why must you watch for side effects between the merged checks?',
+    options: [
+      'Side effects make the function slower',
+      'Short-circuit evaluation could skip work the separate chain performed',
+      'The compiler forbids side effects in conditions',
+      'Side effects change the variable names',
+    ],
+    answer: 1,
+  },
+];
+
+<Quiz client:visible id="simplifying-conditionals/consolidate-conditional" questions={quizConsolidate} />
+
+<ProgressTracker client:visible id="simplifying-conditionals/consolidate-conditional" />

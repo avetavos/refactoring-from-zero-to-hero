@@ -1,0 +1,87 @@
+---
+title: Simplifying Conditionals
+description: Conditional logic gets tangled fast — these refactorings turn nested if/else, scattered checks, and type switches into decision logic a reader can follow.
+sidebar:
+  order: 1
+---
+
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+export const overviewDiagram = `flowchart TD
+  A["Tangled conditional logic"] --> B{"What is wrong?"}
+  B -->|"A condition is hard to read"| C["Decompose Conditional"]
+  B -->|"Many checks, one outcome"| D["Consolidate Conditional Expression"]
+  B -->|"Deep nesting hides the happy path"| E["Replace Nested Conditional with Guard Clauses"]
+  B -->|"A switch on a type keeps recurring"| F["Replace Conditional with Polymorphism"]
+  B -->|"The same null check is everywhere"| G["Introduce Special Case"]
+  C --> H["Decision logic that explains itself"]
+  D --> H
+  E --> H
+  F --> H
+  G --> H`;
+
+## Intent
+
+The **simplifying conditionals** family is about decision logic: the branches, guards, and switches that decide *what the program does next*. A condition that started as a single clear question grows extra clauses, nests inside other conditions, and sprouts copies across the codebase. These refactorings untangle that growth so the reader can see, at a glance, which case leads where.
+
+## The smell
+
+Complex conditional logic is one of the loudest signals that a function is hard to maintain. The warning signs are familiar: a boolean expression so long you have to read it twice, an arrow of nested `if` blocks marching off the right edge of the screen, a `switch` on a "type" field repeated in five functions, and `if (x == null)` scattered through every method that touches `x`. Each of these has a named cure, and each cure leaves the behaviour identical while making the intent obvious.
+
+<Mermaid code={overviewDiagram} title="Choosing a simplifying-conditionals move by what is wrong" />
+
+## What this module covers
+
+Five refactorings, each small and reversible:
+
+- **Decompose Conditional** — extract the test, the then-branch, and the else-branch into well-named functions so the structure reads like a sentence: *if it is a peak day, charge the peak rate, otherwise the regular rate.*
+- **Consolidate Conditional Expression** — when several separate checks all lead to the same result, combine them into one condition and name it, so the reader learns *why* rather than *how many ways*.
+- **Replace Nested Conditional with Guard Clauses** — flatten deep `if/else` by returning early for the special cases, leaving the main path unindented and obvious.
+- **Replace Conditional with Polymorphism** — when a `switch` or `if` on a type recurs, push each branch into a subclass method so the language dispatches for you.
+- **Introduce Special Case** — replace a repeated null-or-special check with an object that responds with sensible defaults, so callers stop asking "is it missing?".
+
+Each lesson shows the same before-and-after in TypeScript, Python, Go, and Rust, then walks through the safe, ordered mechanics — running your tests between every step.
+
+<Callout title="Make the decision visible, not the plumbing">
+The goal is never to remove conditionals for their own sake. A program has to make decisions. The goal is to make each decision *legible*: one question per condition, a name for every non-obvious test, and the common path easy to find. If a refactoring here makes the logic harder to read, you have gone too far — stop and reverse it.
+</Callout>
+
+export const quizIndex = [
+  {
+    q: 'What do the "simplifying conditionals" refactorings primarily improve?',
+    options: [
+      'The raw execution speed of branches',
+      'The legibility of decision logic — which case leads where',
+      'The amount of memory a function uses',
+      'The number of conditions in the program',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'Which refactoring flattens deep if/else by returning early for special cases?',
+    options: [
+      'Decompose Conditional',
+      'Consolidate Conditional Expression',
+      'Replace Nested Conditional with Guard Clauses',
+      'Introduce Special Case',
+    ],
+    answer: 2,
+  },
+  {
+    q: 'When several checks all lead to the same result, which move combines them?',
+    options: [
+      'Replace Conditional with Polymorphism',
+      'Consolidate Conditional Expression',
+      'Introduce Special Case',
+      'Decompose Conditional',
+    ],
+    answer: 1,
+  },
+];
+
+<Quiz client:visible id="simplifying-conditionals/index" questions={quizIndex} />
+
+<ProgressTracker client:visible id="simplifying-conditionals/index" />

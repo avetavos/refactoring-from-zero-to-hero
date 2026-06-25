@@ -1,0 +1,235 @@
+---
+title: Introduce Parameter Object
+description: เมื่ออาร์กิวเมนต์กลุ่มหนึ่งเดินทางไปด้วยกันเสมอ ให้จัดมันเข้าเป็นออบเจกต์เดียวเพื่อให้ความสัมพันธ์ชัดเจนและการเรียกใช้สั้นลง
+sidebar:
+  order: 4
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+export const paramObjectDiagram = `flowchart LR
+  subgraph Before["Before"]
+    A["bookFlight(<br/>from, to,<br/>startDate, endDate)"]
+  end
+  subgraph After["After"]
+    B["bookFlight(trip)"]
+    B --> C["Trip<br/>{ from, to,<br/>startDate, endDate }"]
+  end
+  Before -.->|"Introduce Parameter Object"| After`;
+
+## เจตนา
+
+มองหากลุ่มอาร์กิวเมนต์ที่ปรากฏด้วยกันอยู่เรื่อย ๆ ในหลายฟังก์ชัน แล้วแทนที่มันด้วยออบเจกต์เดียวที่เก็บมันไว้ทั้งหมด กลุ่มนั้นได้ชื่อ ความสัมพันธ์ระหว่างค่าต่าง ๆ ชัดเจนขึ้น และทุกฟังก์ชันที่เคยรับอาร์กิวเมนต์กระจัดกระจาย ตอนนี้รับพารามิเตอร์ที่เรียบร้อยเพียงตัวเดียว
+
+## กลิ่นไม่ดี
+
+นี่รักษา **Long Parameter List** และญาติของมัน **Data Clump** — ค่าสองหรือสามตัวเดิมที่ถูกส่งเรียงข้างกัน ในลำดับเดิม ให้ฟังก์ชันแล้วฟังก์ชันเล่า `start` และ `end` ที่จริง ๆ แล้วเป็น *ช่วง* วันที่ `latitude` และ `longitude` ที่จริง ๆ แล้วเป็น *ตำแหน่ง* เมื่อค่าต่าง ๆ เดินทางกันเป็นฝูง ฝูงนั้นคือแนวคิดที่โค้ดยังไม่ได้ตั้งชื่อ ที่แย่กว่านั้นคือ รายการเปล่า ๆ ที่ยาว ยังเชื้อเชิญความผิดพลาดคลาสสิกในการส่งอาร์กิวเมนต์ในลำดับที่ผิด
+
+## ก่อน → หลัง
+
+การจองเที่ยวบินที่ลากอาร์กิวเมนต์สี่ตัวที่เกี่ยวข้องกันอย่างหลวม ๆ ไปไหนมาไหน หลังจากนั้น มันกลายเป็นออบเจกต์ `Trip` เดียว
+
+<Tabs syncKey="lang">
+  <TabItem label="TypeScript">
+    ```ts
+    // Before
+    function bookFlight(
+      from: string,
+      to: string,
+      startDate: string,
+      endDate: string,
+    ): string {
+      return `Flight ${from}->${to} from ${startDate} to ${endDate}`;
+    }
+
+    const summary = bookFlight("BKK", "NRT", "2026-07-01", "2026-07-09");
+
+    // After
+    interface Trip {
+      from: string;
+      to: string;
+      startDate: string;
+      endDate: string;
+    }
+
+    function bookFlight(trip: Trip): string {
+      return `Flight ${trip.from}->${trip.to} from ${trip.startDate} to ${trip.endDate}`;
+    }
+
+    const summary = bookFlight({
+      from: "BKK",
+      to: "NRT",
+      startDate: "2026-07-01",
+      endDate: "2026-07-09",
+    });
+    ```
+  </TabItem>
+  <TabItem label="Python">
+    ```python
+    # Before
+    def book_flight(origin, destination, start_date, end_date):
+        return f"Flight {origin}->{destination} from {start_date} to {end_date}"
+
+    summary = book_flight("BKK", "NRT", "2026-07-01", "2026-07-09")
+
+    # After
+    from dataclasses import dataclass
+
+    @dataclass
+    class Trip:
+        origin: str
+        destination: str
+        start_date: str
+        end_date: str
+
+    def book_flight(trip):
+        return (
+            f"Flight {trip.origin}->{trip.destination} "
+            f"from {trip.start_date} to {trip.end_date}"
+        )
+
+    summary = book_flight(Trip("BKK", "NRT", "2026-07-01", "2026-07-09"))
+    ```
+  </TabItem>
+  <TabItem label="Go">
+    ```go
+    // Before
+    func BookFlight(from, to, startDate, endDate string) string {
+        return fmt.Sprintf("Flight %s->%s from %s to %s", from, to, startDate, endDate)
+    }
+
+    summary := BookFlight("BKK", "NRT", "2026-07-01", "2026-07-09")
+
+    // After
+    type Trip struct {
+        From      string
+        To        string
+        StartDate string
+        EndDate   string
+    }
+
+    func BookFlight(t Trip) string {
+        return fmt.Sprintf("Flight %s->%s from %s to %s", t.From, t.To, t.StartDate, t.EndDate)
+    }
+
+    summary := BookFlight(Trip{
+        From:      "BKK",
+        To:        "NRT",
+        StartDate: "2026-07-01",
+        EndDate:   "2026-07-09",
+    })
+    ```
+  </TabItem>
+  <TabItem label="Rust">
+    ```rust
+    // Before
+    fn book_flight(from: &str, to: &str, start_date: &str, end_date: &str) -> String {
+        format!("Flight {from}->{to} from {start_date} to {end_date}")
+    }
+
+    let summary = book_flight("BKK", "NRT", "2026-07-01", "2026-07-09");
+
+    // After
+    struct Trip {
+        from: String,
+        to: String,
+        start_date: String,
+        end_date: String,
+    }
+
+    fn book_flight(trip: &Trip) -> String {
+        format!(
+            "Flight {}->{} from {} to {}",
+            trip.from, trip.to, trip.start_date, trip.end_date
+        )
+    }
+
+    let trip = Trip {
+        from: "BKK".to_string(),
+        to: "NRT".to_string(),
+        start_date: "2026-07-01".to_string(),
+        end_date: "2026-07-09".to_string(),
+    };
+    let summary = book_flight(&trip);
+    ```
+  </TabItem>
+</Tabs>
+
+<Mermaid code={paramObjectDiagram} title="อาร์กิวเมนต์กระจัดกระจายสี่ตัวกลายเป็นออบเจกต์ Trip ที่มีชื่อเพียงตัวเดียว" />
+
+## กลไก
+
+1. ระบุกลุ่ม — อาร์กิวเมนต์ที่ปรากฏด้วยกันเสมอ เลือกชื่อให้กับแนวคิดที่มันแทน
+2. สร้างโครงสร้างใหม่ (คลาส, struct, record หรือ interface) ที่มีฟิลด์สำหรับสมาชิกแต่ละตัวของกลุ่ม
+3. เพิ่มออบเจกต์ใหม่เป็นพารามิเตอร์ให้ฟังก์ชันเป้าหมายตัวหนึ่ง โดยตอนแรกวางไว้ข้าง ๆ อาร์กิวเมนต์เดิม **รันเทสต์ของคุณ**
+4. ภายในเนื้อใน ให้เริ่มอ่านจากฟิลด์ของออบเจกต์แทนพารามิเตอร์ที่กระจัดกระจาย ทีละฟิลด์ โดยเทสต์ไปเรื่อย ๆ ขณะทำ
+5. เมื่อเนื้อในอ่านจากออบเจกต์เพียงอย่างเดียวแล้ว ให้ลบพารามิเตอร์ที่กระจัดกระจายซึ่งไม่ได้ใช้แล้วออกจากลายเซ็น จากนั้นอัปเดตผู้เรียกใช้ของฟังก์ชันนั้นให้สร้างและส่งออบเจกต์
+6. ทำซ้ำกับฟังก์ชันอื่น ๆ ที่ใช้กลุ่มเดียวกัน เพื่อให้ทั้งหมดรับออบเจกต์
+7. **รันเทสต์ของคุณ** หลังแต่ละฟังก์ชัน คอยจับตาดูพฤติกรรมใหม่ที่ผุดขึ้นมา: เมื่อข้อมูลอยู่ด้วยกันแล้ว ตรรกะที่ทำงานกับมันมักอยากจะย้ายเข้ามาอยู่บนออบเจกต์ด้วยเช่นกัน
+
+## เมื่อไรควรใช้ / ข้อแลกเปลี่ยน
+
+แนะนำให้ใช้ parameter object เมื่อค่าชุดเดิมถูกส่งด้วยกันซ้ำ ๆ เมื่อรายการพารามิเตอร์ยาวจนผู้เรียกใช้ส่งลำดับผิด หรือเมื่อคุณรู้สึกได้ว่ามีแนวคิดที่ยังไม่ได้ตั้งชื่อซ่อนอยู่ในรายการอาร์กิวเมนต์ ออบเจกต์บันทึกความสัมพันธ์ไว้และให้ที่อยู่ตามธรรมชาติแก่พฤติกรรมที่เป็นของกลุ่มนั้น
+
+ข้อแลกเปลี่ยนคือมีไทป์เพิ่มที่ต้องนิยาม และมีพิธีรีตองเล็กน้อยในการสร้างมันที่จุดเรียกใช้แต่ละจุด สำหรับการเรียกใช้สองอาร์กิวเมนต์ครั้งเดียวที่ไม่เคยเกิดซ้ำ พิธีรีตองนั้นอาจไม่คุ้มค่า ผลตอบแทนเติบโตขึ้นตามการนำกลับมาใช้: ยิ่งมีฟังก์ชันที่ใช้กลุ่มร่วมกันมากเท่าไร ออบเจกต์ก็ยิ่งคุ้มค่ามากขึ้น — และยิ่งกลายเป็นแม่เหล็กดึงดูดเมท็อดที่เกี่ยวข้อง
+
+## ที่เกี่ยวข้อง
+
+- [Remove Flag Argument](/refactoring-from-zero-to-hero/th/simplifying-apis/remove-flag-argument/)
+- [Parameterize Function](/refactoring-from-zero-to-hero/th/simplifying-apis/parameterize-function/)
+- [Rename Function/Variable](/refactoring-from-zero-to-hero/th/simplifying-apis/rename-function/)
+
+<Callout title="กลุ่มของข้อมูลคือแนวคิดที่รอชื่อ">
+เมื่อค่าสองตัวถูกส่งด้วยกันเสมอ มันไม่ใช่สองสิ่ง — มันคือสิ่งเดียวที่โค้ดยังไม่ได้ตั้งชื่อ การตั้งชื่อให้มัน (เป็น `Range`, `Location`, `Trip`) ทำได้มากกว่าการย่อการเรียกใช้: มันให้ที่อยู่แก่แนวคิดนั้น ที่ซึ่งการตรวจสอบความถูกต้องและตัวช่วยของมันเองในที่สุดก็จะได้มาอาศัยอยู่
+</Callout>
+
+export const quizParamObject = [
+  {
+    q: 'Introduce Parameter Object จัดการกับกลิ่นใดเป็นหลัก?',
+    options: [
+      'ลูปที่ช้าและคิวรีที่ซ้ำซ้อน',
+      'Long Parameter List และ Data Clump',
+      'การไม่มีเทสต์',
+      'สถานะ global ที่เปลี่ยนแปลงได้',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'ทำไมกลุ่มของอาร์กิวเมนต์ที่เดินทางไปด้วยกันเสมอจึงมีนัยสำคัญ?',
+    options: [
+      'มันบ่งชี้ถึงบั๊กด้านประสิทธิภาพเสมอ',
+      'มันมักแทนแนวคิดที่ยังไม่ได้ตั้งชื่อซึ่งอยากกลายเป็นออบเจกต์',
+      'มันหมายความว่าฟังก์ชันสั้นเกินไป',
+      'มันหมายความว่าอาร์กิวเมนต์ไม่ได้ถูกใช้',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'อะไรมักเกิดขึ้นหลังจากข้อมูลถูกจัดเข้าเป็นออบเจกต์เดียว?',
+    options: [
+      'ออบเจกต์กลายเป็นที่อยู่ตามธรรมชาติของตรรกะที่ทำงานกับข้อมูลนั้น',
+      'โปรแกรมทำงานช้าลง',
+      'ต้องลบเทสต์ทิ้ง',
+      'ต้องส่งอาร์กิวเมนต์ในลำดับย้อนกลับ',
+    ],
+    answer: 0,
+  },
+  {
+    q: 'เมื่อใดที่การนำ parameter object เข้ามาอาจไม่คุ้มค่า?',
+    options: [
+      'เมื่อฟังก์ชันจำนวนมากใช้กลุ่มเดียวกันร่วมกัน',
+      'สำหรับการเรียกใช้ครั้งเดียวที่อาร์กิวเมนต์ไม่เคยเกิดซ้ำที่อื่น',
+      'เมื่อลำดับอาร์กิวเมนต์สับสนได้ง่าย',
+      'เมื่อค่าต่าง ๆ แทนแนวคิดที่ชัดเจน',
+    ],
+    answer: 1,
+  },
+];
+
+<Quiz client:visible id="simplifying-apis/introduce-parameter-object" questions={quizParamObject} />
+
+<ProgressTracker client:visible id="simplifying-apis/introduce-parameter-object" />

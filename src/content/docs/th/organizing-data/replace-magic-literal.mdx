@@ -1,0 +1,205 @@
+---
+title: Replace Magic Literal
+description: ให้ชื่อเชิงสัญลักษณ์แก่ตัวเลขหรือสตริงที่ไม่มีคำอธิบาย เพื่อให้ค่าคงที่อธิบายความหมายของตัวเอง และเปลี่ยนแปลงได้ในจุดเดียวเป๊ะ
+sidebar:
+  order: 3
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+export const literalDiagram = `flowchart LR
+  subgraph Before["Before"]
+    A["code: weight * 9.80665"]
+    B["code: if status == 2"]
+  end
+  subgraph After["After"]
+    C["GRAVITY = 9.80665"]
+    D["STATUS_SHIPPED = 2"]
+    C --> E["code: weight * GRAVITY"]
+    D --> F["code: if status == STATUS_SHIPPED"]
+  end
+  Before -.->|"Replace Magic Literal"| After`;
+
+## เจตนา
+
+หาค่าคงที่เปลือย ๆ — ตัวเลขอย่าง `9.80665` หรือ `86400` สตริงอย่าง `"ADMIN"` — ที่แบกความหมายซึ่งผู้อ่านต้องเดาเอาเอง แล้วแทนที่มันด้วยค่าคงที่ที่มีชื่อ ชื่อนั้นอธิบายว่า *ค่านี้มีไว้เพื่ออะไร* และนิยามเดียวนั้นก็กลายเป็นจุดเดียวที่ใช้แก้ไขหากวันหนึ่งมันจำเป็นต้องเปลี่ยน
+
+## กลิ่นเหม็น
+
+นี่รักษาอาการ **Magic Number** (และพี่น้องของมันคือ magic string) สัญญาณบ่งบอกคือค่าคงที่ที่ความหมายไม่ชัดเจนจากบริบท โดยเฉพาะอย่างยิ่งอันที่ปรากฏในมากกว่าหนึ่งที่ เมื่อ `0.07` โผล่ในโมดูลคิดราคา และโผล่อีกครั้งในโมดูลใบแจ้งหนี้ ปัญหาสองอย่างซ่อนอยู่: ผู้อ่านไม่สามารถรู้ได้ว่าทั้งสองหมายถึง "อัตราภาษีขาย" และในวันที่อัตรานั้นเปลี่ยน คุณต้องไล่หาและแก้ไขทุกสำเนา — และคุณ *จะ* พลาดไปสักอันแน่นอน
+
+## ก่อน → หลัง
+
+การคำนวณค่าจัดส่งที่เต็มไปด้วยตัวเลขที่ไม่มีคำอธิบาย หลังจากนั้น ค่าคงที่แต่ละตัวเป็นค่าคงที่ที่มีชื่อซึ่งชื่อของมันแบกเจตนาเอาไว้
+
+<Tabs syncKey="lang">
+  <TabItem label="TypeScript">
+    ```ts
+    // Before
+    function shippingCost(weightKg: number): number {
+      if (weightKg > 30) {
+        return weightKg * 2.5 + 15;
+      }
+      return weightKg * 2.5;
+    }
+
+    // After
+    const RATE_PER_KG = 2.5;
+    const HEAVY_THRESHOLD_KG = 30;
+    const HEAVY_SURCHARGE = 15;
+
+    function shippingCost(weightKg: number): number {
+      const base = weightKg * RATE_PER_KG;
+      return weightKg > HEAVY_THRESHOLD_KG ? base + HEAVY_SURCHARGE : base;
+    }
+    ```
+  </TabItem>
+  <TabItem label="Python">
+    ```python
+    # Before
+    def shipping_cost(weight_kg):
+        if weight_kg > 30:
+            return weight_kg * 2.5 + 15
+        return weight_kg * 2.5
+
+    # After
+    RATE_PER_KG = 2.5
+    HEAVY_THRESHOLD_KG = 30
+    HEAVY_SURCHARGE = 15
+
+    def shipping_cost(weight_kg):
+        base = weight_kg * RATE_PER_KG
+        return base + HEAVY_SURCHARGE if weight_kg > HEAVY_THRESHOLD_KG else base
+    ```
+  </TabItem>
+  <TabItem label="Go">
+    ```go
+    // Before
+    func ShippingCost(weightKg float64) float64 {
+        if weightKg > 30 {
+            return weightKg*2.5 + 15
+        }
+        return weightKg * 2.5
+    }
+
+    // After
+    const (
+        ratePerKg       = 2.5
+        heavyThresholdKg = 30.0
+        heavySurcharge   = 15.0
+    )
+
+    func ShippingCost(weightKg float64) float64 {
+        base := weightKg * ratePerKg
+        if weightKg > heavyThresholdKg {
+            return base + heavySurcharge
+        }
+        return base
+    }
+    ```
+  </TabItem>
+  <TabItem label="Rust">
+    ```rust
+    // Before
+    fn shipping_cost(weight_kg: f64) -> f64 {
+        if weight_kg > 30.0 {
+            weight_kg * 2.5 + 15.0
+        } else {
+            weight_kg * 2.5
+        }
+    }
+
+    // After
+    const RATE_PER_KG: f64 = 2.5;
+    const HEAVY_THRESHOLD_KG: f64 = 30.0;
+    const HEAVY_SURCHARGE: f64 = 15.0;
+
+    fn shipping_cost(weight_kg: f64) -> f64 {
+        let base = weight_kg * RATE_PER_KG;
+        if weight_kg > HEAVY_THRESHOLD_KG {
+            base + HEAVY_SURCHARGE
+        } else {
+            base
+        }
+    }
+    ```
+  </TabItem>
+</Tabs>
+
+<Mermaid code={literalDiagram} title="ค่าคงที่เปลือย ๆ กลายเป็นค่าคงที่ที่มีชื่อซึ่งใช้ที่จุดเรียกแต่ละแห่ง" />
+
+## กลไก
+
+1. ประกาศค่าคงที่และกำหนดค่าคงที่ดิบให้กับมัน ตั้งชื่อที่บอกว่าค่านั้น *หมายถึง* อะไร ไม่ใช่ว่ามันคืออะไร — `HEAVY_THRESHOLD_KG` ไม่ใช่ `THIRTY`
+2. หาการใช้งานค่าคงที่นั้นหนึ่งจุด ยืนยันว่ามันหมายถึงสิ่งเดียวกันกับค่าคงที่จริง ๆ — เลข `2` สองตัวที่ไม่เกี่ยวข้องกันไม่ใช่ magic number ตัวเดียวกัน
+3. แทนที่การใช้งานนั้นด้วยค่าคงที่
+4. **รันเทสต์ของคุณ**
+5. ทำซ้ำกับการใช้งานที่เหลือแต่ละจุดที่มีความหมายร่วมกัน
+6. เมื่อทุกการใช้งานที่ตรงกันถูกแทนที่แล้ว ค่าคงที่นั้นจะอยู่ในจุดเดียวเป๊ะ การเปลี่ยนค่าตอนนี้เป็นการแก้ไขเพียงบรรทัดเดียว
+
+## เมื่อไรควรใช้ / ข้อแลกเปลี่ยน
+
+แทนที่ค่าคงที่เมื่อใดก็ตามที่ความหมายของมันไม่ชัดเจนในตัวเอง และโดยเฉพาะอย่างยิ่งเมื่อใดก็ตามที่ค่าที่มีความหมายเดียวกันปรากฏมากกว่าหนึ่งครั้ง ค่าคงที่ที่มีชื่อทำหน้าที่เป็นทั้งเอกสารและจุดเปลี่ยนแปลงเพียงจุดเดียว
+
+ข้อควรระวังสองข้อ ข้อแรก อย่าแทนที่ค่าคงที่ที่อธิบายตัวเองได้อย่างแท้จริง: `index + 1` หรือการคูณด้วย `2` เพื่อทำให้ค่าเป็นสองเท่านั้นไม่ต้องการค่าคงที่ — ชื่ออย่าง `ONE` มีแต่จะเพิ่มความรกรุงรัง ข้อสอง ระวัง *ความเท่ากันโดยบังเอิญ*: หาก `100` สองตัวหมายถึง "สเกลเปอร์เซ็นต์" และ "จำนวนครั้ง retry สูงสุด" พวกมันต้องกลายเป็นค่าคงที่สองตัวที่แตกต่างกัน ไม่ใช่ชื่อร่วมกันชื่อเดียวเด็ดขาด ไม่เช่นนั้นการแก้ไขในอนาคตที่จุดหนึ่งจะทำลายอีกจุดหนึ่งอย่างเงียบ ๆ
+
+## ที่เกี่ยวข้อง
+
+- [Encapsulate Variable](/refactoring-from-zero-to-hero/th/organizing-data/encapsulate-variable/)
+- [Replace Primitive with Object](/refactoring-from-zero-to-hero/th/organizing-data/replace-primitive-with-object/)
+- [Replace Type Code with Subclasses](/refactoring-from-zero-to-hero/th/organizing-data/replace-type-code-with-subclasses/)
+
+<Callout title="ตั้งชื่อตามความหมาย ไม่ใช่ตามค่า">
+ค่าคงที่ที่ชื่อ `THIRTY` ไม่ได้ดีไปกว่าเลข `30` เปลือย ๆ เลย — มันแค่ย้ายความลึกลับไปที่อื่น ตั้งชื่อมันว่า `HEAVY_THRESHOLD_KG` แล้วผู้อ่านจะได้เรียนรู้ว่า *ทำไม* เลขสามสิบจึงสำคัญ หากในภายหลังค่ากลายเป็นสามสิบห้า ชื่อนั้นก็ยังเหมาะอยู่ ซึ่งนั่นคือประเด็นทั้งหมด
+</Callout>
+
+export const quizLiteral = [
+  {
+    q: 'Replace Magic Literal แก้ปัญหาอะไร?',
+    options: [
+      'การเรียกฟังก์ชันที่ช้า',
+      'ค่าคงที่ที่ไม่มีคำอธิบายซึ่งผู้อ่านต้องเดาความหมาย มักจะซ้ำกันหลายที่',
+      'ฟังก์ชันมากเกินไปในไฟล์เดียว',
+      'การจัดการ error ที่ขาดหายไป',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'ควรตั้งชื่อค่าคงที่ตามอะไร?',
+    options: [
+      'ค่าคงที่ตัวมันเอง เช่น THIRTY',
+      'ความหมายหรือวัตถุประสงค์ของค่า',
+      'ฟังก์ชันที่ใช้มัน',
+      'ชนิดข้อมูลของค่า',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'ค่าคงที่สองตัวบังเอิญมีค่าเป็น 100 เหมือนกัน แต่หมายถึงสิ่งที่ต่างกัน คุณควรทำอย่างไร?',
+    options: [
+      'ใช้ค่าคงที่ร่วมกันตัวเดียวสำหรับทั้งสอง',
+      'สร้างค่าคงที่แยกกันสองตัว หนึ่งตัวต่อหนึ่งความหมาย',
+      'ปล่อยทั้งสองให้เป็นค่าคงที่เปลือย ๆ ตลอดไป',
+      'ลบทิ้งไปหนึ่งตัว',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'ค่าคงที่ใดเป็นตัวเลือกที่ดีที่สุดที่จะปล่อยไว้โดยไม่ตั้งชื่อ?',
+    options: [
+      'อัตราภาษีที่ใช้ในสามโมดูล',
+      '+ 1 ที่อธิบายตัวเองได้ ใช้เพื่อขยับไปยัง index ถัดไป',
+      'ขีดจำกัด retry ที่ถูกอ้างอิงในห้าไฟล์',
+      'รหัสสถานะ magic ที่ถูกเปรียบเทียบในหลายที่',
+    ],
+    answer: 1,
+  },
+];
+
+<Quiz client:visible id="organizing-data/replace-magic-literal" questions={quizLiteral} />
+
+<ProgressTracker client:visible id="organizing-data/replace-magic-literal" />

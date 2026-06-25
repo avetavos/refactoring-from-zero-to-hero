@@ -1,0 +1,246 @@
+---
+title: Extract Function
+description: Pull a fragment of a long function into its own well-named function so the caller reads as a list of intentions.
+sidebar:
+  order: 2
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+export const extractDiagram = `flowchart LR
+  subgraph Before["Before"]
+    A["printReceipt()<br/>— compute subtotal<br/>— compute tax<br/>— print lines"]
+  end
+  subgraph After["After"]
+    B["printReceipt()<br/>calls helpers"]
+    B --> C["subtotal()"]
+    B --> D["taxFor()"]
+    B --> E["printLines()"]
+  end
+  Before -.->|"Extract Function"| After`;
+
+## Intent
+
+Take a coherent fragment of code, move it into a new function, and name that function after the *purpose* it serves. The original site now calls the helper, so it reads as a short list of named steps instead of a wall of detail.
+
+## The smell
+
+This is the cure for the **Long Function** — and for any block of code that needs a comment to explain what it does. A comment that says "now calculate the tax" above ten lines is a flashing sign that those ten lines want to be a function called `taxFor`. When the function name carries the intent, the comment becomes unnecessary and the caller becomes readable.
+
+## Before → After
+
+A receipt function that computes a subtotal, applies tax, then prints. Before, it does everything inline. After, each job is a named helper.
+
+<Tabs syncKey="lang">
+  <TabItem label="TypeScript">
+    ```ts
+    // Before
+    function printReceipt(items: { price: number; qty: number }[]): void {
+      let subtotal = 0;
+      for (const item of items) {
+        subtotal += item.price * item.qty;
+      }
+      const tax = subtotal * 0.07;
+      console.log(`Subtotal: ${subtotal.toFixed(2)}`);
+      console.log(`Tax: ${tax.toFixed(2)}`);
+      console.log(`Total: ${(subtotal + tax).toFixed(2)}`);
+    }
+
+    // After
+    function printReceipt(items: { price: number; qty: number }[]): void {
+      const sub = subtotal(items);
+      const tax = taxFor(sub);
+      printLines(sub, tax);
+    }
+
+    function subtotal(items: { price: number; qty: number }[]): number {
+      return items.reduce((sum, item) => sum + item.price * item.qty, 0);
+    }
+
+    function taxFor(amount: number): number {
+      return amount * 0.07;
+    }
+
+    function printLines(sub: number, tax: number): void {
+      console.log(`Subtotal: ${sub.toFixed(2)}`);
+      console.log(`Tax: ${tax.toFixed(2)}`);
+      console.log(`Total: ${(sub + tax).toFixed(2)}`);
+    }
+    ```
+  </TabItem>
+  <TabItem label="Python">
+    ```python
+    # Before
+    def print_receipt(items):
+        subtotal = 0
+        for item in items:
+            subtotal += item["price"] * item["qty"]
+        tax = subtotal * 0.07
+        print(f"Subtotal: {subtotal:.2f}")
+        print(f"Tax: {tax:.2f}")
+        print(f"Total: {subtotal + tax:.2f}")
+
+    # After
+    def print_receipt(items):
+        sub = subtotal(items)
+        tax = tax_for(sub)
+        print_lines(sub, tax)
+
+    def subtotal(items):
+        return sum(item["price"] * item["qty"] for item in items)
+
+    def tax_for(amount):
+        return amount * 0.07
+
+    def print_lines(sub, tax):
+        print(f"Subtotal: {sub:.2f}")
+        print(f"Tax: {tax:.2f}")
+        print(f"Total: {sub + tax:.2f}")
+    ```
+  </TabItem>
+  <TabItem label="Go">
+    ```go
+    // Before
+    func PrintReceipt(items []Item) {
+        subtotal := 0.0
+        for _, item := range items {
+            subtotal += item.Price * float64(item.Qty)
+        }
+        tax := subtotal * 0.07
+        fmt.Printf("Subtotal: %.2f\n", subtotal)
+        fmt.Printf("Tax: %.2f\n", tax)
+        fmt.Printf("Total: %.2f\n", subtotal+tax)
+    }
+
+    // After
+    func PrintReceipt(items []Item) {
+        sub := subtotal(items)
+        tax := taxFor(sub)
+        printLines(sub, tax)
+    }
+
+    func subtotal(items []Item) float64 {
+        total := 0.0
+        for _, item := range items {
+            total += item.Price * float64(item.Qty)
+        }
+        return total
+    }
+
+    func taxFor(amount float64) float64 {
+        return amount * 0.07
+    }
+
+    func printLines(sub, tax float64) {
+        fmt.Printf("Subtotal: %.2f\n", sub)
+        fmt.Printf("Tax: %.2f\n", tax)
+        fmt.Printf("Total: %.2f\n", sub+tax)
+    }
+    ```
+  </TabItem>
+  <TabItem label="Rust">
+    ```rust
+    // Before
+    fn print_receipt(items: &[Item]) {
+        let mut subtotal = 0.0;
+        for item in items {
+            subtotal += item.price * item.qty as f64;
+        }
+        let tax = subtotal * 0.07;
+        println!("Subtotal: {:.2}", subtotal);
+        println!("Tax: {:.2}", tax);
+        println!("Total: {:.2}", subtotal + tax);
+    }
+
+    // After
+    fn print_receipt(items: &[Item]) {
+        let sub = subtotal(items);
+        let tax = tax_for(sub);
+        print_lines(sub, tax);
+    }
+
+    fn subtotal(items: &[Item]) -> f64 {
+        items.iter().map(|item| item.price * item.qty as f64).sum()
+    }
+
+    fn tax_for(amount: f64) -> f64 {
+        amount * 0.07
+    }
+
+    fn print_lines(sub: f64, tax: f64) {
+        println!("Subtotal: {:.2}", sub);
+        println!("Tax: {:.2}", tax);
+        println!("Total: {:.2}", sub + tax);
+    }
+    ```
+  </TabItem>
+</Tabs>
+
+<Mermaid code={extractDiagram} title="One long function becomes a caller plus three named helpers" />
+
+## Mechanics
+
+1. Decide on the fragment to extract and a name that says *what it accomplishes*, not how. If you cannot name it cleanly, the fragment may not be a coherent unit yet — adjust your boundaries.
+2. Create a new empty function with that name.
+3. Copy the fragment into the new function.
+4. Look at the variables the fragment reads: pass them in as parameters. Look at the variables it produces and the outside code still needs: return them.
+5. Replace the original fragment with a call to the new function.
+6. **Run your tests.** Behaviour must be unchanged.
+7. Repeat for the next fragment. Keep each extraction small so a failing test points at one tiny change.
+
+## When to use / trade-offs
+
+Reach for Extract Function whenever a block has a clear single purpose, whenever you are tempted to write a clarifying comment, or whenever you spot the same fragment duplicated in two places — extracting once lets both sites call the shared helper.
+
+The cost is a small jump in navigation: the reader follows a name to its definition. That trade is almost always worth it, because a good name lets most readers stop *without* following the jump. The inverse refactoring is **Inline Function**: if a helper's name says no more than its body, fold it back.
+
+## Related
+
+- [Inline Function](/refactoring-from-zero-to-hero/en/composing-methods/inline-function/)
+- [Replace Temp with Query](/refactoring-from-zero-to-hero/en/composing-methods/replace-temp-with-query/)
+- [Split Phase](/refactoring-from-zero-to-hero/en/composing-methods/split-phase/)
+
+<Callout title="Name it after what it does, not how">
+A function called `loopOverItemsAndAdd` describes its mechanics; `subtotal` describes its result. Name the *outcome*, and the caller reads as a sentence. If you later change *how* the subtotal is computed, the name still fits.
+</Callout>
+
+export const quizExtract = [
+  {
+    q: 'When picking a name for the extracted function, what should it describe?',
+    options: [
+      'The implementation details, line by line',
+      'The purpose or result of the code, not how it is done',
+      'The name of the variable it returns',
+      'The number of statements it contains',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'How do you handle a variable the extracted fragment reads but does not own?',
+    options: [
+      'Make it a global variable',
+      'Pass it in as a parameter',
+      'Duplicate its computation inside the new function',
+      'Delete it',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'Which smell is Extract Function the primary cure for?',
+    options: ['Duplicate database queries', 'A Long Function or a block needing an explanatory comment', 'Slow startup time', 'Missing types'],
+    answer: 1,
+  },
+  {
+    q: 'What is the inverse of Extract Function?',
+    options: ['Split Phase', 'Inline Function', 'Extract Variable', 'Replace Temp with Query'],
+    answer: 1,
+  },
+];
+
+<Quiz client:visible id="composing-methods/extract-function" questions={quizExtract} />
+
+<ProgressTracker client:visible id="composing-methods/extract-function" />

@@ -1,0 +1,243 @@
+---
+title: Replace Subclass with Delegation
+description: Subclasses that vary on a single axis become one class holding a swappable strategy object.
+sidebar:
+  order: 5
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+export const strategyDiagram = `classDiagram
+  class Booking {
+    -pricer: PricingPolicy
+    +price() number
+  }
+  class PricingPolicy {
+    <<interface>>
+    +price(base) number
+  }
+  class RegularPricing
+  class PremiumPricing
+  Booking --> PricingPolicy : delegates
+  PricingPolicy <|.. RegularPricing
+  PricingPolicy <|.. PremiumPricing`;
+
+## Intent
+
+**Replace Subclass with Delegation** collapses a family of subclasses that differ along *one axis of variation* into a single class that holds a **strategy** object. Instead of `RegularBooking` and `PremiumBooking` subclasses, you have one `Booking` that delegates its varying behaviour to an injected `PricingPolicy`. The variation moves from the type hierarchy into a field you can set — even change at runtime.
+
+## The smell
+
+Subclassing is a static, one-time choice: an object is a `PremiumBooking` forever, and if the same booking varies along a *second* axis too — say weekday versus weekend pricing *and* refundable versus non-refundable — you face a combinatorial explosion of subclasses. When the difference between subclasses is really just "which algorithm runs here", that difference belongs in a delegate, not in the type. This is the classic move from inheritance to the **Strategy** pattern.
+
+## Before → After
+
+A booking whose price depends on its tier. Before, each tier is a subclass. After, the tier is a `PricingPolicy` the single `Booking` delegates to.
+
+<Tabs syncKey="lang">
+  <TabItem label="TypeScript">
+    ```ts
+    // Before — one subclass per pricing tier
+    abstract class Booking {
+      constructor(protected base: number) {}
+      abstract price(): number;
+    }
+
+    class RegularBooking extends Booking {
+      price(): number { return this.base; }
+    }
+
+    class PremiumBooking extends Booking {
+      price(): number { return this.base * 1.5 + 20; }
+    }
+
+    // After — one Booking that delegates pricing to a strategy
+    interface PricingPolicy {
+      price(base: number): number;
+    }
+
+    class RegularPricing implements PricingPolicy {
+      price(base: number): number { return base; }
+    }
+
+    class PremiumPricing implements PricingPolicy {
+      price(base: number): number { return base * 1.5 + 20; }
+    }
+
+    class Booking {
+      constructor(private base: number, private pricer: PricingPolicy) {}
+      price(): number { return this.pricer.price(this.base); }
+    }
+    ```
+  </TabItem>
+  <TabItem label="Python">
+    ```python
+    # Before — one subclass per pricing tier
+    class Booking:
+        def __init__(self, base):
+            self.base = base
+
+        def price(self):
+            raise NotImplementedError
+
+    class RegularBooking(Booking):
+        def price(self):
+            return self.base
+
+    class PremiumBooking(Booking):
+        def price(self):
+            return self.base * 1.5 + 20
+
+    # After — one Booking that delegates pricing to a strategy
+    class RegularPricing:
+        def price(self, base):
+            return base
+
+    class PremiumPricing:
+        def price(self, base):
+            return base * 1.5 + 20
+
+    class Booking:
+        def __init__(self, base, pricer):
+            self.base = base
+            self.pricer = pricer
+
+        def price(self):
+            return self.pricer.price(self.base)
+    ```
+  </TabItem>
+  <TabItem label="Go">
+    ```go
+    // Go has no subclasses to begin with. The idiomatic shape is exactly the
+    // "after": a Booking value holds a PricingPolicy interface and delegates.
+
+    type PricingPolicy interface {
+        Price(base float64) float64
+    }
+
+    type RegularPricing struct{}
+
+    func (RegularPricing) Price(base float64) float64 { return base }
+
+    type PremiumPricing struct{}
+
+    func (PremiumPricing) Price(base float64) float64 { return base*1.5 + 20 }
+
+    type Booking struct {
+        Base   float64
+        Pricer PricingPolicy
+    }
+
+    func (b Booking) Price() float64 {
+        return b.Pricer.Price(b.Base)
+    }
+
+    // booking := Booking{Base: 100, Pricer: PremiumPricing{}}
+    ```
+  </TabItem>
+  <TabItem label="Rust">
+    ```rust
+    // Rust has no subclasses. The strategy is a trait object (or a generic
+    // type parameter) held by the single Booking struct.
+
+    trait PricingPolicy {
+        fn price(&self, base: f64) -> f64;
+    }
+
+    struct RegularPricing;
+    impl PricingPolicy for RegularPricing {
+        fn price(&self, base: f64) -> f64 {
+            base
+        }
+    }
+
+    struct PremiumPricing;
+    impl PricingPolicy for PremiumPricing {
+        fn price(&self, base: f64) -> f64 {
+            base * 1.5 + 20.0
+        }
+    }
+
+    struct Booking {
+        base: f64,
+        pricer: Box<dyn PricingPolicy>,
+    }
+
+    impl Booking {
+        fn price(&self) -> f64 {
+            self.pricer.price(self.base)
+        }
+    }
+
+    // let booking = Booking { base: 100.0, pricer: Box::new(PremiumPricing) };
+    ```
+  </TabItem>
+</Tabs>
+
+<Mermaid code={strategyDiagram} title="A tier hierarchy becomes one Booking delegating to a PricingPolicy" />
+
+## Mechanics
+
+1. Identify the single axis along which the subclasses vary — the method (or small cluster of methods) whose body differs.
+2. Define a strategy interface (interface in TypeScript/Go, protocol or duck-typed class in Python, trait in Rust) capturing that varying behaviour.
+3. For each existing subclass, create a strategy implementation that holds its version of the varying logic.
+4. Add a field on the base class to hold a strategy, and make the base class delegate the varying method to that field.
+5. Replace each `new SubclassX()` call with `new Base(..., new StrategyX())`. **Run your tests.**
+6. Delete the now-empty subclasses.
+
+## When to use / trade-offs
+
+Reach for this when subclasses differ only in a swappable algorithm, when an object needs to *change* its variant at runtime (something inheritance cannot do), or when two independent axes of variation would otherwise multiply into a subclass explosion — composing two strategy fields scales linearly where subclasses scale multiplicatively.
+
+The trade-off is one extra object and a layer of indirection: callers now wire up a strategy when they build the base object. That is usually worth it, and in Go and Rust it is simply the normal way to vary behaviour — neither language offers a subclass hierarchy to replace, so you write the delegating form from the outset.
+
+## Related
+
+- [Replace Inheritance with Delegation](/refactoring-from-zero-to-hero/en/generalization-and-inheritance/replace-inheritance-with-delegation/)
+- [Collapse Hierarchy](/refactoring-from-zero-to-hero/en/generalization-and-inheritance/collapse-hierarchy/)
+- [Extract Superclass & Interface](/refactoring-from-zero-to-hero/en/generalization-and-inheritance/extract-superclass-and-interface/)
+
+<Callout title="Inheritance is a fixed choice; a strategy can change">
+The deepest reason to prefer a delegate here is *time*: a subclass is decided at construction and frozen for the object's life. A strategy field can be reassigned, swapped, or even composed with a second strategy along an independent axis. When behaviour needs to vary dynamically — or along more than one dimension — composition wins decisively, which is why Go and Rust hand you only this shape.
+</Callout>
+
+export const quizReplaceSub = [
+  {
+    q: 'Replace Subclass with Delegation is ideal when subclasses differ along how many axes of variation?',
+    options: ['Zero', 'A single axis (one swappable behaviour)', 'Exactly seven', 'It never applies to subclasses'],
+    answer: 1,
+  },
+  {
+    q: 'What design pattern does this refactoring move toward?',
+    options: ['Singleton', 'Strategy', 'Observer', 'Visitor'],
+    answer: 1,
+  },
+  {
+    q: 'What can a strategy field do that a subclass choice cannot?',
+    options: [
+      'Be decided at compile time',
+      'Be reassigned or swapped at runtime, and composed along multiple axes',
+      'Hold no state',
+      'Avoid all method calls',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'Why is this already the default shape in Go and Rust?',
+    options: [
+      'They optimize subclasses into strategies automatically',
+      'Neither offers a subclass hierarchy, so behaviour is varied by holding an interface or trait object',
+      'They forbid interfaces',
+      'They require every type to be abstract',
+    ],
+    answer: 1,
+  },
+];
+
+<Quiz client:visible id="generalization-and-inheritance/replace-subclass-with-delegation" questions={quizReplaceSub} />
+
+<ProgressTracker client:visible id="generalization-and-inheritance/replace-subclass-with-delegation" />

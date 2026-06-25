@@ -1,0 +1,215 @@
+---
+title: Replace Inheritance with Delegation
+description: subclass ใช้พ่อแม่เพียงบางส่วน — หรือ "is-a" เป็นเรื่องโกหก ให้ถือพ่อแม่เดิมไว้เป็นฟิลด์แล้ว delegate ไปหามันแทน
+sidebar:
+  order: 4
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+export const delegationDiagram = `classDiagram
+  class List {
+    +add(item)
+    +size() number
+  }
+  class Stack
+  Stack --> List : holds & delegates
+  note for Stack "Stack HAS-A List, not IS-A List"`;
+
+## เจตนา
+
+**Replace Inheritance with Delegation** ปลด subclass ออกจากพ่อแม่ของมัน แล้วให้มันมี *ฟิลด์* ที่ถือ instance ของพ่อแม่เดิมไว้แทน คลาสจะส่งต่อ (delegate) การเรียกที่มันต้องการจริง ๆ และเพิกเฉยส่วนที่เหลือ คุณทำสิ่งนี้เมื่อ subclass ใช้ interface ของ superclass เพียงเสี้ยวเดียว หรือเมื่อ inheritance นั้นจำลองความสัมพันธ์ "has-a" ที่แต่งตัวเป็น "is-a"
+
+## กลิ่นไม่ดี
+
+อาการคลาสสิกคือ **Refused Bequest**: `Stack extends List` แต่ stack ไม่ควรให้ caller `insertAt` ตรงกลางหรือ `remove` จากด้านล่าง การ inherit ทำให้ `Stack` เปิดเผย interface ทั้งหมดของ `List` และทำลาย invariant ของตัวเองอย่างเงียบ ๆ ความสัมพันธ์ผิด — stack *มี* list มันไม่ได้ *เป็น* list การแทน inheritance ด้วย delegation ทำให้ `Stack` เปิดเผยเพียง `push` และ `pop` โดยเก็บ list ไว้เป็น private
+
+## ก่อน → หลัง
+
+`Stack` ที่สร้างขึ้นด้วยการ extend `List` รั่วทุก operation ของ list ออกไป หลัง refactoring มันจะ *ถือ* list และเปิดเผยเพียง operation ของ stack เท่านั้น
+
+<Tabs syncKey="lang">
+  <TabItem label="TypeScript">
+    ```ts
+    // Before — Stack IS-A List, leaking add/get/removeAt to callers
+    class List<T> {
+      private items: T[] = [];
+      add(item: T): void { this.items.push(item); }
+      removeLast(): T | undefined { return this.items.pop(); }
+      size(): number { return this.items.length; }
+    }
+
+    class Stack<T> extends List<T> {
+      push(item: T): void { this.add(item); }
+      pop(): T | undefined { return this.removeLast(); }
+    }
+
+    // After — Stack HAS-A List and delegates only what it needs
+    class Stack<T> {
+      private list = new List<T>();
+      push(item: T): void { this.list.add(item); }
+      pop(): T | undefined { return this.list.removeLast(); }
+      size(): number { return this.list.size(); }
+    }
+    ```
+  </TabItem>
+  <TabItem label="Python">
+    ```python
+    # Before — Stack IS-A list, leaking insert/remove/index to callers
+    class Stack(list):
+        def push(self, item):
+            self.append(item)
+
+        def pop_top(self):
+            return self.pop()
+
+    # After — Stack HAS-A list and delegates only what it needs
+    class Stack:
+        def __init__(self):
+            self._items = []
+
+        def push(self, item):
+            self._items.append(item)
+
+        def pop_top(self):
+            return self._items.pop()
+
+        def size(self):
+            return len(self._items)
+    ```
+  </TabItem>
+  <TabItem label="Go">
+    ```go
+    // Go favours composition by default. The "before" abuses embedding so a
+    // Stack promotes every List method. The "after" holds the list as an
+    // unexported field and exposes only Push/Pop — the idiomatic Go style.
+
+    // Before — embedding promotes Add/RemoveLast/Size onto Stack
+    type List struct{ items []int }
+
+    func (l *List) Add(item int)    { l.items = append(l.items, item) }
+    func (l *List) RemoveLast() int { n := len(l.items) - 1; v := l.items[n]; l.items = l.items[:n]; return v }
+    func (l *List) Size() int       { return len(l.items) }
+
+    type Stack struct{ List } // leaks Add, RemoveLast to callers
+
+    // After — Stack holds a List and delegates only what it needs
+    type Stack struct{ list List }
+
+    func (s *Stack) Push(item int) { s.list.Add(item) }
+    func (s *Stack) Pop() int      { return s.list.RemoveLast() }
+    func (s *Stack) Size() int     { return s.list.Size() }
+    ```
+  </TabItem>
+  <TabItem label="Rust">
+    ```rust
+    // Rust has no inheritance at all, so delegation is the only option — and
+    // the idiomatic one. The Stack owns a Vec (the "list") privately and
+    // exposes only push and pop.
+
+    // Before (the closest mistake) — exposing the inner Vec publicly,
+    // so callers can call insert/remove/truncate and break the invariant.
+    pub struct Stack {
+        pub items: Vec<i32>,
+    }
+
+    // After — the Vec is private; only stack operations are delegated outward.
+    pub struct Stack {
+        items: Vec<i32>,
+    }
+
+    impl Stack {
+        pub fn new() -> Self {
+            Stack { items: Vec::new() }
+        }
+        pub fn push(&mut self, item: i32) {
+            self.items.push(item);
+        }
+        pub fn pop(&mut self) -> Option<i32> {
+            self.items.pop()
+        }
+        pub fn size(&self) -> usize {
+            self.items.len()
+        }
+    }
+    ```
+  </TabItem>
+</Tabs>
+
+<Mermaid code={delegationDiagram} title="Stack เลิกเป็น List แล้วเริ่มถือ List ไว้แทน" />
+
+## กลไก
+
+1. สร้างฟิลด์ใน subclass เพื่อถือ instance ของ superclass (เดิม) ตั้งค่าเริ่มต้นให้มัน — ไม่ว่าจะด้วย instance ใหม่ หรือด้วยตัว object เองหากคุณกำลังแกะ self-reference ออก
+2. สำหรับแต่ละเมท็อดของ superclass ที่ subclass ใช้จริง ให้เพิ่มเมท็อดที่ delegate ซึ่งส่งต่อการเรียกไปยังฟิลด์นั้น
+3. ลบความสัมพันธ์ `extends` / embedding ออก เพื่อให้คลาสไม่ inherit interface ทั้งหมดของพ่อแม่อีกต่อไป
+4. ปรับ caller ที่พึ่งพาสมาชิกที่ inherit มาซึ่งไม่ควรเข้าถึงได้ตั้งแต่แรก — นี่คือรอยรั่วที่คุณกำลังอุด
+5. **รันเทสต์** หลังเดินสายเมท็อดที่ delegate แต่ละตัวเสร็จ
+6. เมื่อ delegation อยู่ที่แล้ว คุณก็มีอิสระที่จะแคบ interface ที่เปิดเผยและปกป้อง invariant ที่ inheritance เดิมละเมิด
+
+## เมื่อไรควรใช้ / ข้อแลกเปลี่ยน
+
+ใช้สิ่งนี้เมื่อ subclass ปฏิเสธมรดกส่วนใหญ่ของมัน เมื่อ inheritance รั่ว operation ที่ทำลายกฎของ subclass เอง หรือเมื่อ "is-a" ไม่เคยเป็นจริงจริง ๆ หลังการย้าย คุณควบคุมได้เป๊ะ ๆ ว่า operation ใดเป็น public ดังนั้น invariant จึงบังคับใช้ได้
+
+ต้นทุนคือ boilerplate ของการส่งต่อเล็กน้อย — หนึ่งเมท็อดสั้น ๆ ต่อหนึ่ง operation ที่ delegate นั่นเป็นราคาเล็ก ๆ และซื่อตรงสำหรับความสัมพันธ์ที่ถูกต้องแม่นยำ ใน Go นี่เป็นเพียงการเลือกฟิลด์ที่ถือไว้แทน embedding ส่วนใน Rust delegation คือเส้นทาง *เดียว* ดังนั้น refactoring นี้จึงเป็นแค่ "เขียน Rust แบบ idiomatic ตั้งแต่แรก"
+
+## เกี่ยวข้อง
+
+- [Replace Subclass with Delegation](/refactoring-from-zero-to-hero/th/generalization-and-inheritance/replace-subclass-with-delegation/)
+- [Pull Up & Push Down](/refactoring-from-zero-to-hero/th/generalization-and-inheritance/pull-up-and-push-down/)
+- [Extract Superclass & Interface](/refactoring-from-zero-to-hero/th/generalization-and-inheritance/extract-superclass-and-interface/)
+
+<Callout title="เลือก composition มากกว่า inheritance">
+inheritance ผูกคุณเข้ากับ interface *ทั้งหมด* ของพ่อแม่และวิวัฒนาการของมัน ส่วน composition ให้คุณส่งต่อเฉพาะสิ่งที่คุณตั้งใจจะรองรับ เมื่อไม่แน่ใจ ให้ถือ collaborator ไว้เป็นฟิลด์แล้ว delegate Go และ Rust อบคำแนะนำนี้ไว้ในตัวภาษาแล้ว — มันไม่ให้ inheritance คุณไปใช้ผิด ๆ ดังนั้นคุณจึงหยิบ delegation มาใช้โดยปริยาย และความสัมพันธ์ของคุณก็ซื่อตรงอยู่เสมอ
+</Callout>
+
+export const quizReplaceInh = [
+  {
+    q: 'Replace Inheritance with Delegation แก้ปัญหาใด?',
+    options: [
+      'ฟังก์ชันที่ยาวเกินไป',
+      'subclass ที่ใช้พ่อแม่เพียงบางส่วน หรือจำลองความสัมพันธ์ "is-a" ที่ผิด',
+      'ดัชนีฐานข้อมูลที่หายไป',
+      'สองเมท็อดที่มีชื่อเดียวกัน',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'หลัง refactoring คลาสนำพ่อแม่เดิมมาใช้ซ้ำอย่างไร?',
+    options: [
+      'มันคัดลอกโค้ดของพ่อแม่ทั้งหมดมาแบบ inline',
+      'มันถือพ่อแม่เดิมไว้เป็นฟิลด์แล้ว delegate การเรียกที่มันต้องการ',
+      'มันลบพ่อแม่ทิ้งทั้งหมด',
+      'มันทำให้พ่อแม่เป็น abstract',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'ทำไม refactoring นี้จึง "ฟรี" ใน Rust?',
+    options: [
+      'Rust ปรับ inheritance ออกให้อัตโนมัติ',
+      'Rust ไม่มี inheritance ดังนั้น delegation จึงเป็นวิธีเดียวและเป็นแบบ idiomatic อยู่แล้ว',
+      'Rust ห้ามใช้ struct',
+      'Rust กำหนดให้ทุก type ต้อง extend base trait',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'อะไรคือต้นทุนหลักของการเลือก delegation แทน inheritance?',
+    options: [
+      'มันทำงานช้ากว่าเสมอ',
+      'boilerplate ของการส่งต่อเล็กน้อย — หนึ่งเมท็อดสั้น ๆ ต่อหนึ่ง operation ที่ delegate',
+      'คุณเสียความสามารถในการเขียนเทสต์',
+      'คลาสไม่สามารถถือฟิลด์ได้อีกต่อไป',
+    ],
+    answer: 1,
+  },
+];
+
+<Quiz client:visible id="generalization-and-inheritance/replace-inheritance-with-delegation" questions={quizReplaceInh} />
+
+<ProgressTracker client:visible id="generalization-and-inheritance/replace-inheritance-with-delegation" />

@@ -1,0 +1,280 @@
+---
+title: Replace Constructor with Factory Function
+description: เมื่อ constructor แข็งทื่อเกินไป — มันเลือก subtype ไม่ได้ หรือมีชื่อที่สื่อความหมายไม่ได้ — ให้ห่อมันด้วยฟังก์ชัน factory ที่ตัดสินใจว่าจะสร้างอะไร
+sidebar:
+  order: 6
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+## เจตนา
+
+แทนที่การเรียก constructor โดยตรงด้วยการเรียกฟังก์ชัน factory constructor ถูกจำกัด: มันต้องใช้ชื่อเดียวกับไทป์ และมันคืน instance ของไทป์นั้นเป๊ะ ๆ เสมอ ส่วนฟังก์ชัน factory เป็นอิสระ — มันมีชื่อที่สื่อความหมายได้ เลือกได้ว่าจะคืน subtype ตัวใด ส่งคืน instance ที่แคชไว้ได้ หรือตรวจสอบความถูกต้องก่อนสร้างได้ ผู้เรียกใช้ขอสิ่งที่ต้องการจาก factory แล้ว factory ตัดสินใจว่าจะสร้างมันอย่างไร
+
+## กลิ่นไม่ดี
+
+constructor ดิบ ๆ ทำให้การตัดสินใจเรื่องการสร้างรั่วไหลไปยังผู้เรียกใช้ทุกคน คุณเห็น `new Employee("Sara", "manager")` แล้วผู้เรียกใช้ถูกทิ้งให้จำเองว่าสตริงตัวไหนหมายถึงอะไร ที่แย่กว่านั้น เมื่อไทป์มีตัวแปร — ผู้จัดการจริง ๆ แล้วเป็นพนักงานคนละชนิดกับวิศวกร — constructor เปล่า ๆ ไม่สามารถคืน subtype ที่ถูกต้องได้ ผู้เรียกใช้จึงต้องแตกแขนงตามรหัสไทป์เอง ชื่อของ constructor ถูกตรึงไว้กับคลาส มันจึงพูดว่า `hire` หรือ `fromJson` หรือ `default` ไม่ได้ แต่ละอย่างนี้คือ constructor ที่จำกัดเกินไปสำหรับงาน
+
+## ก่อน → หลัง
+
+ไทป์พนักงานที่ constructor รับสตริงไทป์ หลังจากนั้น ฟังก์ชัน factory เลือก subtype ที่ถูกต้องและอ่านได้ชัดเจน
+
+<Tabs syncKey="lang">
+  <TabItem label="TypeScript">
+    ```ts
+    // Before
+    class Employee {
+      constructor(public name: string, public type: string) {}
+      monthlyBonus(): number {
+        return this.type === "manager" ? 1000 : 200;
+      }
+    }
+
+    const e = new Employee("Sara", "manager");
+
+    // After
+    abstract class Employee {
+      constructor(public name: string) {}
+      abstract monthlyBonus(): number;
+    }
+
+    class Manager extends Employee {
+      monthlyBonus(): number {
+        return 1000;
+      }
+    }
+
+    class Engineer extends Employee {
+      monthlyBonus(): number {
+        return 200;
+      }
+    }
+
+    function hire(name: string, role: string): Employee {
+      switch (role) {
+        case "manager":
+          return new Manager(name);
+        case "engineer":
+          return new Engineer(name);
+        default:
+          throw new Error(`Unknown role: ${role}`);
+      }
+    }
+
+    const e = hire("Sara", "manager");
+    ```
+  </TabItem>
+  <TabItem label="Python">
+    ```python
+    # Before
+    class Employee:
+        def __init__(self, name, type):
+            self.name = name
+            self.type = type
+
+        def monthly_bonus(self):
+            return 1000 if self.type == "manager" else 200
+
+    e = Employee("Sara", "manager")
+
+    # After
+    from abc import ABC, abstractmethod
+
+    class Employee(ABC):
+        def __init__(self, name):
+            self.name = name
+
+        @abstractmethod
+        def monthly_bonus(self):
+            ...
+
+    class Manager(Employee):
+        def monthly_bonus(self):
+            return 1000
+
+    class Engineer(Employee):
+        def monthly_bonus(self):
+            return 200
+
+    def hire(name, role):
+        builders = {"manager": Manager, "engineer": Engineer}
+        if role not in builders:
+            raise ValueError(f"Unknown role: {role}")
+        return builders[role](name)
+
+    e = hire("Sara", "manager")
+    ```
+  </TabItem>
+  <TabItem label="Go">
+    ```go
+    // Before
+    type Employee struct {
+        Name string
+        Type string
+    }
+
+    func (e Employee) MonthlyBonus() float64 {
+        if e.Type == "manager" {
+            return 1000
+        }
+        return 200
+    }
+
+    e := Employee{Name: "Sara", Type: "manager"}
+
+    // After
+    type Employee interface {
+        MonthlyBonus() float64
+    }
+
+    type Manager struct{ Name string }
+
+    func (m Manager) MonthlyBonus() float64 { return 1000 }
+
+    type Engineer struct{ Name string }
+
+    func (e Engineer) MonthlyBonus() float64 { return 200 }
+
+    func Hire(name, role string) (Employee, error) {
+        switch role {
+        case "manager":
+            return Manager{Name: name}, nil
+        case "engineer":
+            return Engineer{Name: name}, nil
+        default:
+            return nil, fmt.Errorf("unknown role: %s", role)
+        }
+    }
+
+    e, err := Hire("Sara", "manager")
+    ```
+  </TabItem>
+  <TabItem label="Rust">
+    ```rust
+    // Before
+    struct Employee {
+        name: String,
+        kind: String,
+    }
+
+    impl Employee {
+        fn monthly_bonus(&self) -> u32 {
+            if self.kind == "manager" { 1000 } else { 200 }
+        }
+    }
+
+    let e = Employee { name: "Sara".to_string(), kind: "manager".to_string() };
+
+    // After
+    trait Employee {
+        fn monthly_bonus(&self) -> u32;
+    }
+
+    struct Manager {
+        name: String,
+    }
+
+    impl Employee for Manager {
+        fn monthly_bonus(&self) -> u32 {
+            1000
+        }
+    }
+
+    struct Engineer {
+        name: String,
+    }
+
+    impl Employee for Engineer {
+        fn monthly_bonus(&self) -> u32 {
+            200
+        }
+    }
+
+    fn hire(name: &str, role: &str) -> Result<Box<dyn Employee>, String> {
+        match role {
+            "manager" => Ok(Box::new(Manager { name: name.to_string() })),
+            "engineer" => Ok(Box::new(Engineer { name: name.to_string() })),
+            other => Err(format!("unknown role: {other}")),
+        }
+    }
+
+    let e = hire("Sara", "manager")?;
+    ```
+  </TabItem>
+</Tabs>
+
+## กลไก
+
+1. เขียนฟังก์ชัน factory ที่เนื้อในไม่ทำอะไรนอกจากเรียก constructor ที่มีอยู่แล้วคืนผลลัพธ์ ตั้งชื่อให้มันบอกว่ามันสร้างอะไร อย่าง `hire` หรือ `defaultConfig`
+2. เปลี่ยนเส้นทางผู้เรียกใช้ไปยัง factory ทีละตัว แทนการเรียก constructor แต่ละครั้งด้วยการเรียก factory **รันเทสต์ของคุณ** หลังแต่ละครั้ง
+3. เมื่อผู้เรียกใช้ทุกตัวผ่าน factory แล้ว คุณก็มีจุดคอขวดเดียว ตอนนี้คุณเสริมมันได้: ตรวจสอบความถูกต้องของอาร์กิวเมนต์ คืน instance ที่แคชไว้ หรือแตกแขนงไปยัง subtype
+4. หากคุณกำลังนำ subtype เข้ามา ให้สร้างมันขึ้น ย้ายพฤติกรรมของแต่ละแขนงไปไว้บน subtype ที่ตรงกัน แล้วให้ factory คืนตัวที่ถูกต้องตามอินพุตของมัน
+5. **รันเทสต์ของคุณ** หลังการเปลี่ยนแปลงแต่ละครั้ง ลายเซ็นของ factory คงที่สำหรับผู้เรียกใช้ แม้สิ่งที่มันสร้างจะวิวัฒน์อยู่เบื้องหลัง
+6. หากภาษาอนุญาต ให้ทำ constructor ดิบเป็น private หรือ non-public เพื่อให้ factory เป็นทางเข้าที่รองรับเพียงทางเดียว
+
+## เมื่อไรควรใช้ / ข้อแลกเปลี่ยน
+
+หยิบ factory มาใช้เมื่อการสร้างต้องการชื่อที่ชัดเจนกว่าที่คลาสจะให้ได้ เมื่อไทป์ที่เป็นรูปธรรมที่ถูกต้องขึ้นอยู่กับอินพุต เมื่อคุณต้องการซ่อนหรือรวม instance ไว้เป็น pool หรือเมื่อคุณต้องการตรวจสอบความถูกต้องก่อนที่ออบเจกต์จะมีตัวตน factory กลายเป็นประตูเดียวที่มีชื่อดีซึ่งออบเจกต์เข้าสู่ระบบผ่านมัน
+
+ข้อแลกเปลี่ยนคือชั้นของการอ้อม: ผู้เรียกใช้ไม่เห็น `new` และไทป์ที่เป็นรูปธรรมโดยตรงอีกต่อไป ซึ่งอาจทำให้การนำทางชัดเจนน้อยลงเล็กน้อย สำหรับไทป์ค่าธรรมดาที่มีรูปทรงเดียวและไม่มีตัวแปร constructor โดยตรงเรียบง่ายกว่า และ factory ก็เป็นพิธีรีตองที่ไม่จำเป็น เพิ่ม factory เมื่อความแข็งทื่อของ constructor เริ่มทำให้คุณต้องเสีย — ไม่ใช่ก่อนหน้านั้น
+
+## ที่เกี่ยวข้อง
+
+- [Remove Flag Argument](/refactoring-from-zero-to-hero/th/simplifying-apis/remove-flag-argument/)
+- [Introduce Parameter Object](/refactoring-from-zero-to-hero/th/simplifying-apis/introduce-parameter-object/)
+- [Rename Function/Variable](/refactoring-from-zero-to-hero/th/simplifying-apis/rename-function/)
+
+<Callout title="factory คือ constructor ที่ได้เลือกเอง">
+constructor ต้องคืนไทป์ของตัวเอง ภายใต้ชื่อของตัวเอง ส่วนฟังก์ชัน factory ถูกปลดปล่อยจากทั้งสองกฎ: มันถูกเรียกว่า `hire` ได้ มันส่งคืน `Manager` หรือ `Engineer` ได้ และมันปฏิเสธที่จะสร้างได้เลยเมื่ออินพุตผิด อิสระนั้นคือประเด็นทั้งหมด
+</Callout>
+
+export const quizFactory = [
+  {
+    q: 'อะไรคือข้อจำกัดสำคัญของ constructor ที่ฟังก์ชัน factory หลีกเลี่ยงได้?',
+    options: [
+      'constructor รับอาร์กิวเมนต์ไม่ได้',
+      'constructor ต้องใช้ชื่อเดียวกับไทป์และคืน instance ของไทป์นั้นเป๊ะ ๆ เสมอ',
+      'constructor เทสต์ไม่ได้',
+      'constructor รันช้ากว่าฟังก์ชัน',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'อะไรคือขั้นตอนแรกที่ปลอดภัยเมื่อนำ factory เข้ามา?',
+    options: [
+      'ลบ constructor ทิ้งทันที',
+      'เขียน factory ที่แค่เรียก constructor ที่มีอยู่ แล้วเปลี่ยนเส้นทางผู้เรียกใช้ทีละตัว',
+      'เปลี่ยนชื่อ subtype ทุกตัวก่อน',
+      'ลบเทสต์ทั้งหมดออก',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'ทำไมการให้การสร้างทั้งหมดผ่าน factory เดียวจึงช่วยได้?',
+    options: [
+      'มันทำให้โปรแกรมพิมพ์สั้นลง',
+      'มันสร้างจุดคอขวดเดียวที่คุณตรวจสอบความถูกต้อง แคช หรือเลือก subtype ได้',
+      'มันขจัดความจำเป็นในการมีคลาส',
+      'มันรับประกันการสร้างออบเจกต์ที่เร็วขึ้น',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'เมื่อใดที่ constructor ธรรมดาดีกว่า factory?',
+    options: [
+      'เมื่อไทป์มีตัวแปรหลายตัวที่เลือกตอนรันไทม์',
+      'สำหรับไทป์ค่าธรรมดาที่มีรูปทรงเดียวและไม่มีตัวแปร',
+      'เมื่อคุณต้องตรวจสอบความถูกต้องของอินพุตก่อนสร้าง',
+      'เมื่อคุณต้องการชื่อการสร้างที่สื่อความหมาย',
+    ],
+    answer: 1,
+  },
+];
+
+<Quiz client:visible id="simplifying-apis/replace-constructor-with-factory" questions={quizFactory} />
+
+<ProgressTracker client:visible id="simplifying-apis/replace-constructor-with-factory" />

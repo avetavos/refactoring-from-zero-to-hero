@@ -1,0 +1,87 @@
+---
+title: การทำให้เงื่อนไขเรียบง่ายขึ้น
+description: ตรรกะเงื่อนไขพันกันยุ่งเหยิงได้อย่างรวดเร็ว — การ refactor เหล่านี้เปลี่ยน if/else ที่ซ้อนกัน การตรวจสอบที่กระจัดกระจาย และการสลับตามชนิดข้อมูล ให้กลายเป็นตรรกะการตัดสินใจที่ผู้อ่านติดตามได้
+sidebar:
+  order: 1
+---
+
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+export const overviewDiagram = `flowchart TD
+  A["Tangled conditional logic"] --> B{"What is wrong?"}
+  B -->|"A condition is hard to read"| C["Decompose Conditional"]
+  B -->|"Many checks, one outcome"| D["Consolidate Conditional Expression"]
+  B -->|"Deep nesting hides the happy path"| E["Replace Nested Conditional with Guard Clauses"]
+  B -->|"A switch on a type keeps recurring"| F["Replace Conditional with Polymorphism"]
+  B -->|"The same null check is everywhere"| G["Introduce Special Case"]
+  C --> H["Decision logic that explains itself"]
+  D --> H
+  E --> H
+  F --> H
+  G --> H`;
+
+## เจตนา
+
+ตระกูล **simplifying conditionals** ว่าด้วยเรื่องตรรกะการตัดสินใจ ได้แก่ สาขา (branch), การ์ด (guard), และการสลับ (switch) ที่ตัดสินว่า *โปรแกรมจะทำอะไรต่อไป* เงื่อนไขที่เริ่มต้นจากคำถามเดียวอย่างชัดเจน ค่อย ๆ งอกอนุประโยคเพิ่มเข้ามา ซ้อนตัวเองอยู่ภายในเงื่อนไขอื่น ๆ และแตกตัวเป็นสำเนากระจายไปทั่วฐานโค้ด การ refactor เหล่านี้ช่วยคลายความซับซ้อนที่งอกออกมา เพื่อให้ผู้อ่านมองเห็นได้ในพริบตาว่ากรณีใดนำไปสู่จุดไหน
+
+## กลิ่นโค้ด
+
+ตรรกะเงื่อนไขที่ซับซ้อนเป็นหนึ่งในสัญญาณที่ดังที่สุดว่าฟังก์ชันหนึ่งดูแลรักษายาก สัญญาณเตือนนั้นคุ้นเคยกันดี ได้แก่ นิพจน์บูลีนที่ยาวจนต้องอ่านสองรอบ, แถวของบล็อก `if` ที่ซ้อนกันจนพุ่งทะลุขอบขวาของหน้าจอ, `switch` บนฟิลด์ "ชนิด" ที่ซ้ำกันอยู่ในห้าฟังก์ชัน, และ `if (x == null)` ที่กระจัดกระจายอยู่ในทุกเมธอดที่แตะต้อง `x` แต่ละอย่างมีวิธีแก้ที่มีชื่อเรียกชัดเจน และแต่ละวิธีก็ทิ้งพฤติกรรมไว้เหมือนเดิมพร้อมกับทำให้เจตนาชัดเจนขึ้น
+
+<Mermaid code={overviewDiagram} title="เลือกท่า simplifying-conditionals จากสิ่งที่ผิดพลาด" />
+
+## โมดูลนี้ครอบคลุมอะไรบ้าง
+
+การ refactor ห้าแบบ แต่ละแบบเล็กและย้อนกลับได้:
+
+- **Decompose Conditional** — แยกการทดสอบ, สาขา then, และสาขา else ออกมาเป็นฟังก์ชันที่ตั้งชื่ออย่างดี เพื่อให้โครงสร้างอ่านได้เหมือนประโยค: *ถ้าเป็นวันพีค ให้คิดอัตราพีค มิฉะนั้นคิดอัตราปกติ*
+- **Consolidate Conditional Expression** — เมื่อการตรวจสอบหลายตัวที่แยกกันนำไปสู่ผลลัพธ์เดียวกัน ให้รวมมันเป็นเงื่อนไขเดียวและตั้งชื่อ เพื่อให้ผู้อ่านเรียนรู้ว่า *ทำไม* แทนที่จะเป็นว่า *มีกี่วิธี*
+- **Replace Nested Conditional with Guard Clauses** — ทำให้ `if/else` ที่ซ้อนลึกแบนราบลง โดย return ออกไปก่อนสำหรับกรณีพิเศษ เหลือเส้นทางหลักไว้แบบไม่ย่อหน้าและเห็นได้ชัด
+- **Replace Conditional with Polymorphism** — เมื่อ `switch` หรือ `if` บนชนิดข้อมูลเกิดซ้ำ ให้ผลักแต่ละสาขาเข้าไปเป็นเมธอดของซับคลาส เพื่อให้ภาษากระจายงาน (dispatch) ให้คุณ
+- **Introduce Special Case** — แทนการตรวจสอบ null-หรือ-พิเศษ ที่ซ้ำ ๆ ด้วยอ็อบเจกต์ที่ตอบกลับด้วยค่าดีฟอลต์ที่สมเหตุสมผล เพื่อให้ผู้เรียกหยุดถามว่า "มันหายไปไหม?"
+
+แต่ละบทเรียนแสดง before-and-after เดียวกันใน TypeScript, Python, Go, และ Rust จากนั้นพาเดินผ่านกลไกที่ปลอดภัยและเรียงลำดับ — โดยรันเทสต์ของคุณระหว่างทุกขั้นตอน
+
+<Callout title="ทำให้การตัดสินใจมองเห็นได้ ไม่ใช่ท่อร้อยสาย">
+เป้าหมายไม่เคยเป็นการกำจัดเงื่อนไขเพื่อตัวมันเอง โปรแกรมต้องตัดสินใจ เป้าหมายคือทำให้แต่ละการตัดสินใจ *อ่านออกง่าย*: หนึ่งคำถามต่อหนึ่งเงื่อนไข, ตั้งชื่อให้ทุกการทดสอบที่ไม่ชัดเจนในตัวเอง, และทำให้เส้นทางทั่วไปหาเจอง่าย หากการ refactor ตรงนี้ทำให้ตรรกะอ่านยากขึ้น แสดงว่าคุณไปไกลเกินไป — หยุดและย้อนกลับ
+</Callout>
+
+export const quizIndex = [
+  {
+    q: 'การ refactor ตระกูล "simplifying conditionals" ปรับปรุงสิ่งใดเป็นหลัก?',
+    options: [
+      'ความเร็วในการประมวลผลดิบของสาขา',
+      'ความอ่านง่ายของตรรกะการตัดสินใจ — กรณีใดนำไปสู่จุดไหน',
+      'ปริมาณหน่วยความจำที่ฟังก์ชันใช้',
+      'จำนวนเงื่อนไขในโปรแกรม',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'การ refactor ใดที่ทำให้ if/else ที่ซ้อนลึกแบนราบลงด้วยการ return ออกไปก่อนสำหรับกรณีพิเศษ?',
+    options: [
+      'Decompose Conditional',
+      'Consolidate Conditional Expression',
+      'Replace Nested Conditional with Guard Clauses',
+      'Introduce Special Case',
+    ],
+    answer: 2,
+  },
+  {
+    q: 'เมื่อการตรวจสอบหลายตัวล้วนนำไปสู่ผลลัพธ์เดียวกัน ท่าใดที่รวมมันเข้าด้วยกัน?',
+    options: [
+      'Replace Conditional with Polymorphism',
+      'Consolidate Conditional Expression',
+      'Introduce Special Case',
+      'Decompose Conditional',
+    ],
+    answer: 1,
+  },
+];
+
+<Quiz client:visible id="simplifying-conditionals/index" questions={quizIndex} />
+
+<ProgressTracker client:visible id="simplifying-conditionals/index" />

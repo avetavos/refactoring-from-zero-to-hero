@@ -1,0 +1,248 @@
+---
+title: Replace Primitive with Object
+description: When a primitive value starts attracting validation and formatting rules, promote it to a small value type that holds both the data and the behaviour it has been asking for.
+sidebar:
+  order: 5
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+export const primitiveDiagram = `flowchart LR
+  subgraph Before["Before — Primitive Obsession"]
+    A["phone: string"]
+    A --> B["validate() copy-pasted"]
+    A --> C["format() copy-pasted"]
+    A --> D["areaCode() copy-pasted"]
+  end
+  subgraph After["After — a value type"]
+    E["class PhoneNumber"]
+    E --> F["holds the digits"]
+    E --> G["isValid()"]
+    E --> H["formatted()"]
+    E --> I["areaCode()"]
+  end
+  Before -.->|"Replace Primitive with Object"| After`;
+
+## Intent
+
+Take a primitive value — a string, a number — that has begun to accumulate rules about how it must be validated, parsed, or formatted, and wrap it in a small dedicated type. The new value object holds the raw data *and* the behaviour, so the rules live in one place and the type name announces what the value really is.
+
+## The smell
+
+This is the cure for **Primitive Obsession**: representing a meaningful domain concept with a raw primitive. A phone number is a `string`; a money amount is a `number`; a temperature is a bare `float`. The symptom is the same logic scattered everywhere the primitive is used — the same regex to validate the phone, the same rounding to handle cents, the same conversion repeated at each site. Each duplication is a place to forget a rule and introduce a bug.
+
+## Before → After
+
+A phone number carried as a raw string, with validation and formatting repeated at every use. After, a small `PhoneNumber` value type owns the digits and the behaviour.
+
+<Tabs syncKey="lang">
+  <TabItem label="TypeScript">
+    ```ts
+    // Before
+    function callCustomer(phone: string): void {
+      const digits = phone.replace(/\D/g, '');
+      if (digits.length !== 10) throw new Error('invalid phone');
+      const pretty = `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
+      dial(pretty);
+    }
+
+    // After
+    class PhoneNumber {
+      private readonly digits: string;
+      constructor(raw: string) {
+        this.digits = raw.replace(/\D/g, '');
+        if (this.digits.length !== 10) throw new Error('invalid phone');
+      }
+      areaCode(): string {
+        return this.digits.slice(0, 3);
+      }
+      formatted(): string {
+        return `(${this.digits.slice(0, 3)}) ${this.digits.slice(3, 6)}-${this.digits.slice(6)}`;
+      }
+    }
+
+    function callCustomer(phone: PhoneNumber): void {
+      dial(phone.formatted());
+    }
+    ```
+  </TabItem>
+  <TabItem label="Python">
+    ```python
+    # Before
+    def call_customer(phone):
+        digits = "".join(c for c in phone if c.isdigit())
+        if len(digits) != 10:
+            raise ValueError("invalid phone")
+        pretty = f"({digits[:3]}) {digits[3:6]}-{digits[6:]}"
+        dial(pretty)
+
+    # After
+    class PhoneNumber:
+        def __init__(self, raw):
+            self._digits = "".join(c for c in raw if c.isdigit())
+            if len(self._digits) != 10:
+                raise ValueError("invalid phone")
+
+        def area_code(self):
+            return self._digits[:3]
+
+        def formatted(self):
+            d = self._digits
+            return f"({d[:3]}) {d[3:6]}-{d[6:]}"
+
+    def call_customer(phone):
+        dial(phone.formatted())
+    ```
+  </TabItem>
+  <TabItem label="Go">
+    ```go
+    // Before
+    func CallCustomer(phone string) error {
+        digits := stripNonDigits(phone)
+        if len(digits) != 10 {
+            return errors.New("invalid phone")
+        }
+        pretty := fmt.Sprintf("(%s) %s-%s", digits[:3], digits[3:6], digits[6:])
+        dial(pretty)
+        return nil
+    }
+
+    // After
+    type PhoneNumber struct {
+        digits string
+    }
+
+    func NewPhoneNumber(raw string) (PhoneNumber, error) {
+        d := stripNonDigits(raw)
+        if len(d) != 10 {
+            return PhoneNumber{}, errors.New("invalid phone")
+        }
+        return PhoneNumber{digits: d}, nil
+    }
+
+    func (p PhoneNumber) AreaCode() string { return p.digits[:3] }
+
+    func (p PhoneNumber) Formatted() string {
+        return fmt.Sprintf("(%s) %s-%s", p.digits[:3], p.digits[3:6], p.digits[6:])
+    }
+
+    func CallCustomer(phone PhoneNumber) {
+        dial(phone.Formatted())
+    }
+    ```
+  </TabItem>
+  <TabItem label="Rust">
+    ```rust
+    // Before
+    fn call_customer(phone: &str) -> Result<(), String> {
+        let digits: String = phone.chars().filter(|c| c.is_ascii_digit()).collect();
+        if digits.len() != 10 {
+            return Err("invalid phone".into());
+        }
+        let pretty = format!("({}) {}-{}", &digits[..3], &digits[3..6], &digits[6..]);
+        dial(&pretty);
+        Ok(())
+    }
+
+    // After
+    pub struct PhoneNumber {
+        digits: String,
+    }
+
+    impl PhoneNumber {
+        pub fn parse(raw: &str) -> Result<Self, String> {
+            let digits: String = raw.chars().filter(|c| c.is_ascii_digit()).collect();
+            if digits.len() != 10 {
+                return Err("invalid phone".into());
+            }
+            Ok(Self { digits })
+        }
+
+        pub fn area_code(&self) -> &str {
+            &self.digits[..3]
+        }
+
+        pub fn formatted(&self) -> String {
+            format!("({}) {}-{}", &self.digits[..3], &self.digits[3..6], &self.digits[6..])
+        }
+    }
+
+    fn call_customer(phone: &PhoneNumber) {
+        dial(&phone.formatted());
+    }
+    ```
+  </TabItem>
+</Tabs>
+
+<Mermaid code={primitiveDiagram} title="A raw primitive with scattered rules becomes a value type that owns its behaviour" />
+
+## Mechanics
+
+1. Create the new class with a single field holding the primitive. Give it a constructor (or parsing function) that takes the raw value and validates it once.
+2. Move one piece of scattered behaviour — a validation, a format, a parse — into a method on the new type.
+3. Replace one use of the raw primitive with the value object, calling the new method instead of the inline logic.
+4. **Run your tests.**
+5. Repeat: migrate each use site and fold each duplicated rule into a method, one at a time.
+6. Once every site uses the value object, the primitive and its scattered logic disappear from the calling code. The type is now the home for any future rule about that concept.
+
+## When to use / trade-offs
+
+Promote a primitive once it carries meaning beyond its raw type and once you find yourself repeating logic about it — validation, comparison, formatting, unit conversion. The value object centralises those rules, makes invalid states harder to construct, and lets the type system catch a `PhoneNumber` passed where a `ZipCode` was expected.
+
+The cost is one more class and the work of constructing it at the boundaries. For a value used in one place with no rules attached, a raw primitive is perfectly fine — wrapping it would be ceremony with no payoff. The signal to act is *repetition*: the second or third copy of the same rule is the moment the object earns its keep.
+
+## Related
+
+- [Replace Magic Literal](/refactoring-from-zero-to-hero/en/organizing-data/replace-magic-literal/)
+- [Encapsulate Variable](/refactoring-from-zero-to-hero/en/organizing-data/encapsulate-variable/)
+- [Replace Type Code with Subclasses](/refactoring-from-zero-to-hero/en/organizing-data/replace-type-code-with-subclasses/)
+
+<Callout title="Validate once, at the door">
+The biggest win of a value object is that the constructor is the only door in. Validate there, and every instance that exists is valid by construction — no caller can ever hold a malformed phone number, because one could never be created. The rest of your code stops re-checking what cannot be wrong.
+</Callout>
+
+export const quizPrimitive = [
+  {
+    q: 'Which smell does Replace Primitive with Object cure?',
+    options: ['Long Function', 'Primitive Obsession', 'Duplicate imports', 'Dead code'],
+    answer: 1,
+  },
+  {
+    q: 'What is the clearest signal that a primitive should become an object?',
+    options: [
+      'It is used exactly once with no rules',
+      'The same validation or formatting logic is repeated at several sites',
+      'It is a constant',
+      'It is never read',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'Why is validating in the constructor so valuable?',
+    options: [
+      'It makes the program multithreaded',
+      'Every instance is valid by construction, so other code need not re-check it',
+      'It removes the need for tests',
+      'It hides the value from the owner',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'When is a raw primitive still the right choice?',
+    options: [
+      'When the value has many scattered rules',
+      'When the value is used in one place with no behaviour attached',
+      'When the value participates in an invariant',
+      'When the value is duplicated everywhere',
+    ],
+    answer: 1,
+  },
+];
+
+<Quiz client:visible id="organizing-data/replace-primitive-with-object" questions={quizPrimitive} />
+
+<ProgressTracker client:visible id="organizing-data/replace-primitive-with-object" />

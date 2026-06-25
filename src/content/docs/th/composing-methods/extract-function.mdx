@@ -1,0 +1,246 @@
+---
+title: Extract Function
+description: ดึงชิ้นส่วนของฟังก์ชันที่ยาวออกมาเป็นฟังก์ชันของตัวเองที่มีชื่อดี เพื่อให้ผู้เรียกอ่านได้เหมือนรายการของเจตนา
+sidebar:
+  order: 2
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+export const extractDiagram = `flowchart LR
+  subgraph Before["Before"]
+    A["printReceipt()<br/>— compute subtotal<br/>— compute tax<br/>— print lines"]
+  end
+  subgraph After["After"]
+    B["printReceipt()<br/>calls helpers"]
+    B --> C["subtotal()"]
+    B --> D["taxFor()"]
+    B --> E["printLines()"]
+  end
+  Before -.->|"Extract Function"| After`;
+
+## เจตนา
+
+นำชิ้นส่วนโค้ดที่เป็นเอกภาพชิ้นหนึ่งมาย้ายเข้าไปในฟังก์ชันใหม่ แล้วตั้งชื่อฟังก์ชันนั้นตาม *จุดประสงค์* ที่มันทำหน้าที่อยู่ จุดเดิมตอนนี้เพียงแค่เรียก helper จึงอ่านได้เหมือนรายการสั้น ๆ ของขั้นตอนที่มีชื่อ แทนที่จะเป็นกำแพงของรายละเอียด
+
+## smell
+
+นี่คือวิธีรักษา **Long Function** — และรักษาบล็อกโค้ดใด ๆ ที่ต้องมี comment มาอธิบายว่ามันทำอะไร comment ที่เขียนว่า "ตอนนี้คำนวณภาษี" ไว้เหนือโค้ดสิบบรรทัด คือป้ายไฟกระพริบที่บอกว่าโค้ดสิบบรรทัดนั้นอยากเป็นฟังก์ชันชื่อ `taxFor` เมื่อชื่อฟังก์ชันแบกเจตนาไว้ comment ก็กลายเป็นสิ่งไม่จำเป็น และผู้เรียกก็อ่านง่าย
+
+## Before → After
+
+ฟังก์ชันใบเสร็จที่คำนวณ subtotal นำภาษีมาคิด แล้วพิมพ์ออกมา ก่อนหน้านี้มันทำทุกอย่างแบบ inline หลังจากนั้น แต่ละงานกลายเป็น helper ที่มีชื่อ
+
+<Tabs syncKey="lang">
+  <TabItem label="TypeScript">
+    ```ts
+    // Before
+    function printReceipt(items: { price: number; qty: number }[]): void {
+      let subtotal = 0;
+      for (const item of items) {
+        subtotal += item.price * item.qty;
+      }
+      const tax = subtotal * 0.07;
+      console.log(`Subtotal: ${subtotal.toFixed(2)}`);
+      console.log(`Tax: ${tax.toFixed(2)}`);
+      console.log(`Total: ${(subtotal + tax).toFixed(2)}`);
+    }
+
+    // After
+    function printReceipt(items: { price: number; qty: number }[]): void {
+      const sub = subtotal(items);
+      const tax = taxFor(sub);
+      printLines(sub, tax);
+    }
+
+    function subtotal(items: { price: number; qty: number }[]): number {
+      return items.reduce((sum, item) => sum + item.price * item.qty, 0);
+    }
+
+    function taxFor(amount: number): number {
+      return amount * 0.07;
+    }
+
+    function printLines(sub: number, tax: number): void {
+      console.log(`Subtotal: ${sub.toFixed(2)}`);
+      console.log(`Tax: ${tax.toFixed(2)}`);
+      console.log(`Total: ${(sub + tax).toFixed(2)}`);
+    }
+    ```
+  </TabItem>
+  <TabItem label="Python">
+    ```python
+    # Before
+    def print_receipt(items):
+        subtotal = 0
+        for item in items:
+            subtotal += item["price"] * item["qty"]
+        tax = subtotal * 0.07
+        print(f"Subtotal: {subtotal:.2f}")
+        print(f"Tax: {tax:.2f}")
+        print(f"Total: {subtotal + tax:.2f}")
+
+    # After
+    def print_receipt(items):
+        sub = subtotal(items)
+        tax = tax_for(sub)
+        print_lines(sub, tax)
+
+    def subtotal(items):
+        return sum(item["price"] * item["qty"] for item in items)
+
+    def tax_for(amount):
+        return amount * 0.07
+
+    def print_lines(sub, tax):
+        print(f"Subtotal: {sub:.2f}")
+        print(f"Tax: {tax:.2f}")
+        print(f"Total: {sub + tax:.2f}")
+    ```
+  </TabItem>
+  <TabItem label="Go">
+    ```go
+    // Before
+    func PrintReceipt(items []Item) {
+        subtotal := 0.0
+        for _, item := range items {
+            subtotal += item.Price * float64(item.Qty)
+        }
+        tax := subtotal * 0.07
+        fmt.Printf("Subtotal: %.2f\n", subtotal)
+        fmt.Printf("Tax: %.2f\n", tax)
+        fmt.Printf("Total: %.2f\n", subtotal+tax)
+    }
+
+    // After
+    func PrintReceipt(items []Item) {
+        sub := subtotal(items)
+        tax := taxFor(sub)
+        printLines(sub, tax)
+    }
+
+    func subtotal(items []Item) float64 {
+        total := 0.0
+        for _, item := range items {
+            total += item.Price * float64(item.Qty)
+        }
+        return total
+    }
+
+    func taxFor(amount float64) float64 {
+        return amount * 0.07
+    }
+
+    func printLines(sub, tax float64) {
+        fmt.Printf("Subtotal: %.2f\n", sub)
+        fmt.Printf("Tax: %.2f\n", tax)
+        fmt.Printf("Total: %.2f\n", sub+tax)
+    }
+    ```
+  </TabItem>
+  <TabItem label="Rust">
+    ```rust
+    // Before
+    fn print_receipt(items: &[Item]) {
+        let mut subtotal = 0.0;
+        for item in items {
+            subtotal += item.price * item.qty as f64;
+        }
+        let tax = subtotal * 0.07;
+        println!("Subtotal: {:.2}", subtotal);
+        println!("Tax: {:.2}", tax);
+        println!("Total: {:.2}", subtotal + tax);
+    }
+
+    // After
+    fn print_receipt(items: &[Item]) {
+        let sub = subtotal(items);
+        let tax = tax_for(sub);
+        print_lines(sub, tax);
+    }
+
+    fn subtotal(items: &[Item]) -> f64 {
+        items.iter().map(|item| item.price * item.qty as f64).sum()
+    }
+
+    fn tax_for(amount: f64) -> f64 {
+        amount * 0.07
+    }
+
+    fn print_lines(sub: f64, tax: f64) {
+        println!("Subtotal: {:.2}", sub);
+        println!("Tax: {:.2}", tax);
+        println!("Total: {:.2}", sub + tax);
+    }
+    ```
+  </TabItem>
+</Tabs>
+
+<Mermaid code={extractDiagram} title="ฟังก์ชันยาวหนึ่งฟังก์ชันกลายเป็นผู้เรียกพร้อม helper ที่มีชื่อสามตัว" />
+
+## Mechanics
+
+1. ตัดสินใจเลือกชิ้นส่วนที่จะ extract และชื่อที่บอกว่า *มันทำสำเร็จอะไร* ไม่ใช่บอกว่าทำอย่างไร ถ้าคุณตั้งชื่อให้มันสะอาด ๆ ไม่ได้ ชิ้นส่วนนั้นอาจยังไม่เป็นหน่วยที่เป็นเอกภาพ — ลองปรับขอบเขตของมันใหม่
+2. สร้างฟังก์ชันว่างใหม่ที่มีชื่อนั้น
+3. คัดลอกชิ้นส่วนนั้นเข้าไปในฟังก์ชันใหม่
+4. ดูตัวแปรที่ชิ้นส่วนนั้นอ่าน: ส่งมันเข้าไปเป็น parameter ดูตัวแปรที่มันสร้างขึ้นและโค้ดภายนอกยังต้องใช้: คืนค่ามันออกมา
+5. แทนที่ชิ้นส่วนเดิมด้วยการเรียกฟังก์ชันใหม่
+6. **รันเทสต์ของคุณ** พฤติกรรมต้องไม่เปลี่ยนแปลง
+7. ทำซ้ำกับชิ้นส่วนถัดไป ให้แต่ละการ extract เล็ก ๆ เพื่อให้เทสต์ที่ล้มเหลวชี้ไปยังการเปลี่ยนแปลงเล็ก ๆ เพียงจุดเดียว
+
+## เมื่อใดควรใช้ / ข้อแลกเปลี่ยน
+
+เอื้อมไปหา Extract Function เมื่อบล็อกหนึ่งมีจุดประสงค์เดียวที่ชัดเจน เมื่อคุณรู้สึกอยากเขียน comment มาอธิบาย หรือเมื่อคุณเห็นชิ้นส่วนเดียวกันถูกทำซ้ำในสองที่ — extract เพียงครั้งเดียวแล้วทั้งสองจุดก็เรียก helper ที่ใช้ร่วมกันได้
+
+ราคาที่ต้องจ่ายคือการกระโดดเล็ก ๆ ในการนำทาง: ผู้อ่านต้องตามชื่อไปยังนิยามของมัน แต่การแลกเปลี่ยนนั้นแทบจะคุ้มเสมอ เพราะชื่อที่ดีทำให้ผู้อ่านส่วนใหญ่หยุดได้ *โดยไม่ต้อง* ตามการกระโดดนั้นไป refactoring ที่ตรงกันข้ามคือ **Inline Function**: ถ้าชื่อของ helper บอกอะไรไม่มากไปกว่า body ของมัน ก็พับมันกลับเข้าไป
+
+## ที่เกี่ยวข้อง
+
+- [Inline Function](/refactoring-from-zero-to-hero/th/composing-methods/inline-function/)
+- [Replace Temp with Query](/refactoring-from-zero-to-hero/th/composing-methods/replace-temp-with-query/)
+- [Split Phase](/refactoring-from-zero-to-hero/th/composing-methods/split-phase/)
+
+<Callout title="ตั้งชื่อตามสิ่งที่มันทำ ไม่ใช่ตามวิธีที่มันทำ">
+ฟังก์ชันชื่อ `loopOverItemsAndAdd` อธิบายกลไกของมัน ส่วน `subtotal` อธิบายผลลัพธ์ของมัน ตั้งชื่อตาม *ผลลัพธ์* แล้วผู้เรียกจะอ่านได้เหมือนประโยค ถ้าภายหลังคุณเปลี่ยน *วิธี* คำนวณ subtotal ชื่อนั้นก็ยังเข้ากันได้อยู่
+</Callout>
+
+export const quizExtract = [
+  {
+    q: 'เมื่อเลือกชื่อให้ฟังก์ชันที่ extract ออกมา ชื่อนั้นควรอธิบายอะไร?',
+    options: [
+      'รายละเอียดการ implement ทีละบรรทัด',
+      'จุดประสงค์หรือผลลัพธ์ของโค้ด ไม่ใช่วิธีที่มันทำ',
+      'ชื่อของตัวแปรที่มันคืนค่า',
+      'จำนวน statement ที่มันมี',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'คุณจะจัดการกับตัวแปรที่ชิ้นส่วนที่ extract ออกมาอ่านแต่ไม่ได้เป็นเจ้าของอย่างไร?',
+    options: [
+      'ทำให้มันเป็นตัวแปร global',
+      'ส่งมันเข้าไปเป็น parameter',
+      'ทำสำเนาการคำนวณของมันไว้ภายในฟังก์ชันใหม่',
+      'ลบมันทิ้ง',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'Extract Function เป็นวิธีรักษาหลักของ smell แบบใด?',
+    options: ['การ query ฐานข้อมูลซ้ำซ้อน', 'Long Function หรือบล็อกที่ต้องมี comment มาอธิบาย', 'เวลาเริ่มทำงานที่ช้า', 'type ที่หายไป'],
+    answer: 1,
+  },
+  {
+    q: 'อะไรคือสิ่งที่ตรงกันข้ามกับ Extract Function?',
+    options: ['Split Phase', 'Inline Function', 'Extract Variable', 'Replace Temp with Query'],
+    answer: 1,
+  },
+];
+
+<Quiz client:visible id="composing-methods/extract-function" questions={quizExtract} />
+
+<ProgressTracker client:visible id="composing-methods/extract-function" />

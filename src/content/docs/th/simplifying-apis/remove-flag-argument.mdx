@@ -1,0 +1,204 @@
+---
+title: Remove Flag Argument
+description: เมื่ออาร์กิวเมนต์แบบ boolean สลับฟังก์ชันระหว่างสองพฤติกรรม ให้แยกมันออกเป็นสองฟังก์ชันที่มีชื่อชัดเจนซึ่งแต่ละตัวทำสิ่งเดียว
+sidebar:
+  order: 5
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+## เจตนา
+
+นำฟังก์ชันที่ใช้อาร์กิวเมนต์แบบ boolean เพื่อเลือกระหว่างสองพฤติกรรมที่แตกต่างกัน แล้วแทนที่ด้วยสองฟังก์ชันแยกกัน — หนึ่งฟังก์ชันต่อหนึ่งพฤติกรรม — แต่ละตัวมีชื่อที่บอกว่ามันทำอะไร ผู้เรียกใช้เลิกส่ง `true` ที่เข้ารหัสยาก แล้วเริ่มเรียกฟังก์ชันที่ชื่อของมันคือคำตอบ
+
+## กลิ่นไม่ดี
+
+flag argument ซ่อนเจตนาไว้ที่จุดเรียกใช้ เมื่อคุณอ่าน `sendEmail(order, true)` ตัว `true` ไม่ได้บอกอะไรคุณเลย — คุณต้องเปิดฟังก์ชันเพื่อจะรู้ว่า `true` หมายถึง "ส่งด่วน" ในขณะที่ `false` หมายถึง "เข้าคิวไว้ทีหลัง" boolean กำลังทำงานที่ชื่อฟังก์ชันควรทำ มันยังมักทำให้เนื้อในแตกแขนงด้วย: `if (urgent) ... else ...` ที่ยัดสองกระแสงานที่ไม่เกี่ยวข้องกันเข้ามาในฟังก์ชันเดียว ทำให้ทั้งสองอ่านไม่สะอาดและทั้งคู่ต้องถูกเทสต์ผ่านประตูเดียวกัน
+
+## ก่อน → หลัง
+
+ฟังก์ชันแจ้งเตือนที่ boolean เลือกระหว่างเส้นทางด่วนและเส้นทางปกติ หลังจากนั้น สองฟังก์ชันที่มีชื่อ แต่ละตัวมุ่งเน้น
+
+<Tabs syncKey="lang">
+  <TabItem label="TypeScript">
+    ```ts
+    // Before
+    function notify(message: string, urgent: boolean): void {
+      if (urgent) {
+        console.log(`[URGENT] ${message}`);
+      } else {
+        console.log(`[info] ${message}`);
+      }
+    }
+
+    notify("Server down", true);
+    notify("Backup finished", false);
+
+    // After
+    function notifyUrgent(message: string): void {
+      console.log(`[URGENT] ${message}`);
+    }
+
+    function notifyInfo(message: string): void {
+      console.log(`[info] ${message}`);
+    }
+
+    notifyUrgent("Server down");
+    notifyInfo("Backup finished");
+    ```
+  </TabItem>
+  <TabItem label="Python">
+    ```python
+    # Before
+    def notify(message, urgent):
+        if urgent:
+            print(f"[URGENT] {message}")
+        else:
+            print(f"[info] {message}")
+
+    notify("Server down", True)
+    notify("Backup finished", False)
+
+    # After
+    def notify_urgent(message):
+        print(f"[URGENT] {message}")
+
+    def notify_info(message):
+        print(f"[info] {message}")
+
+    notify_urgent("Server down")
+    notify_info("Backup finished")
+    ```
+  </TabItem>
+  <TabItem label="Go">
+    ```go
+    // Before
+    func Notify(message string, urgent bool) {
+        if urgent {
+            fmt.Printf("[URGENT] %s\n", message)
+        } else {
+            fmt.Printf("[info] %s\n", message)
+        }
+    }
+
+    Notify("Server down", true)
+    Notify("Backup finished", false)
+
+    // After
+    func NotifyUrgent(message string) {
+        fmt.Printf("[URGENT] %s\n", message)
+    }
+
+    func NotifyInfo(message string) {
+        fmt.Printf("[info] %s\n", message)
+    }
+
+    NotifyUrgent("Server down")
+    NotifyInfo("Backup finished")
+    ```
+  </TabItem>
+  <TabItem label="Rust">
+    ```rust
+    // Before
+    fn notify(message: &str, urgent: bool) {
+        if urgent {
+            println!("[URGENT] {message}");
+        } else {
+            println!("[info] {message}");
+        }
+    }
+
+    notify("Server down", true);
+    notify("Backup finished", false);
+
+    // After
+    fn notify_urgent(message: &str) {
+        println!("[URGENT] {message}");
+    }
+
+    fn notify_info(message: &str) {
+        println!("[info] {message}");
+    }
+
+    notify_urgent("Server down");
+    notify_info("Backup finished");
+    ```
+  </TabItem>
+</Tabs>
+
+## กลไก
+
+1. ยืนยันว่า flag เลือกระหว่าง *พฤติกรรม* จริง ๆ ไม่ใช่แค่ค่า ถ้ามันแค่สลับตัวเลขหรือป้ายกำกับ Parameterize Function อาจเหมาะกว่าการแยก
+2. สร้างฟังก์ชันใหม่สำหรับแขนงหนึ่งของ flag ตั้งชื่อให้จับเจตนาของแขนงนั้น อย่าง `notifyUrgent`
+3. คัดลอกตรรกะของแขนงที่เกี่ยวข้องเข้าไปในฟังก์ชันใหม่ แล้วทิ้งแขนงที่ตายแล้ว **รันเทสต์ของคุณ**
+4. หาผู้เรียกใช้ทุกตัวที่ส่ง flag ด้วยค่านั้น แล้วเปลี่ยนเส้นทางไปยังฟังก์ชันใหม่ พร้อมลบอาร์กิวเมนต์ boolean ออก
+5. ทำซ้ำขั้นที่ 2 ถึง 4 สำหรับอีกแขนงหนึ่ง
+6. **รันเทสต์ของคุณ** หลังการเปลี่ยนเส้นทางแต่ละครั้ง เพื่อให้ความล้มเหลวชี้ไปยังผู้เรียกใช้จุดเดียว
+7. เมื่อไม่มีผู้เรียกใช้ตัวใดส่ง flag อีกแล้ว ให้ลบฟังก์ชันเดิมทิ้ง
+
+## เมื่อไรควรใช้ / ข้อแลกเปลี่ยน
+
+แยก flag argument ออกเมื่อใดก็ตามที่พารามิเตอร์ boolean เปลี่ยน *สิ่งที่ฟังก์ชันทำ* เมื่อใดที่ `true` หรือ `false` แบบ literal ที่จุดเรียกใช้อ่านไม่รู้เรื่อง หรือเมื่อใดที่เนื้อในแตกออกเป็นสองกระแสงานที่แทบไม่มีอะไรร่วมกัน สองฟังก์ชันที่มีชื่อทำให้การเรียกใช้แต่ละครั้งอธิบายตัวเองได้ และให้แต่ละเส้นทางถูกเทสต์ได้โดยตรง
+
+ต้นทุนคือมีฟังก์ชันใน namespace มากขึ้น และโค้ดเตรียมการที่ใช้ร่วมกันจริง ๆ บางส่วนอาจไปอยู่ในสองที่ — ดึงส่วนที่ใช้ร่วมกันนั้นออกมาเป็น helper ส่วนตัวเพื่อไม่ให้คุณทำซ้ำมัน จงใช้สามัญสำนึกด้วย: flag ที่แค่พลิกข้อมูลการตั้งค่า โดยไม่มีการแตกแขนงเชิงพฤติกรรม คงไว้ได้ไม่เป็นไร กลิ่นที่ว่านี้เจาะจงคือ boolean ที่ *ตัดสินใจเลือกระหว่างพฤติกรรม*
+
+## ที่เกี่ยวข้อง
+
+- [Parameterize Function](/refactoring-from-zero-to-hero/th/simplifying-apis/parameterize-function/)
+- [Rename Function/Variable](/refactoring-from-zero-to-hero/th/simplifying-apis/rename-function/)
+- [Replace Constructor with Factory Function](/refactoring-from-zero-to-hero/th/simplifying-apis/replace-constructor-with-factory/)
+
+<Callout title="ให้ชื่อฟังก์ชันตอบคำถาม">
+flag argument บังคับให้ผู้เรียกใช้เข้ารหัสการตัดสินใจเป็นข้อมูลที่ผู้อ่านต้องถอดรหัส สองฟังก์ชันย้ายการตัดสินใจนั้นเข้าไปในชื่อ เพื่อให้ `notifyUrgent("Server down")` อ่านได้เหมือนประโยค จุดเรียกใช้ควรบอกคุณว่าเกิดอะไรขึ้น — ไม่ใช่ทำให้คุณต้องไปค้นหาเอง
+</Callout>
+
+export const quizFlag = [
+  {
+    q: 'ทำไม flag argument จึงซ่อนเจตนาไว้ที่จุดเรียกใช้?',
+    options: [
+      'มันทำให้ฟังก์ชันรันช้าลง',
+      'true หรือ false เปล่า ๆ ไม่บอกอะไรเลยว่าเลือกพฤติกรรมใด หากไม่อ่านเนื้อใน',
+      'มันใช้หน่วยความจำเพิ่ม',
+      'มันป้องกันไม่ให้ฟังก์ชันคืนค่า',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'เมื่อใดที่การแยกออกเป็นสองฟังก์ชันเป็นทางเลือกที่ถูกต้องแทนที่จะ parameterize?',
+    options: [
+      'เมื่อ boolean แค่สลับค่าตัวเลขหรือป้ายกำกับ',
+      'เมื่อ boolean เลือกระหว่างสองพฤติกรรมที่แตกต่างกัน',
+      'เมื่อฟังก์ชันไม่มีอาร์กิวเมนต์',
+      'เมื่อฟังก์ชันสั้นอยู่แล้ว',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'หลังจากแยกแล้ว คุณควรทำอย่างไรกับตรรกะการเตรียมการที่ทั้งสองแขนงใช้ร่วมกัน?',
+    options: [
+      'ทำซ้ำมันทั้งหมดในแต่ละฟังก์ชันแล้วปล่อยไว้',
+      'ดึงมันออกมาเป็น helper ส่วนตัวที่ทั้งสองฟังก์ชันเรียกใช้',
+      'ลบมันออกจากทั้งสองฟังก์ชัน',
+      'ย้ายมันเข้าไปในตัวแปร global',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'หลังจากเปลี่ยนเส้นทางผู้เรียกใช้ทั้งหมดออกจาก flag แล้ว ขั้นตอนสุดท้ายคืออะไร?',
+    options: [
+      'เพิ่ม flag กลับเข้ามาเป็นค่าเริ่มต้น',
+      'ลบฟังก์ชันเดิมที่รับ flag ทิ้ง',
+      'เปลี่ยนชื่อฟังก์ชันใหม่ให้ตรงกับตัวเดิม',
+      'นำพารามิเตอร์ boolean กลับเข้ามาใหม่',
+    ],
+    answer: 1,
+  },
+];
+
+<Quiz client:visible id="simplifying-apis/remove-flag-argument" questions={quizFlag} />
+
+<ProgressTracker client:visible id="simplifying-apis/remove-flag-argument" />

@@ -1,0 +1,216 @@
+---
+title: Collapse Hierarchy
+description: A subclass and its superclass have drifted so close that two types no longer earn their keep — merge them into one.
+sidebar:
+  order: 6
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+export const collapseDiagram = `classDiagram
+  class Employee {
+    +name string
+    +grade number
+    +annualCost() number
+  }
+  note for Employee "Salesperson merged back in — one type now"`;
+
+## Intent
+
+**Collapse Hierarchy** merges a superclass and a subclass that are no longer different enough to justify being two separate types. The members of one are folded into the other, the now-redundant class is deleted, and every reader is spared a layer of indirection that bought them nothing.
+
+## The smell
+
+Hierarchies erode. Refactorings pull members up and push them down until a subclass adds almost nothing — maybe one trivial field, maybe an override that now matches the parent. This is **Lazy Class** wearing a subclass costume: an extra type, an extra file, an extra hop for every reader, all to express a distinction that has quietly disappeared. When a subclass and its superclass have become near-twins, the honest move is to make them one.
+
+## Before → After
+
+A `Salesperson` subclass once meaningfully extended `Employee`, but successive refactorings left it holding a single field that `Employee` could just as well own. We collapse them.
+
+<Tabs syncKey="lang">
+  <TabItem label="TypeScript">
+    ```ts
+    // Before — Salesperson adds almost nothing over Employee
+    class Employee {
+      constructor(public name: string, public monthlyPay: number) {}
+      annualCost(): number { return this.monthlyPay * 12; }
+    }
+
+    class Salesperson extends Employee {
+      constructor(name: string, monthlyPay: number, public region: string) {
+        super(name, monthlyPay);
+      }
+    }
+
+    // After — one Employee carries the region field directly
+    class Employee {
+      constructor(
+        public name: string,
+        public monthlyPay: number,
+        public region: string = "",
+      ) {}
+      annualCost(): number { return this.monthlyPay * 12; }
+    }
+    ```
+  </TabItem>
+  <TabItem label="Python">
+    ```python
+    # Before — Salesperson adds almost nothing over Employee
+    class Employee:
+        def __init__(self, name, monthly_pay):
+            self.name = name
+            self.monthly_pay = monthly_pay
+
+        def annual_cost(self):
+            return self.monthly_pay * 12
+
+    class Salesperson(Employee):
+        def __init__(self, name, monthly_pay, region):
+            super().__init__(name, monthly_pay)
+            self.region = region
+
+    # After — one Employee carries the region field directly
+    class Employee:
+        def __init__(self, name, monthly_pay, region=""):
+            self.name = name
+            self.monthly_pay = monthly_pay
+            self.region = region
+
+        def annual_cost(self):
+            return self.monthly_pay * 12
+    ```
+  </TabItem>
+  <TabItem label="Go">
+    ```go
+    // Go has no class hierarchy. The equivalent "hierarchy" is a thin struct
+    // that embeds a base just to add one field. Collapsing means folding that
+    // field into the base struct and deleting the wrapper.
+
+    // Before — Salesperson embeds Employee only to add Region
+    type Employee struct {
+        Name       string
+        MonthlyPay float64
+    }
+
+    func (e Employee) AnnualCost() float64 { return e.MonthlyPay * 12 }
+
+    type Salesperson struct {
+        Employee
+        Region string
+    }
+
+    // After — one Employee struct carries Region directly
+    type Employee struct {
+        Name       string
+        MonthlyPay float64
+        Region     string
+    }
+
+    func (e Employee) AnnualCost() float64 { return e.MonthlyPay * 12 }
+    ```
+  </TabItem>
+  <TabItem label="Rust">
+    ```rust
+    // Rust has no inheritance. The equivalent is a wrapper struct that holds
+    // a base struct just to bolt on one field. Collapsing folds the field into
+    // the base and removes the wrapper.
+
+    // Before — Salesperson wraps Employee only to add a region
+    struct Employee {
+        name: String,
+        monthly_pay: f64,
+    }
+
+    impl Employee {
+        fn annual_cost(&self) -> f64 {
+            self.monthly_pay * 12.0
+        }
+    }
+
+    struct Salesperson {
+        employee: Employee,
+        region: String,
+    }
+
+    // After — one Employee struct carries region directly
+    struct Employee {
+        name: String,
+        monthly_pay: f64,
+        region: String,
+    }
+
+    impl Employee {
+        fn annual_cost(&self) -> f64 {
+            self.monthly_pay * 12.0
+        }
+    }
+    ```
+  </TabItem>
+</Tabs>
+
+<Mermaid code={collapseDiagram} title="Two near-identical types become one Employee" />
+
+## Mechanics
+
+1. Decide which class survives. Usually the superclass absorbs the subclass, but if the subclass name reads better for the merged concept, keep it instead.
+2. Use **Pull Up** and **Push Down** to move all fields and methods into the single surviving class, so the doomed class is left empty.
+3. Repoint every reference and constructor call from the deleted class to the survivor. **Run your tests.**
+4. Delete the now-empty class (and remove the embedding/wrapper in Go and Rust).
+5. **Run your tests** one final time. The program should behave exactly as before, with one fewer type to navigate.
+
+## When to use / trade-offs
+
+Collapse a hierarchy when a subclass adds so little that the extra type is pure overhead — no meaningful behaviour, no real distinction, just indirection. Removing it makes the code shorter and flatter, and readers stop hopping between parent and child to assemble one concept.
+
+The trade-off is reversibility: if the distinction returns later, you will re-extract a subclass (or interface). That is fine — Collapse Hierarchy is the natural inverse of **Extract Superclass**, and refactoring is meant to flow both ways as your understanding changes. In Go and Rust there was never a class hierarchy to begin with, so "collapse" simply means deleting a needless wrapper struct and inlining its one field.
+
+## Related
+
+- [Extract Superclass & Interface](/refactoring-from-zero-to-hero/en/generalization-and-inheritance/extract-superclass-and-interface/)
+- [Pull Up & Push Down](/refactoring-from-zero-to-hero/en/generalization-and-inheritance/pull-up-and-push-down/)
+- [Replace Inheritance with Delegation](/refactoring-from-zero-to-hero/en/generalization-and-inheritance/replace-inheritance-with-delegation/)
+
+<Callout title="A type should earn its existence">
+Every class, struct, or trait a reader meets is a small tax on their attention. A subclass that adds nothing real is a tax with no return. Collapse it — and if a genuine distinction emerges later, extract a fresh type then, when it actually carries weight. In Go and Rust, where the "hierarchy" was only a wrapper struct, collapsing is just removing a layer that never needed to exist.
+</Callout>
+
+export const quizCollapse = [
+  {
+    q: 'When is Collapse Hierarchy the right move?',
+    options: [
+      'When a subclass adds rich, distinct behaviour',
+      'When a subclass and its superclass are no longer different enough to justify two types',
+      'When you need more subclasses',
+      'When a function is too long',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'Collapse Hierarchy is the natural inverse of which refactoring?',
+    options: ['Inline Function', 'Extract Superclass', 'Replace Subclass with Delegation', 'Push Down'],
+    answer: 1,
+  },
+  {
+    q: 'Which smell does an almost-empty subclass exhibit?',
+    options: ['Feature Envy', 'Lazy Class', 'Long Parameter List', 'Primitive Obsession'],
+    answer: 1,
+  },
+  {
+    q: 'What does "collapse" mean in Go or Rust, which have no inheritance?',
+    options: [
+      'Merging two interfaces into one',
+      'Deleting a needless wrapper/embedding struct and inlining its field into the base',
+      'Removing all methods',
+      'Converting a struct into a function',
+    ],
+    answer: 1,
+  },
+];
+
+<Quiz client:visible id="generalization-and-inheritance/collapse-hierarchy" questions={quizCollapse} />
+
+<ProgressTracker client:visible id="generalization-and-inheritance/collapse-hierarchy" />

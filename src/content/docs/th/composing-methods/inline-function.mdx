@@ -1,0 +1,153 @@
+---
+title: Inline Function
+description: เมื่อ body ของฟังก์ชันชัดเจนพอ ๆ กับชื่อของมัน ก็พับมันกลับเข้าไปในผู้เรียก — สิ่งที่ตรงกันข้ามกับ Extract Function
+sidebar:
+  order: 3
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+## เจตนา
+
+แทนที่การเรียกฟังก์ชันเล็ก ๆ ด้วย body ของฟังก์ชันนั้น แล้วลบฟังก์ชันทิ้ง ใช้มันเมื่อชื่อไม่ได้เพิ่มอะไรที่ body ยังไม่ได้ทำให้ชัดเจนอยู่แล้ว
+
+## smell
+
+นี่คือวิธีรักษา **needless indirection** บางครั้ง helper เคยสมเหตุสมผลในอดีต แต่หดเหลือเพียงบรรทัดเดียวที่ไม่สำคัญ หรือชื่อของมันก็เพียงแค่พูดซ้ำสิ่งที่ statement เดียวของมันทำ การตามชื่อไปยังนิยามที่บอกอะไรไม่มากไปกว่าจุดที่เรียก คือความเหนื่อยเปล่าสำหรับผู้อ่าน การ inline กำจัดการกระโดดนั้น มันยังเป็นขั้นตอนทำความสะอาดที่มีประโยชน์: ยุบ helper เล็ก ๆ ที่พันกันยุ่งเหยิงให้มาอยู่ที่เดียว แล้วค่อย extract ขอบเขตที่ดีกว่าออกมาใหม่
+
+## Before → After
+
+helper ชื่อ `ratingFor` ที่เพียงแค่ส่งต่อไปยังการตรวจสอบบรรทัดเดียว เพิ่มชั้นหนึ่งโดยไม่ได้ผลตอบแทนอะไร inline มันเสีย
+
+<Tabs syncKey="lang">
+  <TabItem label="TypeScript">
+    ```ts
+    // Before
+    function deliveryFee(driver: Driver): number {
+      return moreThanFiveTrips(driver) ? 2 : 5;
+    }
+
+    function moreThanFiveTrips(driver: Driver): boolean {
+      return driver.trips > 5;
+    }
+
+    // After
+    function deliveryFee(driver: Driver): number {
+      return driver.trips > 5 ? 2 : 5;
+    }
+    ```
+  </TabItem>
+  <TabItem label="Python">
+    ```python
+    # Before
+    def delivery_fee(driver):
+        return 2 if more_than_five_trips(driver) else 5
+
+    def more_than_five_trips(driver):
+        return driver.trips > 5
+
+    # After
+    def delivery_fee(driver):
+        return 2 if driver.trips > 5 else 5
+    ```
+  </TabItem>
+  <TabItem label="Go">
+    ```go
+    // Before
+    func DeliveryFee(driver Driver) int {
+        if moreThanFiveTrips(driver) {
+            return 2
+        }
+        return 5
+    }
+
+    func moreThanFiveTrips(driver Driver) bool {
+        return driver.Trips > 5
+    }
+
+    // After
+    func DeliveryFee(driver Driver) int {
+        if driver.Trips > 5 {
+            return 2
+        }
+        return 5
+    }
+    ```
+  </TabItem>
+  <TabItem label="Rust">
+    ```rust
+    // Before
+    fn delivery_fee(driver: &Driver) -> i32 {
+        if more_than_five_trips(driver) { 2 } else { 5 }
+    }
+
+    fn more_than_five_trips(driver: &Driver) -> bool {
+        driver.trips > 5
+    }
+
+    // After
+    fn delivery_fee(driver: &Driver) -> i32 {
+        if driver.trips > 5 { 2 } else { 5 }
+    }
+    ```
+  </TabItem>
+</Tabs>
+
+## Mechanics
+
+1. ยืนยันว่าฟังก์ชันไม่เป็น polymorphic — คุณ inline method ที่ subclass override ไม่ได้
+2. ค้นหาทุกจุดที่เรียก (ถ้ามีมาก ให้ทบทวนใหม่ การ inline ง่ายที่สุดเมื่อจุดเรียกมีไม่กี่จุด)
+3. แทนที่การเรียกแต่ละครั้งด้วยสำเนาของ body ฟังก์ชัน โดยปรับให้เข้ากับ argument จริง
+4. **รันเทสต์ของคุณ** หลังการแทนที่แต่ละครั้ง
+5. เมื่อไม่เหลือจุดเรียกแล้ว ให้ลบฟังก์ชันเดิมทิ้ง
+6. รันชุดเทสต์ทั้งหมดอีกครั้งเพื่อยืนยันว่าไม่มีอะไรอ้างอิงถึงมัน
+
+## เมื่อใดควรใช้ / ข้อแลกเปลี่ยน
+
+inline เมื่อ body ชัดเจนอย่างน้อยเท่ากับชื่อ เมื่อกลุ่มของ helper ที่จัดโครงสร้างไม่ดีควรถูกรวมก่อนจะแยกใหม่ หรือเมื่อ indirection ขวางทางผู้อ่าน **อย่า** inline ฟังก์ชันที่ถูกเรียกจากหลายที่ หรือฟังก์ชันที่ชื่อจับใจความของแนวคิดที่ไม่ชัดเจนได้จริง ๆ — ในกรณีนั้นชื่อคือเอกสารที่ควรเก็บไว้
+
+สิ่งที่ตรงกันข้ามคือ **Extract Function** ทั้งสองเป็นคู่หูกัน: inline เพื่อยุบโครงสร้างที่ไม่ดี แล้ว extract เพื่อสร้างโครงสร้างที่ดีกว่าขึ้นมาใหม่
+
+## ที่เกี่ยวข้อง
+
+- [Extract Function](/refactoring-from-zero-to-hero/th/composing-methods/extract-function/)
+- [Replace Temp with Query](/refactoring-from-zero-to-hero/th/composing-methods/replace-temp-with-query/)
+
+<Callout title="Inline คือปุ่มรีเซ็ต">
+เมื่อขอบเขตของ helper ผิด อย่าแก้ไขมันตรงนั้น inline ทุกอย่างกลับเข้าไปในฟังก์ชันเดียว มองเห็น flow ทั้งหมดอย่างชัดเจน แล้วค่อย Extract ตามขอบเขตที่สำคัญจริง ๆ การ inline มักเป็น *วิธีการ* ไปสู่การ extract ที่สะอาดกว่า
+</Callout>
+
+export const quizInline = [
+  {
+    q: 'เมื่อใดที่ Inline Function เป็นการเคลื่อนไหวที่ถูกต้อง?',
+    options: [
+      'เมื่อฟังก์ชันถูกเรียกจากหลายสิบที่',
+      'เมื่อ body ของฟังก์ชันชัดเจนอย่างน้อยเท่ากับชื่อของมัน',
+      'เมื่อฟังก์ชันเป็น polymorphic',
+      'เมื่อฟังก์ชันยาวมาก',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'Inline Function เป็นสิ่งที่ตรงกันข้ามกับ refactoring แบบใด?',
+    options: ['Split Phase', 'Extract Variable', 'Extract Function', 'Replace Temp with Query'],
+    answer: 2,
+  },
+  {
+    q: 'ทำไมคุณอาจจงใจ inline helper หลายตัวก่อนทำอย่างอื่น?',
+    options: [
+      'เพื่อทำให้โปรแกรมรันเร็วขึ้น',
+      'เพื่อยุบโครงสร้างที่ไม่ดีให้มาอยู่ที่เดียว เพื่อให้คุณ extract ขอบเขตที่ดีกว่าออกมาใหม่ได้',
+      'เพื่อกำจัดฟังก์ชันทั้งหมดออกจาก codebase',
+      'เพื่อให้ผ่าน type checker',
+    ],
+    answer: 1,
+  },
+];
+
+<Quiz client:visible id="composing-methods/inline-function" questions={quizInline} />
+
+<ProgressTracker client:visible id="composing-methods/inline-function" />

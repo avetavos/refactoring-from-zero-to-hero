@@ -1,0 +1,256 @@
+---
+title: Hide Delegate and Remove Middle Man
+description: Encapsulate a delegation so callers stop walking object chains — and the inverse, stripping a delegating method out when it stops paying for itself.
+sidebar:
+  order: 6
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+export const hideDelegateDiagram = `flowchart LR
+  subgraph Before["Before — caller walks the chain"]
+    A["client"] --> B["person.department"]
+    B --> C[".manager"]
+  end
+  subgraph After["After — Hide Delegate"]
+    D["client"] --> E["person.manager()"]
+    E -.->|"internally"| F["department.manager"]
+  end
+  Before -.->|"Hide Delegate"| After
+  After -.->|"Remove Middle Man"| Before`;
+
+## Intent
+
+**Hide Delegate**: when a client reaches through one object to call a method on a second — `person.department.manager` — give the first object its own method that hides the hop, so the client just calls `person.manager()`. The client stops depending on the structure behind `person`.
+
+**Remove Middle Man** is the inverse: when an object is doing little but forwarding call after call to its delegate, let the client talk to the delegate directly and delete the forwarding methods.
+
+## The smell
+
+Hide Delegate cures **Inappropriate Intimacy** with a class's internals and is the practical face of the **Law of Demeter**: talk to your friends, not your friends' friends. A chain like `a.getB().getC().doIt()` couples the caller to two relationships it has no business knowing about. The reverse smell is the **Middle Man**: a class whose methods nearly all read "return delegate.something()" — so much forwarding that the wrapper adds nothing.
+
+## Before → After
+
+A `Person` whose manager is found through their `Department`. Before, the client navigates the chain. After, `Person` hides the delegate behind a `manager()` method. (Apply Remove Middle Man to go back the other way when the wrapper stops earning its place.)
+
+<Tabs syncKey="lang">
+  <TabItem label="TypeScript">
+    ```ts
+    // Before — client walks person.department.manager
+    class Department {
+      constructor(public manager: string) {}
+    }
+
+    class Person {
+      constructor(public name: string, public department: Department) {}
+    }
+
+    const managerName = person.department.manager;
+
+    // After — Hide Delegate
+    class Department {
+      constructor(private _manager: string) {}
+      get manager(): string {
+        return this._manager;
+      }
+    }
+
+    class Person {
+      constructor(public name: string, private department: Department) {}
+      manager(): string {
+        return this.department.manager;
+      }
+    }
+
+    const managerName = person.manager();
+    ```
+  </TabItem>
+  <TabItem label="Python">
+    ```python
+    # Before — client walks person.department.manager
+    class Department:
+        def __init__(self, manager):
+            self.manager = manager
+
+    class Person:
+        def __init__(self, name, department):
+            self.name = name
+            self.department = department
+
+    manager_name = person.department.manager
+
+    # After — Hide Delegate
+    class Department:
+        def __init__(self, manager):
+            self._manager = manager
+
+        @property
+        def manager(self):
+            return self._manager
+
+    class Person:
+        def __init__(self, name, department):
+            self.name = name
+            self._department = department
+
+        def manager(self):
+            return self._department.manager
+
+    manager_name = person.manager()
+    ```
+  </TabItem>
+  <TabItem label="Go">
+    ```go
+    // Before — client walks person.Department.Manager
+    type Department struct {
+        Manager string
+    }
+
+    type Person struct {
+        Name       string
+        Department Department
+    }
+
+    managerName := person.Department.Manager
+
+    // After — Hide Delegate
+    type Department struct {
+        manager string
+    }
+
+    func (d Department) Manager() string {
+        return d.manager
+    }
+
+    type Person struct {
+        Name       string
+        department Department
+    }
+
+    func (p Person) Manager() string {
+        return p.department.Manager()
+    }
+
+    managerName := person.Manager()
+    ```
+  </TabItem>
+  <TabItem label="Rust">
+    ```rust
+    // Before — client walks person.department.manager
+    struct Department {
+        manager: String,
+    }
+
+    struct Person {
+        name: String,
+        department: Department,
+    }
+
+    let manager_name = &person.department.manager;
+
+    // After — Hide Delegate
+    struct Department {
+        manager: String,
+    }
+
+    impl Department {
+        fn manager(&self) -> &str {
+            &self.manager
+        }
+    }
+
+    struct Person {
+        name: String,
+        department: Department,
+    }
+
+    impl Person {
+        fn manager(&self) -> &str {
+            self.department.manager()
+        }
+    }
+
+    let manager_name = person.manager();
+    ```
+  </TabItem>
+</Tabs>
+
+<Mermaid code={hideDelegateDiagram} title="Hide Delegate wraps the chain; Remove Middle Man unwraps it" />
+
+## Mechanics
+
+**Hide Delegate**
+
+1. For each method on the delegate the client reaches for, add a simple delegating method on the server (the object the client already holds).
+2. Update the client to call the new server method instead of walking the chain.
+3. **Run your tests** after each method you redirect.
+4. Once no client navigates to the delegate directly, you can hide the accessor that exposed it.
+
+**Remove Middle Man** (the inverse)
+
+1. Add an accessor on the server that returns the delegate itself.
+2. For each delegating method that adds no value, replace its callers with a direct call through that accessor.
+3. **Run your tests** as you go.
+4. Delete the delegating methods once they have no callers left.
+
+## When to use / trade-offs
+
+Hide a delegate when clients are reaching through an object to its neighbours, when you want freedom to change the relationship behind an object without breaking every caller, or when a chain has grown long enough to read like a navigation instruction.
+
+The risk is overshoot: hide every delegate and the server fills with forwarding methods until it *becomes* a Middle Man. That is precisely when you reach for **Remove Middle Man** and let clients talk to the delegate again. The two moves are a dial — turn it toward encapsulation when the structure is volatile, toward directness when the wrapper is just noise.
+
+## Related
+
+- [Move Function](/refactoring-from-zero-to-hero/en/moving-features/move-function/)
+- [Extract Class](/refactoring-from-zero-to-hero/en/moving-features/extract-class/)
+- [Inline Class](/refactoring-from-zero-to-hero/en/moving-features/inline-class/)
+
+<Callout title="A dial, not a rule">
+Hide Delegate and Remove Middle Man point in opposite directions, and that is the lesson: encapsulation has a cost. Hide a delegate when the relationship behind it might change; remove the middle man when the forwarding earns nothing. Tune the dial to how stable the structure actually is.
+</Callout>
+
+export const quizHideDelegate = [
+  {
+    q: 'Which principle does Hide Delegate help you honour?',
+    options: ['Single Responsibility Principle', 'Law of Demeter', 'Open/Closed Principle', 'Liskov Substitution Principle'],
+    answer: 1,
+  },
+  {
+    q: 'What does Hide Delegate do for the client?',
+    options: [
+      'It makes the client walk a longer object chain',
+      'It hides the chain behind a method on the object the client already holds',
+      'It deletes the delegate object',
+      'It merges the two classes into one',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'When should you reach for Remove Middle Man?',
+    options: [
+      'When clients reach through an object to its neighbours',
+      'When the server has filled with methods that only forward to a delegate',
+      'When a class has two responsibilities',
+      'When a field lives in the wrong record',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'What is the relationship between Hide Delegate and Remove Middle Man?',
+    options: [
+      'They are the same refactoring',
+      'They are inverses — one adds encapsulation, the other strips needless forwarding',
+      'Remove Middle Man must always follow Hide Delegate',
+      'They both split a class into two',
+    ],
+    answer: 1,
+  },
+];
+
+<Quiz client:visible id="moving-features/hide-delegate-and-remove-middle-man" questions={quizHideDelegate} />
+
+<ProgressTracker client:visible id="moving-features/hide-delegate-and-remove-middle-man" />

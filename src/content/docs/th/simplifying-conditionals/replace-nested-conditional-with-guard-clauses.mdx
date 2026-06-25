@@ -1,0 +1,245 @@
+---
+title: Replace Nested Conditional with Guard Clauses
+description: ทำให้ if/else ที่ซ้อนลึกแบนราบลง โดย return ออกไปก่อนสำหรับกรณีพิเศษ เหลือเส้นทางหลักไว้แบบไม่ย่อหน้าและเห็นได้ชัด
+sidebar:
+  order: 4
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+export const guardDiagram = `flowchart TD
+  subgraph Before["Before — nested"]
+    A{"is dead?"} -->|no| B{"is separated?"}
+    A -->|yes| AD["deadAmount"]
+    B -->|no| C{"is retired?"}
+    B -->|yes| BD["separatedAmount"]
+    C -->|no| CN["normalPay"]
+    C -->|yes| CD["retiredAmount"]
+  end
+  subgraph After["After — guards"]
+    G1["if dead return deadAmount"] --> G2["if separated return separatedAmount"]
+    G2 --> G3["if retired return retiredAmount"]
+    G3 --> G4["return normalPay"]
+  end
+  Before -.->|"Replace Nested Conditional with Guard Clauses"| After`;
+
+## เจตนา
+
+เอาฟังก์ชันที่งานจริง ๆ ฝังอยู่ภายในบันไดของบล็อก `if/else` แล้วดึงแต่ละกรณีพิเศษออกมาไว้ด้านบนในรูปของ **guard clause** — การตรวจสอบที่ return ออกไปทันที เมื่อทุกกรณียกเว้นออกไปก่อนแล้ว เส้นทางปกติก็เหลืออยู่ที่ระดับการย่อหน้าฐาน ซึ่งมันอ่านได้เหมือนเป็นจุดประสงค์ที่แท้จริงของฟังก์ชัน
+
+## กลิ่นโค้ด
+
+นี่คือวิธีแก้สำหรับ **เงื่อนไขที่ซ้อนกัน** ซึ่งทำให้หาเส้นทางหลัก (happy path) ได้ยาก เมื่อบล็อก `if/else` ซ้อนกันลึกสามหรือสี่ชั้น บรรทัดที่คุณสนใจจริง ๆ จะอยู่ไกลไปทางขวา และคุณต้องจดจำทุกเงื่อนไขที่ห่อหุ้มอยู่ไว้ในหัวเพื่อรู้ว่ามันรันเมื่อไร guard clause พลิกการเน้น: การ return ออกไปก่อนแต่ละครั้งบอกว่า *"กรณีแปลก ๆ นี้จัดการเรียบร้อยแล้ว ตอนนี้ลืมมันไปได้"* ดังนั้นเมื่อคุณมาถึงด้านล่าง ก็เหลือเพียงสถานการณ์หลักเท่านั้น
+
+## Before → After
+
+ฟังก์ชันเงินเดือน return จำนวนเงินที่ต่างกันสำหรับพนักงานที่เสียชีวิต ออกจากงาน และเกษียณ โดยมีเงินเดือนปกติเป็นค่าดีฟอลต์ ก่อนหน้านี้ กรณีต่าง ๆ ซ้อนกัน หลังจากนั้น แต่ละกรณีเป็น guard
+
+<Tabs syncKey="lang">
+  <TabItem label="TypeScript">
+    ```ts
+    // Before
+    function payAmount(employee: Employee): number {
+      let result: number;
+      if (employee.isDead) {
+        result = deadAmount();
+      } else {
+        if (employee.isSeparated) {
+          result = separatedAmount();
+        } else {
+          if (employee.isRetired) {
+            result = retiredAmount();
+          } else {
+            result = normalPay(employee);
+          }
+        }
+      }
+      return result;
+    }
+
+    // After
+    function payAmount(employee: Employee): number {
+      if (employee.isDead) return deadAmount();
+      if (employee.isSeparated) return separatedAmount();
+      if (employee.isRetired) return retiredAmount();
+      return normalPay(employee);
+    }
+    ```
+  </TabItem>
+  <TabItem label="Python">
+    ```python
+    # Before
+    def pay_amount(employee):
+        if employee.is_dead:
+            result = dead_amount()
+        else:
+            if employee.is_separated:
+                result = separated_amount()
+            else:
+                if employee.is_retired:
+                    result = retired_amount()
+                else:
+                    result = normal_pay(employee)
+        return result
+
+    # After
+    def pay_amount(employee):
+        if employee.is_dead:
+            return dead_amount()
+        if employee.is_separated:
+            return separated_amount()
+        if employee.is_retired:
+            return retired_amount()
+        return normal_pay(employee)
+    ```
+  </TabItem>
+  <TabItem label="Go">
+    ```go
+    // Before
+    func PayAmount(employee Employee) int {
+        var result int
+        if employee.IsDead {
+            result = deadAmount()
+        } else {
+            if employee.IsSeparated {
+                result = separatedAmount()
+            } else {
+                if employee.IsRetired {
+                    result = retiredAmount()
+                } else {
+                    result = normalPay(employee)
+                }
+            }
+        }
+        return result
+    }
+
+    // After
+    func PayAmount(employee Employee) int {
+        if employee.IsDead {
+            return deadAmount()
+        }
+        if employee.IsSeparated {
+            return separatedAmount()
+        }
+        if employee.IsRetired {
+            return retiredAmount()
+        }
+        return normalPay(employee)
+    }
+    ```
+  </TabItem>
+  <TabItem label="Rust">
+    ```rust
+    // Before
+    fn pay_amount(employee: &Employee) -> i64 {
+        let result;
+        if employee.is_dead {
+            result = dead_amount();
+        } else {
+            if employee.is_separated {
+                result = separated_amount();
+            } else {
+                if employee.is_retired {
+                    result = retired_amount();
+                } else {
+                    result = normal_pay(employee);
+                }
+            }
+        }
+        result
+    }
+
+    // After
+    fn pay_amount(employee: &Employee) -> i64 {
+        if employee.is_dead {
+            return dead_amount();
+        }
+        if employee.is_separated {
+            return separated_amount();
+        }
+        if employee.is_retired {
+            return retired_amount();
+        }
+        normal_pay(employee)
+    }
+    ```
+  </TabItem>
+</Tabs>
+
+<Mermaid code={guardDiagram} title="บันได if/else ที่ซ้อนกันกลายเป็นลำดับ guard clause ที่ราบเรียบ" />
+
+## กลไก
+
+1. เลือกเงื่อนไขชั้นนอกสุดที่จัดการกรณีพิเศษ แทนสาขาของมันด้วยการ return ออกไปก่อน แล้วยกมันขึ้นไปไว้บนสุดของฟังก์ชัน
+2. **รันเทสต์ของคุณ** ผลลัพธ์สำหรับกรณีนั้นต้องเหมือนเดิม
+3. ขยับไปยังเงื่อนไขชั้นนอกถัดไปและทำแบบเดียวกัน ลบ `else` ออกได้เพราะกรณีด้านบน return ไปแล้ว
+4. ทำต่อไปจนทุกกรณีพิเศษเป็น guard และเหลือเพียงเส้นทางหลักที่ด้านล่าง แบบไม่ย่อหน้า
+5. หากเงื่อนไขของ guard อ่านขัดเขินเมื่อกลับด้าน ลองพิจารณาสกัดมันด้วย **Decompose Conditional** เพื่อให้การ return ออกไปก่อนยังอ่านได้สะอาด
+
+## เมื่อไรควรใช้ / ข้อแลกเปลี่ยน
+
+หยิบ guard clause มาใช้เมื่อการซ้อนกันบดบังการไหลปกติของฟังก์ชัน โดยเฉพาะเมื่อสาขาหลายตัวเป็น *ข้อยกเว้น* มากกว่าเป็นทางเลือกที่เท่าเทียมกัน การ refactor นี้โดดเด่นเมื่อกรณีต่าง ๆ เป็นแบบ "จัดการแล้วจากไป" จริง ๆ — การตรวจสอบข้อผิดพลาด ข้อมูลที่หายไป สถานะขอบเขต
+
+มันเหมาะสมน้อยลงเมื่อสาขาเป็นทางเลือกคู่ขนานที่มีน้ำหนักเท่ากันจริง ๆ การยัดสิ่งเหล่านั้นให้เป็น guard อาจสื่อถึงลำดับความสำคัญที่ไม่มีอยู่จริง บางทีมยังชอบจุดออกเพียงจุดเดียวต่อฟังก์ชัน — หากทีมของคุณเป็นเช่นนั้น ก็ชั่งน้ำหนักธรรมเนียมนั้นกับประโยชน์ด้านความอ่านง่าย ในโค้ดสมัยใหม่ส่วนใหญ่ เวอร์ชันที่ราบเรียบกว่าชนะ
+
+## ที่เกี่ยวข้อง
+
+- [Decompose Conditional](/refactoring-from-zero-to-hero/th/simplifying-conditionals/decompose-conditional/)
+- [Consolidate Conditional Expression](/refactoring-from-zero-to-hero/th/simplifying-conditionals/consolidate-conditional/)
+- [Introduce Special Case](/refactoring-from-zero-to-hero/th/simplifying-conditionals/introduce-special-case/)
+
+<Callout title="guard บอกว่า 'นี่ไม่ใช่เรื่องราวหลัก'">
+guard clause บอกผู้อ่านว่ากรณีนี้ผิดปกติและตอนนี้จัดการแล้ว สงวนมันไว้สำหรับข้อยกเว้นและเงื่อนไขขอบเขต หากคุณเปลี่ยนทางเลือกที่เท่าเทียมกันให้เป็น guard คุณจะสื่อว่าตัวหนึ่งสำคัญน้อยกว่าตัวอื่น — ซึ่งอาจทำให้ผู้ดูแลคนถัดไปเข้าใจผิด
+</Callout>
+
+export const quizGuard = [
+  {
+    q: 'guard clause คืออะไร?',
+    options: [
+      'เงื่อนไขที่ห่อเนื้อตัวของฟังก์ชันทั้งหมด',
+      'การตรวจสอบที่ด้านบนซึ่ง return ออกไปก่อนสำหรับกรณีพิเศษ',
+      'ลูปที่ตรวจสอบความถูกต้องของอินพุต',
+      'คอมเมนต์ที่อธิบายเงื่อนไขก่อนหน้า',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'หลังจากแทนเงื่อนไขที่ซ้อนกันด้วย guard แล้ว เส้นทางหลักไปอยู่ที่ไหน?',
+    options: [
+      'ย่อหน้าลึกอยู่ภายใน else ตัวสุดท้าย',
+      'ที่ระดับการย่อหน้าฐาน ที่ด้านล่างของฟังก์ชัน',
+      'ภายในคลาสแยกต่างหาก',
+      'ถูกลบทิ้งทั้งหมด',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'เมื่อไรที่ guard clause เหมาะสมน้อยลง?',
+    options: [
+      'เมื่อสาขาเป็นกรณียกเว้น',
+      'เมื่อสาขาเป็นทางเลือกคู่ขนานที่มีน้ำหนักเท่ากันจริง ๆ',
+      'เมื่อมีข้อมูลที่หายไปต้องจัดการ',
+      'เมื่อข้อผิดพลาดต้องลัดวงจรฟังก์ชัน',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'คุณควรรันอะไรหลังจากยกแต่ละกรณีพิเศษขึ้นไปเป็น guard?',
+    options: [
+      'linter เท่านั้น',
+      'เทสต์ของคุณ เพื่อยืนยันว่าผลลัพธ์สำหรับกรณีนั้นไม่เปลี่ยนแปลง',
+      'build แล้ว commit ทันที',
+      'ไม่ต้องทำอะไร — guard เปลี่ยนพฤติกรรมไม่ได้',
+    ],
+    answer: 1,
+  },
+];
+
+<Quiz client:visible id="simplifying-conditionals/replace-nested-conditional-with-guard-clauses" questions={quizGuard} />
+
+<ProgressTracker client:visible id="simplifying-conditionals/replace-nested-conditional-with-guard-clauses" />

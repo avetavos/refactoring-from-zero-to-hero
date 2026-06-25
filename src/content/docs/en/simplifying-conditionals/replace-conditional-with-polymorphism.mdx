@@ -1,0 +1,294 @@
+---
+title: Replace Conditional with Polymorphism
+description: When a switch or if on a type keeps recurring, push each branch into a subclass method and let the language dispatch for you.
+sidebar:
+  order: 5
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+export const polymorphismDiagram = `flowchart TD
+  subgraph Before["Before — one switch, repeated"]
+    A["plumage(bird):<br/>switch bird.type<br/>case EuropeanSwallow ...<br/>case AfricanSwallow ...<br/>case NorwegianBlue ..."]
+  end
+  subgraph After["After — polymorphic classes"]
+    B["Bird.plumage()"]
+    B --> C["EuropeanSwallow.plumage()"]
+    B --> D["AfricanSwallow.plumage()"]
+    B --> E["NorwegianBlue.plumage()"]
+  end
+  Before -.->|"Replace Conditional with Polymorphism"| After`;
+
+## Intent
+
+Take a `switch` (or `if/else` chain) that branches on a value's *type* and give each type its own class with its own version of the method. The branch labels become subclasses, the case bodies become overriding methods, and the dispatch that used to be hand-written is now done by the language at the call site.
+
+## The smell
+
+This is the cure for a **type switch that recurs**. The signal is not one `switch` — it is the *same* `switch` on the same type field appearing in several functions: `plumage`, `airSpeed`, `singing`, each re-listing every bird type. Every time you add a type, you must find and edit all of them, and it is easy to miss one. Polymorphism gathers everything one type does into one class, so adding a type means adding a class — not hunting down scattered cases.
+
+## Before → After
+
+A bird's plumage depends on its species. Before, one `switch` on a type tag handles every species. After, each species is a subclass overriding `plumage`.
+
+<Tabs syncKey="lang">
+  <TabItem label="TypeScript">
+    ```ts
+    // Before
+    function plumage(bird: Bird): string {
+      switch (bird.type) {
+        case 'EuropeanSwallow':
+          return 'average';
+        case 'AfricanSwallow':
+          return bird.numberOfCoconuts > 2 ? 'tired' : 'average';
+        case 'NorwegianBlue':
+          return bird.voltage > 100 ? 'scorched' : 'beautiful';
+        default:
+          return 'unknown';
+      }
+    }
+
+    // After
+    abstract class Bird {
+      abstract plumage(): string;
+    }
+
+    class EuropeanSwallow extends Bird {
+      plumage(): string {
+        return 'average';
+      }
+    }
+
+    class AfricanSwallow extends Bird {
+      constructor(private numberOfCoconuts: number) {
+        super();
+      }
+      plumage(): string {
+        return this.numberOfCoconuts > 2 ? 'tired' : 'average';
+      }
+    }
+
+    class NorwegianBlue extends Bird {
+      constructor(private voltage: number) {
+        super();
+      }
+      plumage(): string {
+        return this.voltage > 100 ? 'scorched' : 'beautiful';
+      }
+    }
+    ```
+  </TabItem>
+  <TabItem label="Python">
+    ```python
+    # Before
+    def plumage(bird):
+        if bird.type == "EuropeanSwallow":
+            return "average"
+        elif bird.type == "AfricanSwallow":
+            return "tired" if bird.number_of_coconuts > 2 else "average"
+        elif bird.type == "NorwegianBlue":
+            return "scorched" if bird.voltage > 100 else "beautiful"
+        return "unknown"
+
+    # After
+    class Bird:
+        def plumage(self):
+            raise NotImplementedError
+
+    class EuropeanSwallow(Bird):
+        def plumage(self):
+            return "average"
+
+    class AfricanSwallow(Bird):
+        def __init__(self, number_of_coconuts):
+            self.number_of_coconuts = number_of_coconuts
+
+        def plumage(self):
+            return "tired" if self.number_of_coconuts > 2 else "average"
+
+    class NorwegianBlue(Bird):
+        def __init__(self, voltage):
+            self.voltage = voltage
+
+        def plumage(self):
+            return "scorched" if self.voltage > 100 else "beautiful"
+    ```
+  </TabItem>
+  <TabItem label="Go">
+    ```go
+    // Before
+    func Plumage(bird Bird) string {
+        switch bird.Type {
+        case "EuropeanSwallow":
+            return "average"
+        case "AfricanSwallow":
+            if bird.NumberOfCoconuts > 2 {
+                return "tired"
+            }
+            return "average"
+        case "NorwegianBlue":
+            if bird.Voltage > 100 {
+                return "scorched"
+            }
+            return "beautiful"
+        default:
+            return "unknown"
+        }
+    }
+
+    // After
+    type Bird interface {
+        Plumage() string
+    }
+
+    type EuropeanSwallow struct{}
+
+    func (e EuropeanSwallow) Plumage() string { return "average" }
+
+    type AfricanSwallow struct{ NumberOfCoconuts int }
+
+    func (a AfricanSwallow) Plumage() string {
+        if a.NumberOfCoconuts > 2 {
+            return "tired"
+        }
+        return "average"
+    }
+
+    type NorwegianBlue struct{ Voltage int }
+
+    func (n NorwegianBlue) Plumage() string {
+        if n.Voltage > 100 {
+            return "scorched"
+        }
+        return "beautiful"
+    }
+    ```
+  </TabItem>
+  <TabItem label="Rust">
+    ```rust
+    // Before
+    fn plumage(bird: &Bird) -> String {
+        match bird.kind.as_str() {
+            "EuropeanSwallow" => "average".to_string(),
+            "AfricanSwallow" => {
+                if bird.number_of_coconuts > 2 { "tired" } else { "average" }.to_string()
+            }
+            "NorwegianBlue" => {
+                if bird.voltage > 100 { "scorched" } else { "beautiful" }.to_string()
+            }
+            _ => "unknown".to_string(),
+        }
+    }
+
+    // After
+    trait Bird {
+        fn plumage(&self) -> String;
+    }
+
+    struct EuropeanSwallow;
+
+    impl Bird for EuropeanSwallow {
+        fn plumage(&self) -> String {
+            "average".to_string()
+        }
+    }
+
+    struct AfricanSwallow {
+        number_of_coconuts: u32,
+    }
+
+    impl Bird for AfricanSwallow {
+        fn plumage(&self) -> String {
+            if self.number_of_coconuts > 2 { "tired" } else { "average" }.to_string()
+        }
+    }
+
+    struct NorwegianBlue {
+        voltage: u32,
+    }
+
+    impl Bird for NorwegianBlue {
+        fn plumage(&self) -> String {
+            if self.voltage > 100 { "scorched" } else { "beautiful" }.to_string()
+        }
+    }
+    ```
+  </TabItem>
+</Tabs>
+
+<Mermaid code={polymorphismDiagram} title="A recurring type switch becomes a base type and one subclass per case" />
+
+## Mechanics
+
+1. Create a base type (class, interface, or trait) with the method that the `switch` currently computes.
+2. Create one subclass per branch label. Move each case body into that subclass's override, replacing references to the type field with the subclass's own data.
+3. Replace construction sites so the right subclass is created instead of a tagged value — often via a small factory.
+4. Turn the original `switch` into a single call to the polymorphic method. **Run your tests.**
+5. Repeat for the *next* function that switched on the same type, deleting each `switch` as its logic moves into the subclasses. Run tests after every method you move.
+
+## When to use / trade-offs
+
+Use this **sparingly** — it earns its keep only when the *same* conditional on a type appears in more than one place, so that adding a type today means editing several functions. That recurrence is what a class hierarchy removes.
+
+The cost is real: you introduce a hierarchy, a factory, and more indirection. For a single `switch` that lives in one function, polymorphism is overkill — a plain `switch` is clearer, and **Decompose Conditional** or guard clauses serve better. Add the classes only once the repetition proves the structure is worth it.
+
+## Related
+
+- [Decompose Conditional](/refactoring-from-zero-to-hero/en/simplifying-conditionals/decompose-conditional/)
+- [Replace Nested Conditional with Guard Clauses](/refactoring-from-zero-to-hero/en/simplifying-conditionals/replace-nested-conditional-with-guard-clauses/)
+- [Introduce Special Case](/refactoring-from-zero-to-hero/en/simplifying-conditionals/introduce-special-case/)
+
+<Callout title="Use sparingly — only when the conditional recurs">
+One switch in one function is fine; leave it alone. The trigger for polymorphism is the *same* type switch appearing across several functions, where every new type forces edits in many places. Introduce the hierarchy only when that repetition is real — not in anticipation of it.
+</Callout>
+
+export const quizPolymorphism = [
+  {
+    q: 'What is the strongest signal that you should reach for Replace Conditional with Polymorphism?',
+    options: [
+      'A single switch statement in one function',
+      'The same type switch repeated across several functions',
+      'A condition with more than two clauses',
+      'Any if/else that returns a value',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'What do the branch labels of the switch become?',
+    options: [
+      'Private fields',
+      'Subclasses, each overriding the method',
+      'Guard clauses',
+      'Enum constants only',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'After moving the logic into subclasses, what replaces the original switch?',
+    options: [
+      'A larger switch',
+      'A single call to the polymorphic method',
+      'A null check',
+      'A loop over the types',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'When is this refactoring overkill?',
+    options: [
+      'When the same conditional appears in many functions',
+      'When a single switch lives in one function and does not recur',
+      'When new types are added frequently',
+      'When the branches contain complex logic',
+    ],
+    answer: 1,
+  },
+];
+
+<Quiz client:visible id="simplifying-conditionals/replace-conditional-with-polymorphism" questions={quizPolymorphism} />
+
+<ProgressTracker client:visible id="simplifying-conditionals/replace-conditional-with-polymorphism" />

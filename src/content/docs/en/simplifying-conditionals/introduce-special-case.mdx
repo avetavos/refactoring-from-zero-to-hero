@@ -1,0 +1,229 @@
+---
+title: Introduce Special Case
+description: Replace a repeated null-or-special check with a special-case object that responds with sensible defaults, so callers stop asking "is it missing?".
+sidebar:
+  order: 6
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+export const specialCaseDiagram = `flowchart LR
+  subgraph Before["Before"]
+    A["customer == null<br/>? 'occupant'<br/>: customer.name"]
+    B["customer == null<br/>? 'basic'<br/>: customer.plan"]
+  end
+  subgraph After["After"]
+    C["customer.name"]
+    D["customer.plan"]
+    E["UnknownCustomer<br/>name = 'occupant'<br/>plan = 'basic'"]
+  end
+  Before -.->|"Introduce Special Case"| After`;
+
+## Intent
+
+Take a value that is sometimes missing — and a null check repeated everywhere that value is used — and replace the missing case with a real object that knows the right default answers. This **special case** (often a **null object**) implements the same interface, so callers just use it; the "what if it is absent?" branch disappears from every call site and lives in one class instead.
+
+## The smell
+
+This is the cure for a **repeated special-case check**, classically `if (x == null)`. When a field can be absent, every method that touches it grows the same guard, each substituting its own default — a name here, a plan there, a billing amount elsewhere. The knowledge of "what a missing customer means" is smeared across the codebase, and any new default has to be added in yet another place. A special-case object collects all those defaults in one type that answers normally.
+
+## Before → After
+
+Display code reads a customer's name and plan, defaulting for unknown customers. Before, every site checks for null. After, an `UnknownCustomer` supplies the defaults.
+
+<Tabs syncKey="lang">
+  <TabItem label="TypeScript">
+    ```ts
+    // Before
+    function customerName(site: Site): string {
+      return site.customer === null ? 'occupant' : site.customer.name;
+    }
+
+    function billingPlan(site: Site): string {
+      return site.customer === null ? 'basic' : site.customer.plan;
+    }
+
+    // After
+    class UnknownCustomer implements Customer {
+      readonly name = 'occupant';
+      readonly plan = 'basic';
+      readonly isUnknown = true;
+    }
+
+    function customerName(site: Site): string {
+      return site.customer.name;
+    }
+
+    function billingPlan(site: Site): string {
+      return site.customer.plan;
+    }
+    ```
+  </TabItem>
+  <TabItem label="Python">
+    ```python
+    # Before
+    def customer_name(site):
+        return "occupant" if site.customer is None else site.customer.name
+
+    def billing_plan(site):
+        return "basic" if site.customer is None else site.customer.plan
+
+    # After
+    class UnknownCustomer:
+        name = "occupant"
+        plan = "basic"
+        is_unknown = True
+
+    def customer_name(site):
+        return site.customer.name
+
+    def billing_plan(site):
+        return site.customer.plan
+    ```
+  </TabItem>
+  <TabItem label="Go">
+    ```go
+    // Before
+    func CustomerName(site Site) string {
+        if site.Customer == nil {
+            return "occupant"
+        }
+        return site.Customer.Name
+    }
+
+    func BillingPlan(site Site) string {
+        if site.Customer == nil {
+            return "basic"
+        }
+        return site.Customer.Plan
+    }
+
+    // After
+    func UnknownCustomer() *Customer {
+        return &Customer{Name: "occupant", Plan: "basic", IsUnknown: true}
+    }
+
+    func CustomerName(site Site) string {
+        return site.Customer.Name
+    }
+
+    func BillingPlan(site Site) string {
+        return site.Customer.Plan
+    }
+    ```
+  </TabItem>
+  <TabItem label="Rust">
+    ```rust
+    // Before
+    fn customer_name(site: &Site) -> String {
+        match &site.customer {
+            None => "occupant".to_string(),
+            Some(c) => c.name.clone(),
+        }
+    }
+
+    fn billing_plan(site: &Site) -> String {
+        match &site.customer {
+            None => "basic".to_string(),
+            Some(c) => c.plan.clone(),
+        }
+    }
+
+    // After
+    impl Customer {
+        fn unknown() -> Customer {
+            Customer {
+                name: "occupant".to_string(),
+                plan: "basic".to_string(),
+                is_unknown: true,
+            }
+        }
+    }
+
+    fn customer_name(site: &Site) -> String {
+        site.customer.name.clone()
+    }
+
+    fn billing_plan(site: &Site) -> String {
+        site.customer.plan.clone()
+    }
+    ```
+  </TabItem>
+</Tabs>
+
+<Mermaid code={specialCaseDiagram} title="Scattered null checks collapse into one special-case object with defaults" />
+
+## Mechanics
+
+1. Add a property or method that lets callers ask whether a value is the special case (for example `isUnknown`), and make the normal objects answer `false`.
+2. Create the special-case object — a subclass, struct, or factory — that implements the same interface and returns the agreed defaults for each accessor.
+3. Arrange for the source of the value to hand back the special-case object instead of null when the value is absent.
+4. Replace each `if (x == null)` site with a direct use of the value, one site at a time. **Run your tests** after each.
+5. When the last explicit check is gone, remove any now-dead null-handling code.
+
+## When to use / trade-offs
+
+Reach for Introduce Special Case when the *same* missing-value check, with the *same* default, repeats across many call sites. Centralizing those defaults in one object removes duplication and gives the absent case a name and a home.
+
+It is not always the right tool. If the missing value means different things in different places — default here, an error there — a single special-case object cannot serve all of them, and forcing one hides important differences. For a value checked in just one or two spots, a plain guard clause is simpler. Use the special case when the *uniformity* of the default is what makes it worth a type.
+
+## Related
+
+- [Replace Nested Conditional with Guard Clauses](/refactoring-from-zero-to-hero/en/simplifying-conditionals/replace-nested-conditional-with-guard-clauses/)
+- [Replace Conditional with Polymorphism](/refactoring-from-zero-to-hero/en/simplifying-conditionals/replace-conditional-with-polymorphism/)
+- [Consolidate Conditional Expression](/refactoring-from-zero-to-hero/en/simplifying-conditionals/consolidate-conditional/)
+
+<Callout title="A null object answers; it does not explode">
+The point of a special-case object is that callers can treat it like any other value — ask its name, ask its plan — and get a sensible default instead of a crash or a branch. If the defaults differ per call site, the absent case is not uniform enough for one object; keep the explicit checks there.
+</Callout>
+
+export const quizSpecialCase = [
+  {
+    q: 'What does Introduce Special Case replace?',
+    options: [
+      'A long function with several helpers',
+      'A repeated null-or-special check with an object that returns sensible defaults',
+      'A loop with a recursive call',
+      'A class hierarchy with a single switch',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'How should the special-case object behave when a caller uses it?',
+    options: [
+      'Throw an exception to signal the value is missing',
+      'Respond like any normal value, returning agreed defaults',
+      'Return null from every accessor',
+      'Require the caller to check isUnknown first',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'When is a single special-case object the WRONG choice?',
+    options: [
+      'When the same default is needed everywhere',
+      'When the missing value means different things in different places',
+      'When many call sites check for the value',
+      'When the value implements an interface',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'What replaces each "if value is null" site after the refactoring?',
+    options: [
+      'A direct use of the value, since the special case supplies defaults',
+      'A call to a factory at every site',
+      'A new guard clause with a different default',
+      'A switch on the value type',
+    ],
+    answer: 0,
+  },
+];
+
+<Quiz client:visible id="simplifying-conditionals/introduce-special-case" questions={quizSpecialCase} />
+
+<ProgressTracker client:visible id="simplifying-conditionals/introduce-special-case" />

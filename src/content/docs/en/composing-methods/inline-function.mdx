@@ -1,0 +1,153 @@
+---
+title: Inline Function
+description: When a function's body is as clear as its name, fold it back into the caller — the inverse of Extract Function.
+sidebar:
+  order: 3
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+## Intent
+
+Replace a call to a small function with the function's body, then delete the function. Use it when the name adds nothing the body did not already make obvious.
+
+## The smell
+
+This cures **needless indirection**. Sometimes a helper made sense once but has shrunk to a single trivial line, or its name merely restates its one statement. Following the name to a definition that says no more than the call site is wasted effort for the reader. Inlining removes the hop. It is also a useful clean-up step: collapse a tangle of tiny helpers into one place, then re-extract better boundaries.
+
+## Before → After
+
+A `ratingFor` helper that just forwards to a one-line check adds a layer with no payoff. Inline it.
+
+<Tabs syncKey="lang">
+  <TabItem label="TypeScript">
+    ```ts
+    // Before
+    function deliveryFee(driver: Driver): number {
+      return moreThanFiveTrips(driver) ? 2 : 5;
+    }
+
+    function moreThanFiveTrips(driver: Driver): boolean {
+      return driver.trips > 5;
+    }
+
+    // After
+    function deliveryFee(driver: Driver): number {
+      return driver.trips > 5 ? 2 : 5;
+    }
+    ```
+  </TabItem>
+  <TabItem label="Python">
+    ```python
+    # Before
+    def delivery_fee(driver):
+        return 2 if more_than_five_trips(driver) else 5
+
+    def more_than_five_trips(driver):
+        return driver.trips > 5
+
+    # After
+    def delivery_fee(driver):
+        return 2 if driver.trips > 5 else 5
+    ```
+  </TabItem>
+  <TabItem label="Go">
+    ```go
+    // Before
+    func DeliveryFee(driver Driver) int {
+        if moreThanFiveTrips(driver) {
+            return 2
+        }
+        return 5
+    }
+
+    func moreThanFiveTrips(driver Driver) bool {
+        return driver.Trips > 5
+    }
+
+    // After
+    func DeliveryFee(driver Driver) int {
+        if driver.Trips > 5 {
+            return 2
+        }
+        return 5
+    }
+    ```
+  </TabItem>
+  <TabItem label="Rust">
+    ```rust
+    // Before
+    fn delivery_fee(driver: &Driver) -> i32 {
+        if more_than_five_trips(driver) { 2 } else { 5 }
+    }
+
+    fn more_than_five_trips(driver: &Driver) -> bool {
+        driver.trips > 5
+    }
+
+    // After
+    fn delivery_fee(driver: &Driver) -> i32 {
+        if driver.trips > 5 { 2 } else { 5 }
+    }
+    ```
+  </TabItem>
+</Tabs>
+
+## Mechanics
+
+1. Confirm the function is not polymorphic — you cannot inline a method that subclasses override.
+2. Find every call site. (If there are many, reconsider; this is easiest when calls are few.)
+3. Replace each call with a copy of the function's body, adjusting for the actual arguments.
+4. **Run your tests** after each replacement.
+5. When no call sites remain, delete the original function.
+6. Run the full suite once more to confirm nothing referenced it.
+
+## When to use / trade-offs
+
+Inline when the body is at least as clear as the name, when a group of badly-factored helpers should be merged before re-splitting, or when indirection is getting in the reader's way. Do **not** inline a function that is called from many places or whose name genuinely captures a non-obvious concept — there the name is documentation worth keeping.
+
+The inverse is **Extract Function**. The two are partners: inline to collapse a poor structure, then extract to rebuild a better one.
+
+## Related
+
+- [Extract Function](/refactoring-from-zero-to-hero/en/composing-methods/extract-function/)
+- [Replace Temp with Query](/refactoring-from-zero-to-hero/en/composing-methods/replace-temp-with-query/)
+
+<Callout title="Inline is a reset button">
+When helper boundaries are wrong, do not edit them in place. Inline everything back into one function, see the whole flow plainly, then Extract along the boundaries that actually matter. Inlining is often a *means* to a cleaner extraction.
+</Callout>
+
+export const quizInline = [
+  {
+    q: 'When is Inline Function the right move?',
+    options: [
+      'When the function is called from dozens of places',
+      "When the function's body is at least as clear as its name",
+      'When the function is polymorphic',
+      'When the function is very long',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'Inline Function is the inverse of which refactoring?',
+    options: ['Split Phase', 'Extract Variable', 'Extract Function', 'Replace Temp with Query'],
+    answer: 2,
+  },
+  {
+    q: 'Why might you deliberately inline several helpers before doing anything else?',
+    options: [
+      'To make the program run faster',
+      'To collapse a poor structure into one place so you can re-extract better boundaries',
+      'To remove all functions from the codebase',
+      'To satisfy the type checker',
+    ],
+    answer: 1,
+  },
+];
+
+<Quiz client:visible id="composing-methods/inline-function" questions={quizInline} />
+
+<ProgressTracker client:visible id="composing-methods/inline-function" />

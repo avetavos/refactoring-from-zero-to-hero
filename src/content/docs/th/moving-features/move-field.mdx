@@ -1,0 +1,283 @@
+---
+title: Move Field
+description: เมื่อฟิลด์ถูกอ่านและเขียนจาก record อื่นมากกว่าจาก record ของตัวเอง ให้ย้ายมันไปยัง record ที่ใช้งานมันจริง ๆ
+sidebar:
+  order: 3
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+export const moveFieldDiagram = `flowchart LR
+  subgraph Before["Before"]
+    A["Customer<br/>name<br/>discountRate"]
+    B["PricingPlan"]
+    A -.->|"plan logic reads<br/>discountRate"| B
+  end
+  subgraph After["After"]
+    C["Customer<br/>name<br/>plan"]
+    D["PricingPlan<br/>discountRate"]
+    C --> D
+  end
+  Before -.->|"Move Field"| After`;
+
+## Intent
+
+ฟิลด์อาศัยอยู่บน record หนึ่ง แต่ถูกอ้างอิงและอัปเดตผ่านอีก record เป็นส่วนใหญ่ ให้ย้ายมันไปยัง record ที่ใช้งานมันจริง เพื่อให้ข้อมูลอยู่ติดกับพฤติกรรมที่พึ่งพิงมัน และ record ทั้งสองเลิกเอื้อมข้ามขอบเขตที่ถูกสร้างขึ้นมาอย่างไม่เป็นธรรมชาติ
+
+## The smell
+
+โครงสร้างข้อมูลคือโครงกระดูกของโปรแกรม และฟิลด์ที่วางผิดที่ก็บิดเบือนทุกสิ่งที่สร้างขึ้นบนมัน สัญญาณบ่งบอก: ฟิลด์บน record A ที่ถูกส่งไปพร้อมกับ record B เสมอ ฟิลด์ที่เมธอดของ B อ่านและเขียนในขณะที่ A เพียงเก็บมันไว้ หรือ record สองตัวที่ต้องอัปเดตพร้อมกันเพื่อรักษาค่าหนึ่งให้สอดคล้องกัน แต่ละอย่างเป็นสัญญาณว่าเจ้าของที่แท้จริงของฟิลด์คือ B
+
+## Before → After
+
+`discountRate` ที่เก็บอยู่บน `Customer` แต่ถูกควบคุมทั้งหมดโดย `PricingPlan` ของลูกค้า ก่อนหน้านี้ อัตราอยู่บนลูกค้า และ plan เอื้อมข้ามไปเพื่อคำนวณราคา หลังจากนั้น อัตราอาศัยอยู่บน plan ซึ่งเป็นที่ที่กฎของมันอยู่อยู่แล้ว
+
+<Tabs syncKey="lang">
+  <TabItem label="TypeScript">
+    ```ts
+    // Before
+    class PricingPlan {
+      constructor(public name: string) {}
+
+      finalPrice(base: number, discountRate: number): number {
+        return base * (1 - discountRate);
+      }
+    }
+
+    class Customer {
+      constructor(
+        public name: string,
+        public plan: PricingPlan,
+        public discountRate: number,
+      ) {}
+
+      quote(base: number): number {
+        return this.plan.finalPrice(base, this.discountRate);
+      }
+    }
+
+    // After
+    class PricingPlan {
+      constructor(public name: string, public discountRate: number) {}
+
+      finalPrice(base: number): number {
+        return base * (1 - this.discountRate);
+      }
+    }
+
+    class Customer {
+      constructor(public name: string, public plan: PricingPlan) {}
+
+      quote(base: number): number {
+        return this.plan.finalPrice(base);
+      }
+    }
+    ```
+  </TabItem>
+  <TabItem label="Python">
+    ```python
+    # Before
+    class PricingPlan:
+        def __init__(self, name):
+            self.name = name
+
+        def final_price(self, base, discount_rate):
+            return base * (1 - discount_rate)
+
+    class Customer:
+        def __init__(self, name, plan, discount_rate):
+            self.name = name
+            self.plan = plan
+            self.discount_rate = discount_rate
+
+        def quote(self, base):
+            return self.plan.final_price(base, self.discount_rate)
+
+    # After
+    class PricingPlan:
+        def __init__(self, name, discount_rate):
+            self.name = name
+            self.discount_rate = discount_rate
+
+        def final_price(self, base):
+            return base * (1 - self.discount_rate)
+
+    class Customer:
+        def __init__(self, name, plan):
+            self.name = name
+            self.plan = plan
+
+        def quote(self, base):
+            return self.plan.final_price(base)
+    ```
+  </TabItem>
+  <TabItem label="Go">
+    ```go
+    // Before
+    type PricingPlan struct {
+        Name string
+    }
+
+    func (p PricingPlan) FinalPrice(base, discountRate float64) float64 {
+        return base * (1 - discountRate)
+    }
+
+    type Customer struct {
+        Name         string
+        Plan         PricingPlan
+        DiscountRate float64
+    }
+
+    func (c Customer) Quote(base float64) float64 {
+        return c.Plan.FinalPrice(base, c.DiscountRate)
+    }
+
+    // After
+    type PricingPlan struct {
+        Name         string
+        DiscountRate float64
+    }
+
+    func (p PricingPlan) FinalPrice(base float64) float64 {
+        return base * (1 - p.DiscountRate)
+    }
+
+    type Customer struct {
+        Name string
+        Plan PricingPlan
+    }
+
+    func (c Customer) Quote(base float64) float64 {
+        return c.Plan.FinalPrice(base)
+    }
+    ```
+  </TabItem>
+  <TabItem label="Rust">
+    ```rust
+    // Before
+    struct PricingPlan {
+        name: String,
+    }
+
+    impl PricingPlan {
+        fn final_price(&self, base: f64, discount_rate: f64) -> f64 {
+            base * (1.0 - discount_rate)
+        }
+    }
+
+    struct Customer {
+        name: String,
+        plan: PricingPlan,
+        discount_rate: f64,
+    }
+
+    impl Customer {
+        fn quote(&self, base: f64) -> f64 {
+            self.plan.final_price(base, self.discount_rate)
+        }
+    }
+
+    // After
+    struct PricingPlan {
+        name: String,
+        discount_rate: f64,
+    }
+
+    impl PricingPlan {
+        fn final_price(&self, base: f64) -> f64 {
+            base * (1.0 - self.discount_rate)
+        }
+    }
+
+    struct Customer {
+        name: String,
+        plan: PricingPlan,
+    }
+
+    impl Customer {
+        fn quote(&self, base: f64) -> f64 {
+            self.plan.final_price(base)
+        }
+    }
+    ```
+  </TabItem>
+</Tabs>
+
+<Mermaid code={moveFieldDiagram} title="ฟิลด์ที่เก็บอยู่บน Customer ย้ายไปยัง PricingPlan ที่ใช้งานมัน" />
+
+## Mechanics
+
+1. หากฟิลด์เป็น public ให้ห่อหุ้มมันไว้หลัง accessor ก่อน เพื่อให้ทุกการอ่านและเขียนผ่านจุดเดียว สิ่งนี้ทำให้การย้ายในภายหลังเป็นการเปลี่ยนแปลงที่จุดเดียว
+2. เพิ่มฟิลด์ลงใน record ปลายทาง พร้อมกับ accessor ที่นั่น
+3. ตัดสินใจว่าปลายทางจะเข้าถึงค่าอย่างไร: มันอาจคำนวณค่า เก็บค่าตอนสร้าง หรือรับค่าเป็นพารามิเตอร์
+4. เปลี่ยนทิศทาง accessor แต่ละตัวบนต้นทางให้มอบหมายไปยังสำเนาของฟิลด์ที่ปลายทาง
+5. **รันเทสต์ของคุณ** พฤติกรรมต้องไม่เปลี่ยนแปลง ณ จุดตรวจสอบนี้
+6. ลบฟิลด์ออกจากต้นทางเมื่อไม่มีอะไรอ่านมันในเครื่องอีกต่อไป และตัดพารามิเตอร์ที่มีไว้เพื่อขนมันออก
+7. **รันเทสต์ของคุณอีกครั้ง** ชุดเทสต์สีเขียวยืนยันว่าค่าอยู่ในที่เดียวแล้ว
+
+## When to use / trade-offs
+
+ย้ายฟิลด์เมื่อเมธอดของ record อื่นใช้งานมันมากกว่าเจ้าของปัจจุบัน เมื่อฟิลด์ถูกส่งไปพร้อมกับอ็อบเจกต์อื่นเสมอ หรือเมื่อการรักษาสำเนาสองชุดให้ตรงกันเป็นแหล่งบั๊กที่เกิดขึ้นซ้ำ ๆ
+
+ต้นทุนคือการต้องแตะผู้เรียกทุกตัวที่อ่านฟิลด์โดยตรง — ซึ่งนั่นเองคือเหตุผลที่การห่อหุ้มก่อนคุ้มค่า ไม่มีสิ่งตรงข้ามที่มีชื่อแยกต่างหาก: หากการเปลี่ยนแปลงภายหลังทำให้ record *เดิม* กลายเป็นผู้ใช้งานหนักกว่า คุณก็เพียงแค่ Move Field กลับ
+
+## Related
+
+- [Move Function](/refactoring-from-zero-to-hero/th/moving-features/move-function/)
+- [Extract Class](/refactoring-from-zero-to-hero/th/moving-features/extract-class/)
+- [Inline Class](/refactoring-from-zero-to-hero/th/moving-features/inline-class/)
+
+<Callout title="ห่อหุ้มก่อนย้าย">
+ส่วนที่เจ็บปวดของการย้ายฟิลด์คือผู้อ่านโดยตรงที่กระจัดกระจายอยู่ทั่วโค้ด ห่อฟิลด์ไว้ใน getter และ setter ก่อน ชี้ทุกคนไปที่ตัวนั้น แล้วการย้ายเองก็จะกลายเป็นการเปลี่ยนแปลงเดียวภายใน accessor เดียว
+</Callout>
+
+export const quizMoveField = [
+  {
+    q: 'เมื่อใดที่คุณควรย้ายฟิลด์ไปยังอีก record?',
+    options: [
+      'เมื่อฟิลด์มีชื่อยาว',
+      'เมื่อ record อื่นใช้งานมันมากกว่าเจ้าของปัจจุบัน',
+      'เมื่อฟิลด์เป็น string',
+      'เมื่อใดก็ตามที่ record มีฟิลด์มากกว่าสามตัว',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'ทำไมจึงควรห่อหุ้มฟิลด์ไว้หลัง accessor ก่อนย้ายมัน?',
+    options: [
+      'มันทำให้โปรแกรมทำงานเร็วขึ้น',
+      'เพื่อให้ทุกการเข้าถึงผ่านจุดเดียว และการย้ายกลายเป็นการเปลี่ยนแปลงเดียว',
+      'เพราะคอมไพเลอร์บังคับ',
+      'เพื่อซ่อนฟิลด์จากเทสต์',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'อะไรคือสัญญาณที่หนักแน่นว่าฟิลด์อยู่ผิดที่?',
+    options: [
+      'มันถูกส่งไปพร้อมกับอ็อบเจกต์อื่นเสมอ',
+      'มันถูกอ่านเพียงครั้งเดียว',
+      'มันเป็นฟิลด์ private',
+      'มันมีค่าเริ่มต้น',
+    ],
+    answer: 0,
+  },
+  {
+    q: 'คุณควรทำอะไรที่จุดตรวจสอบแต่ละจุดในกลไก (mechanics)?',
+    options: [
+      'Refactor ฟิลด์ที่สองในเวลาเดียวกัน',
+      'รันเทสต์เพื่อยืนยันว่าพฤติกรรมไม่เปลี่ยนแปลง',
+      'ลบ record ต้นทาง',
+      'Commit แล้วหยุด',
+    ],
+    answer: 1,
+  },
+];
+
+<Quiz client:visible id="moving-features/move-field" questions={quizMoveField} />
+
+<ProgressTracker client:visible id="moving-features/move-field" />

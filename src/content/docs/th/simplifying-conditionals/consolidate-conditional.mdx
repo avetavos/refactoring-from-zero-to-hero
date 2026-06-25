@@ -1,0 +1,230 @@
+---
+title: Consolidate Conditional Expression
+description: เมื่อการตรวจสอบหลายตัวที่แยกกันล้วนนำไปสู่ผลลัพธ์เดียวกัน ให้รวมมันเป็นเงื่อนไขเดียวและตั้งชื่อให้มันที่อธิบายว่าทำไม
+sidebar:
+  order: 3
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+export const consolidateDiagram = `flowchart LR
+  subgraph Before["Before"]
+    A["if seniority < 2 return 0<br/>if monthsDisabled > 12 return 0<br/>if isPartTime return 0"]
+  end
+  subgraph After["After"]
+    B["if isNotEligible(emp)<br/>return 0"]
+  end
+  Before -.->|"Consolidate Conditional Expression"| After`;
+
+## เจตนา
+
+เอาชุดเงื่อนไขแยกกันที่แต่ละตัวคุ้มกันผลลัพธ์ *เดียวกัน* มาพับรวมเป็นเงื่อนไขผสมเดียว แล้วสกัดเงื่อนไขนั้นออกมาเป็นฟังก์ชันที่มีชื่อ การตรวจสอบสามตัวที่กระจัดกระจายซึ่งมี `return 0` เหมือนกัน กลายเป็น `if (isNotEligible(employee)) return 0` เพียงตัวเดียว และเหตุผลของผลลัพธ์ก็ถูกจับใจความไว้ในชื่อ
+
+## กลิ่นโค้ด
+
+นี่คือวิธีแก้สำหรับ **ลำดับของเงื่อนไขที่มีผลลัพธ์เหมือนกัน** การตรวจสอบแต่ละตัวลำพังดูไร้เดียงสา แต่เมื่ออยู่ด้วยกัน มันซ่อนแนวคิดเดียวไว้หลังท่อร้อยสายสามบรรทัด ผู้อ่านต้องสังเกตให้ได้ว่าทั้งสามตัวให้ค่าเหมือนกันก่อนจะเข้าใจว่าจริง ๆ แล้วมันคือคำถามเดียว — *คนนี้ขาดคุณสมบัติใช่ไหม?* การรวมเข้าด้วยกันทำให้คำถามเดียวนั้นชัดแจ้ง และตัวช่วยที่มีชื่อก็บอกผู้อ่านคนถัดไปว่า *ทำไม* โดยไม่ต้องให้เขาวิศวกรรมย้อนกลับ
+
+## Before → After
+
+จำนวนเงินสวัสดิการคนพิการ return ศูนย์สำหรับเงื่อนไขที่ตัดสิทธิหลายข้อ ก่อนหน้านี้ ตัวตัดสิทธิแต่ละตัวเป็น `if` ของตัวเอง หลังจากนั้น มันเป็นการตรวจสอบที่มีชื่อเพียงตัวเดียว
+
+<Tabs syncKey="lang">
+  <TabItem label="TypeScript">
+    ```ts
+    // Before
+    function disabilityAmount(employee: Employee): number {
+      if (employee.seniority < 2) return 0;
+      if (employee.monthsDisabled > 12) return 0;
+      if (employee.isPartTime) return 0;
+      // ... compute the real amount
+      return baseAmount(employee);
+    }
+
+    // After
+    function disabilityAmount(employee: Employee): number {
+      if (isNotEligible(employee)) return 0;
+      // ... compute the real amount
+      return baseAmount(employee);
+    }
+
+    function isNotEligible(employee: Employee): boolean {
+      return (
+        employee.seniority < 2 ||
+        employee.monthsDisabled > 12 ||
+        employee.isPartTime
+      );
+    }
+    ```
+  </TabItem>
+  <TabItem label="Python">
+    ```python
+    # Before
+    def disability_amount(employee):
+        if employee.seniority < 2:
+            return 0
+        if employee.months_disabled > 12:
+            return 0
+        if employee.is_part_time:
+            return 0
+        # ... compute the real amount
+        return base_amount(employee)
+
+    # After
+    def disability_amount(employee):
+        if is_not_eligible(employee):
+            return 0
+        # ... compute the real amount
+        return base_amount(employee)
+
+    def is_not_eligible(employee):
+        return (
+            employee.seniority < 2
+            or employee.months_disabled > 12
+            or employee.is_part_time
+        )
+    ```
+  </TabItem>
+  <TabItem label="Go">
+    ```go
+    // Before
+    func DisabilityAmount(employee Employee) int {
+        if employee.Seniority < 2 {
+            return 0
+        }
+        if employee.MonthsDisabled > 12 {
+            return 0
+        }
+        if employee.IsPartTime {
+            return 0
+        }
+        // ... compute the real amount
+        return baseAmount(employee)
+    }
+
+    // After
+    func DisabilityAmount(employee Employee) int {
+        if isNotEligible(employee) {
+            return 0
+        }
+        // ... compute the real amount
+        return baseAmount(employee)
+    }
+
+    func isNotEligible(employee Employee) bool {
+        return employee.Seniority < 2 ||
+            employee.MonthsDisabled > 12 ||
+            employee.IsPartTime
+    }
+    ```
+  </TabItem>
+  <TabItem label="Rust">
+    ```rust
+    // Before
+    fn disability_amount(employee: &Employee) -> i64 {
+        if employee.seniority < 2 {
+            return 0;
+        }
+        if employee.months_disabled > 12 {
+            return 0;
+        }
+        if employee.is_part_time {
+            return 0;
+        }
+        // ... compute the real amount
+        base_amount(employee)
+    }
+
+    // After
+    fn disability_amount(employee: &Employee) -> i64 {
+        if is_not_eligible(employee) {
+            return 0;
+        }
+        // ... compute the real amount
+        base_amount(employee)
+    }
+
+    fn is_not_eligible(employee: &Employee) -> bool {
+        employee.seniority < 2
+            || employee.months_disabled > 12
+            || employee.is_part_time
+    }
+    ```
+  </TabItem>
+</Tabs>
+
+<Mermaid code={consolidateDiagram} title="การตรวจสอบสามตัวที่มีผลลัพธ์เดียวกลายเป็นเงื่อนไขที่มีชื่อตัวเดียว" />
+
+## กลไก
+
+1. ยืนยันว่าเงื่อนไขเหล่านั้นมีผลลัพธ์ร่วมกันจริง ๆ และไม่มีผลข้างเคียง (side effect) ระหว่างกัน หากการตรวจสอบหนึ่งเปลี่ยนสถานะที่ตัวถัดไปพึ่งพา อย่ารวม
+2. รวมการทดสอบด้วย `||` เมื่อทั้งหมดนำไปสู่สาขาเดียวกัน (หรือ `&&` เมื่อโครงสร้างเป็นการตรวจสอบซ้อนกันที่ต้องผ่านทั้งหมด) วางเงื่อนไขที่รวมแล้วไว้ติดกับผลลัพธ์ร่วม
+3. **รันเทสต์ของคุณ** พฤติกรรมต้องตรงกับโซ่ของ `if` แยกกันทุกประการ รวมถึงลำดับการลัดวงจร (short-circuit)
+4. ใช้ **Extract Function** กับเงื่อนไขที่รวมแล้ว ตั้งชื่อตามคำถามที่มันตอบ (`isNotEligible`)
+5. รันเทสต์ของคุณอีกครั้ง
+
+## เมื่อไรควรใช้ / ข้อแลกเปลี่ยน
+
+หยิบ Consolidate Conditional Expression มาใช้เมื่อใดก็ตามที่คุณเห็นการตรวจสอบติดต่อกันซึ่งทุกตัวนำไปสู่ผลลัพธ์เดียวกัน มันมีค่าที่สุดในฐานะท่าตั้งต้น: เมื่อการตรวจสอบกลายเป็นฟังก์ชันที่มีชื่อตัวเดียว คุณสามารถนำฟังก์ชันนั้นกลับมาใช้ใหม่ และมันมักเปิดทางให้ **Replace Nested Conditional with Guard Clauses**
+
+อย่ารวมเมื่อการตรวจสอบเป็นการตัดสินใจที่เป็นอิสระต่อกันจริง ๆ ซึ่งบังเอิญมีค่าร่วมกันในวันนี้แต่อาจแยกทางกันในวันพรุ่งนี้ — การรวมมันจะทำให้กฎที่ไม่เกี่ยวข้องกันมาผูกติดกัน และอย่ารวมข้ามผลข้างเคียงเด็ดขาด การลัดวงจรของนิพจน์ที่รวมแล้วอาจข้ามงานที่โซ่เดิมทำไว้
+
+## ที่เกี่ยวข้อง
+
+- [Decompose Conditional](/refactoring-from-zero-to-hero/th/simplifying-conditionals/decompose-conditional/)
+- [Replace Nested Conditional with Guard Clauses](/refactoring-from-zero-to-hero/th/simplifying-conditionals/replace-nested-conditional-with-guard-clauses/)
+- [Extract Function](/refactoring-from-zero-to-hero/th/composing-methods/extract-function/)
+
+<Callout title="รวมก็ต่อเมื่อผลลัพธ์เหมือนกันจริง ๆ เท่านั้น">
+ตัวกระตุ้นคือผลลัพธ์ที่เหมือนกัน ไม่ใช่เงื่อนไขที่หน้าตาคล้ายกัน หากการตรวจสอบสองตัว return ค่าต่างกัน ก็ปล่อยให้แยกกันไว้ — การยัดมันเข้าด้วยกันจะซ่อนความแตกต่างที่แท้จริง รวมเพื่อความชัดเจน ไม่ใช่เพื่อตัดจำนวนบรรทัด
+</Callout>
+
+export const quizConsolidate = [
+  {
+    q: 'เงื่อนไขก่อนหน้า (precondition) สำหรับการรวมลำดับของเงื่อนไขคืออะไร?',
+    options: [
+      'พวกมันต้องใช้ตัวดำเนินการเปรียบเทียบเดียวกัน',
+      'พวกมันต้องนำไปสู่ผลลัพธ์เดียวกันทั้งหมดและปราศจากผลข้างเคียงระหว่างกัน',
+      'แต่ละตัวต้อง return ค่าที่ต่างกัน',
+      'พวกมันต้องอยู่ภายในลูป',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'หลังจากรวมเงื่อนไขแล้ว ขั้นตอนถัดไปที่แนะนำคืออะไร?',
+    options: [
+      'Inline ฟังก์ชันที่เรียกพวกมัน',
+      'สกัดเงื่อนไขที่รวมแล้วออกมาเป็นฟังก์ชันที่มีชื่อ',
+      'ลบผลลัพธ์ร่วมทิ้ง',
+      'แปลงมันให้เป็นคำสั่ง switch',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'เมื่อไรที่คุณไม่ควรรวมการตรวจสอบสองตัว?',
+    options: [
+      'เมื่อมันมีผลลัพธ์ร่วมกันในวันนี้แต่เป็นกฎที่เป็นอิสระต่อกันซึ่งอาจแยกทางกัน',
+      'เมื่อมันอยู่ติดกัน',
+      'เมื่อมันอ่านฟิลด์ของ struct',
+      'เมื่อฟังก์ชันสั้น',
+    ],
+    answer: 0,
+  },
+  {
+    q: 'ทำไมคุณต้องระวังผลข้างเคียงระหว่างการตรวจสอบที่รวมเข้าด้วยกัน?',
+    options: [
+      'ผลข้างเคียงทำให้ฟังก์ชันช้าลง',
+      'การประเมินแบบลัดวงจรอาจข้ามงานที่โซ่แยกกันทำไว้',
+      'คอมไพเลอร์ห้ามมีผลข้างเคียงในเงื่อนไข',
+      'ผลข้างเคียงเปลี่ยนชื่อตัวแปร',
+    ],
+    answer: 1,
+  },
+];
+
+<Quiz client:visible id="simplifying-conditionals/consolidate-conditional" questions={quizConsolidate} />
+
+<ProgressTracker client:visible id="simplifying-conditionals/consolidate-conditional" />

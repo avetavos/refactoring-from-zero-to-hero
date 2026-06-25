@@ -1,5 +1,82 @@
 ---
 title: Composing Methods
-description: Extract and reshape functions to remove duplication and clarify intent.
+description: ปรับโครงสร้างภายในของฟังก์ชันเพื่อกำจัดความซ้ำซ้อนและเผยให้เห็นเจตนา — Extract, Inline และการเคลื่อนไหวที่ทำให้โค้ดอ่านได้เหมือนเรื่องเล่า
+sidebar:
+  order: 1
 ---
-Coming soon.
+
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+export const overviewDiagram = `flowchart TD
+  A["A long, tangled function"] --> B{"What is wrong?"}
+  B -->|"A block does one named thing"| C["Extract Function"]
+  B -->|"A helper adds no clarity"| D["Inline Function"]
+  B -->|"A sub-expression is cryptic"| E["Extract Variable"]
+  B -->|"A temp holds a computed value"| F["Replace Temp with Query"]
+  B -->|"Two unrelated jobs in one flow"| G["Split Phase"]
+  C --> H["Code that reads like intent"]
+  D --> H
+  E --> H
+  F --> H
+  G --> H`;
+
+## เจตนา
+
+กลุ่ม **composing methods** เป็นเรื่องของ *ภายใน* ของฟังก์ชัน: statement ต่าง ๆ ถูกจัดกลุ่ม ตั้งชื่อ และเรียงลำดับอย่างไร refactoring เหล่านี้ไม่เปลี่ยนพฤติกรรม แต่เปลี่ยนว่ามนุษย์จะติดตามสิ่งที่ฟังก์ชันพยายามจะสื่อได้ง่ายเพียงใด
+
+## smell
+
+ฟังก์ชันเติบโตขึ้นเมื่อเวลาผ่านไป มันสะสมตัวแปรชั่วคราวตรงนี้ เงื่อนไขบรรทัดเดียวอันแสนฉลาดตรงนั้น ลูปที่แอบทำงานสามอย่างเงียบ ๆ ในที่สุดก็ไม่มีใครอ่านมันจากบนลงล่างแล้วอธิบายได้ในประโยคเดียว วิธีรักษาในโมดูลนี้โจมตีปัญหานั้นโดยตรง: มันแยกชิ้นส่วนที่พันกันยุ่งเหยิงออกจากกัน ตั้งชื่อให้ส่วนสำคัญ และปล่อยให้โค้ดที่เหลืออ่านได้เหมือนสรุปย่อ ๆ ของเจตนา
+
+<Mermaid code={overviewDiagram} title="เลือกการเคลื่อนไหวแบบ composing-methods ตามสิ่งที่ผิดพลาด" />
+
+## โมดูลนี้ครอบคลุมอะไรบ้าง
+
+refactoring ห้าแบบ แต่ละแบบเล็กและย้อนกลับได้:
+
+- **Extract Function** — ยกชิ้นส่วนหนึ่งขึ้นไปเป็นฟังก์ชันของตัวเองที่มีชื่อดี เพื่อให้ผู้เรียกอ่านได้เหมือนรายการของเจตนา เป็นการเคลื่อนไหวพื้นฐานที่สุดในบรรดาทั้งหมด
+- **Inline Function** — สิ่งที่ตรงกันข้าม: เมื่อ body ของ helper เรียบง่ายพอ ๆ กับชื่อของมัน ก็พับมันกลับเข้าไป
+- **Extract Variable** — ตั้งชื่อให้ sub-expression ที่ชวนสับสน เพื่อให้บรรทัดนั้นอธิบายตัวเองได้
+- **Replace Temp with Query** — เปลี่ยนตัวแปร local ที่เก็บค่าที่คำนวณไว้ให้กลายเป็นฟังก์ชัน เพื่อให้การคำนวณนำกลับมาใช้ซ้ำได้และ extract ได้ง่าย
+- **Split Phase** — เมื่อบล็อกหนึ่งทำงานสองอย่างที่ต่างกัน ก็แยกมันออกเป็น phase ที่เรียงลำดับและเชื่อมกันด้วยค่ากลางที่ชัดเจน
+
+แต่ละบทเรียนแสดงตัวอย่าง before-and-after เดียวกันในภาษา TypeScript, Python, Go และ Rust จากนั้นพาเดินผ่าน mechanics ที่ปลอดภัยและเรียงลำดับ — โดยรันเทสต์ของคุณระหว่างทุกขั้นตอน
+
+<Callout title="ออกแบบมาให้รักษาพฤติกรรม">
+ทุกการเคลื่อนไหวในที่นี้รักษาพฤติกรรมที่สังเกตได้ของโปรแกรมให้เหมือนเดิมทุกประการ ถ้า refactoring เปลี่ยนสิ่งที่โค้ด *ทำ* นั่นคือบั๊ก ไม่ใช่ refactoring ชุดเทสต์ของคุณคือสิ่งที่ทำให้คุณเปลี่ยนแปลงเหล่านี้ได้อย่างมั่นใจ
+</Callout>
+
+export const quizIndex = [
+  {
+    q: 'refactoring แบบ "composing methods" เปลี่ยนอะไรเป็นหลัก?',
+    options: [
+      'พฤติกรรมที่สังเกตได้ของโปรแกรม',
+      'รูปร่างภายในของฟังก์ชัน — การจัดกลุ่ม การตั้งชื่อ และการเรียงลำดับ statement',
+      'schema ของฐานข้อมูล',
+      'network protocol สาธารณะ',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'refactoring แบบใดที่ถูกอธิบายว่าเป็นการเคลื่อนไหวพื้นฐานที่สุดในโมดูลนี้?',
+    options: ['Split Phase', 'Inline Function', 'Extract Function', 'Replace Temp with Query'],
+    answer: 2,
+  },
+  {
+    q: 'ทำไมชุดเทสต์จึงสำคัญเมื่อนำ refactoring เหล่านี้ไปใช้?',
+    options: [
+      'มันทำให้โค้ดรันเร็วขึ้น',
+      'มันพิสูจน์ว่าพฤติกรรมยังคงเหมือนเดิมหลังแต่ละขั้นตอนเล็ก ๆ',
+      'มันเป็นข้อกำหนดของ compiler',
+      'มันสร้างโค้ดที่ refactor แล้วโดยอัตโนมัติ',
+    ],
+    answer: 1,
+  },
+];
+
+<Quiz client:visible id="composing-methods/index" questions={quizIndex} />
+
+<ProgressTracker client:visible id="composing-methods/index" />

@@ -1,0 +1,175 @@
+---
+title: refactoring คืออะไร?
+description: นิยามที่แม่นยำของ refactoring ในฐานะการเปลี่ยนแปลงที่รักษาพฤติกรรมไว้ และความต่างจากการเขียนใหม่และการเพิ่มฟีเจอร์ — กฎ "สองหมวก"
+sidebar:
+  order: 2
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+export const hatsDiagram = `flowchart TB
+  Start["I want to work on the code"] --> Q{"Which hat?"}
+  Q -->|"Adding behavior"| Feature["Feature hat:<br/>write new code,<br/>add tests"]
+  Q -->|"Cleaning structure"| Refactor["Refactor hat:<br/>keep behavior,<br/>tests stay green"]
+  Feature --> Switch["Switch hats —<br/>never wear both"]
+  Refactor --> Switch`;
+
+## นิยามที่แม่นยำ
+
+ผู้คนใช้คำว่า *refactoring* แบบหลวม ๆ ในความหมายว่า "เก็บกวาดโค้ด" แต่วินัยนี้หมายถึงสิ่งที่คมชัดกว่านั้น
+
+> **refactoring** คือการเปลี่ยนโค้ดที่ปรับปรุงโครงสร้างภายในของมันในขณะที่รักษาพฤติกรรมที่สังเกตได้เอาไว้
+
+สองส่วนนี้สำคัญเท่ากัน การเปลี่ยนแปลงต้อง *ปรับปรุงโครงสร้าง* — มิฉะนั้นมันก็เป็นเพียงการปั่นป่วนที่ไร้ความหมาย และมันต้อง *รักษาพฤติกรรมไว้* — ทุกอินพุตยังคงให้เอาต์พุตเดิม ทุก side effect ยังคงเกิดขึ้น ไม่มี public contract ใดเลื่อนไป การเปลี่ยนแปลงที่แก้ไขสิ่งที่ผู้เรียกสังเกตได้ ไม่ใช่ refactoring ไม่ว่าผลลัพธ์จะดูเรียบร้อยแค่ไหน
+
+## refactoring กับ rewriting กับการเพิ่มฟีเจอร์
+
+สามกิจกรรมนี้รู้สึกคล้ายกันเมื่อมองจากเก้าอี้ แต่มันแบกความเสี่ยงที่ต่างกันมาก
+
+- **Refactoring** ปรับรูปทรงของโค้ดที่มีอยู่และทำงานได้แล้ว ด้วยก้าวเล็ก ๆ ที่ย้อนกลับได้ คุณมีโปรแกรมที่รันได้อยู่เสมอ คุณไม่เคยอยู่ห่างจากสถานะสีเขียวล่าสุด
+- **Rewriting** ทิ้งโค้ดเก่าไปและสร้างของแทนที่ขึ้นมาใหม่ คุณสูญเสียการแก้บั๊กที่สะสมมาฝังอยู่ในของเดิม และคุณไม่มีโปรแกรมที่รันได้จนกว่าของใหม่จะเสร็จ บางครั้งจำเป็น แต่ไม่ค่อยถูก
+- **การเพิ่มฟีเจอร์** นำพฤติกรรม *ใหม่* เข้ามา โปรแกรมทำสิ่งที่มันทำไม่ได้มาก่อน ซึ่งหมายความว่าพฤติกรรมที่สังเกตได้ของมันเปลี่ยนไปโดยตั้งใจ
+
+Refactoring คือทางสายกลางที่ปลอดภัย คุณรักษาโค้ดที่ทำงานได้ไว้และปรับปรุงมันอย่างค่อยเป็นค่อยไป แทนที่จะเสี่ยงกับการสร้างของแทนที่ใหม่ตั้งแต่ศูนย์
+
+## สองหมวก
+
+เมื่อคุณนั่งลงเพื่อแก้โค้ด คุณกำลังสวมหมวกหนึ่งในสองใบ **หมวกฟีเจอร์ (feature hat)** ไว้สำหรับเพิ่มความสามารถ คุณเขียนโค้ดใหม่และ test ของมัน ส่วน **หมวก refactor (refactor hat)** ไว้สำหรับปรับโครงสร้าง คุณเปลี่ยน *รูปทรง* ของโค้ด และ test ที่มีอยู่ต้องคงเป็นสีเขียวตลอดเวลา เพราะพฤติกรรมต้องไม่ขยับ
+
+กฎเรียบง่ายและเข้มงวด สวมหมวกได้ครั้งละหนึ่งใบเท่านั้น ถ้าคุณกำลัง extract function อยู่ครึ่งทางแล้วสังเกตเห็นฟีเจอร์ที่ขาดไป จง refactor ให้เสร็จก่อน commit แล้ว *จึง* สลับหมวก การผสมสองอย่างเข้าด้วยกันคือวิธีที่ "การเก็บกวาดเร็ว ๆ" กลายเป็นการ debug ทั้งบ่าย — เมื่อ test พัง คุณจะไม่สามารถบอกได้อีกต่อไปว่าการปรับโครงสร้างหรือฟีเจอร์ใหม่ของคุณเป็นต้นเหตุ
+
+<Mermaid code={hatsDiagram} title="สองหมวก: แยกงานปรับโครงสร้างกับงานฟีเจอร์ออกจากกันอย่างเด็ดขาด" />
+
+## ตัวอย่าง before → after เล็ก ๆ
+
+Refactoring ที่เล็กที่สุดมักมีค่ามากที่สุด ตรงนี้เราทำสองอย่าง แทน magic number ด้วยค่าคงที่ที่มีชื่อ และเปลี่ยนชื่อตัวแปรที่อ่านไม่รู้เรื่อง พฤติกรรมเหมือนกันทั้งก่อนและหลัง — เอาต์พุตเท่ากัน — แต่เจตนาตอนนี้อ่านออกได้จากหน้ากระดาษ
+
+<Tabs syncKey="lang">
+  <TabItem label="TypeScript">
+    ```ts
+    // Before
+    function price(q: number): number {
+      return q * 9.99 * 1.07;
+    }
+
+    // After
+    const UNIT_PRICE = 9.99;
+    const TAX_RATE = 1.07;
+
+    function price(quantity: number): number {
+      return quantity * UNIT_PRICE * TAX_RATE;
+    }
+    ```
+  </TabItem>
+  <TabItem label="Python">
+    ```python
+    # Before
+    def price(q):
+        return q * 9.99 * 1.07
+
+    # After
+    UNIT_PRICE = 9.99
+    TAX_RATE = 1.07
+
+    def price(quantity):
+        return quantity * UNIT_PRICE * TAX_RATE
+    ```
+  </TabItem>
+  <TabItem label="Go">
+    ```go
+    // Before
+    func Price(q float64) float64 {
+        return q * 9.99 * 1.07
+    }
+
+    // After
+    const (
+        UnitPrice = 9.99
+        TaxRate   = 1.07
+    )
+
+    func Price(quantity float64) float64 {
+        return quantity * UnitPrice * TaxRate
+    }
+    ```
+  </TabItem>
+  <TabItem label="Rust">
+    ```rust
+    // Before
+    fn price(q: f64) -> f64 {
+        q * 9.99 * 1.07
+    }
+
+    // After
+    const UNIT_PRICE: f64 = 9.99;
+    const TAX_RATE: f64 = 1.07;
+
+    fn price(quantity: f64) -> f64 {
+        quantity * UNIT_PRICE * TAX_RATE
+    }
+    ```
+  </TabItem>
+</Tabs>
+
+ไม่มีอะไรที่ฟังก์ชันคืนค่ากลับมาเปลี่ยนไปเลย นั่นแหละคือประเด็นทั้งหมด refactoring ที่คุณรันได้ทั้งก่อนและหลังแล้วได้ผลลัพธ์ที่เหมือนกันชนิดไบต์ต่อไบต์ คือ refactoring ที่คุณไว้ใจได้
+
+## ที่เกี่ยวข้อง
+
+- [ทำไมและเมื่อไหร่ควร refactor](/refactoring-from-zero-to-hero/th/intro-and-principles/why-and-when/)
+- [ก้าวเล็ก ๆ และ test](/refactoring-from-zero-to-hero/th/intro-and-principles/small-steps-and-tests/)
+- [Extract Variable](/refactoring-from-zero-to-hero/th/composing-methods/extract-variable/)
+
+<Callout title="สวมหมวกครั้งละใบ">
+วิธีที่เร็วที่สุดในการเสียเวลาหลายชั่วโมงคือการ refactor และเพิ่มฟีเจอร์ในการแก้ครั้งเดียวกัน เมื่อแถบ test กลายเป็นสีแดง คุณจะไม่รู้ว่าจะโทษการเปลี่ยนแปลงไหน จงตรึงพฤติกรรมไว้ขณะที่คุณปรับโครงสร้าง และเปลี่ยนพฤติกรรมเฉพาะตอนที่สวมหมวกฟีเจอร์เท่านั้น
+</Callout>
+
+export const quizWhat = [
+  {
+    q: 'การเปลี่ยนแปลงแบบไหนที่นับเป็น refactoring?',
+    options: [
+      'การเพิ่ม API endpoint ใหม่',
+      'การเปลี่ยนชื่อตัวแปรโดยที่เอาต์พุตยังคงเหมือนเดิม',
+      'การแก้บั๊กที่เปลี่ยนค่าที่คืนกลับมา',
+      'การเขียนโมดูลใหม่ด้วยภาษาอื่น',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'อะไรคือสิ่งที่แยก refactoring ออกจาก rewriting?',
+    options: [
+      'Refactoring ทิ้งโค้ดเก่าไป',
+      'Refactoring ปรับรูปทรงโค้ดที่ทำงานได้อยู่แล้วด้วยก้าวเล็ก ๆ ที่ย้อนกลับได้',
+      'Rewriting รักษาพฤติกรรมไว้เสมอ',
+      'ทั้งสองเป็นสิ่งเดียวกันเป๊ะ',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'กฎ "สองหมวก" บอกให้คุณทำอะไร?',
+    options: [
+      'refactor ก่อนเขียนฟีเจอร์ใด ๆ เสมอ',
+      'เพิ่มฟีเจอร์และ refactor ใน commit เดียวกันเพื่อความรวดเร็ว',
+      'สวมหมวกครั้งละใบเท่านั้น — อย่าผสมงาน refactoring กับงานฟีเจอร์',
+      'สวมสองหมวกพร้อมกันเพื่อให้เสร็จเร็วเป็นสองเท่า',
+    ],
+    answer: 2,
+  },
+  {
+    q: 'ในตัวอย่าง before/after คุณรู้ได้อย่างไรว่ามันเป็น refactoring จริง?',
+    options: [
+      'ฟังก์ชันสั้นลง',
+      'ชื่อฟังก์ชันเปลี่ยนไป',
+      'มันคืนผลลัพธ์ที่เหมือนกันทั้งก่อนและหลังการเปลี่ยนแปลง',
+      'มีการนำค่าคงที่ใหม่เข้ามา',
+    ],
+    answer: 2,
+  },
+];
+
+<Quiz client:visible id="intro-and-principles/what-is-refactoring" questions={quizWhat} />
+
+<ProgressTracker client:visible id="intro-and-principles/what-is-refactoring" />

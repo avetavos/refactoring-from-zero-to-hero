@@ -1,0 +1,189 @@
+---
+title: Parameterize Function
+description: When two near-identical functions differ only by a literal value, merge them into one function that accepts that value as a parameter.
+sidebar:
+  order: 3
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+## Intent
+
+Spot two or more functions whose bodies are the same except for one baked-in value, then collapse them into a single function that takes that value as a parameter. The duplicated logic now lives in exactly one place, and the difference between the old variants becomes a visible argument at the call site.
+
+## The smell
+
+This is a flavour of **Duplicated Code**. You see `discountFivePercent` and `discountTenPercent` sitting next to each other, identical apart from the number. Or `tierBronze` and `tierSilver`, differing only by a threshold. Every time the shared logic needs a fix, you have to remember to fix each clone — and one day you will forget one. The hard-coded constant is the only thing that varies, so it wants to be an argument, not a copy of the whole function.
+
+## Before → After
+
+Two functions that compute a discounted price, differing only by the rate. After, one function takes the rate as a parameter.
+
+<Tabs syncKey="lang">
+  <TabItem label="TypeScript">
+    ```ts
+    // Before
+    function priceWithFivePercentOff(price: number): number {
+      return price - price * 0.05;
+    }
+
+    function priceWithTenPercentOff(price: number): number {
+      return price - price * 0.10;
+    }
+
+    const a = priceWithFivePercentOff(200);
+    const b = priceWithTenPercentOff(200);
+
+    // After
+    function discountedPrice(price: number, rate: number): number {
+      return price - price * rate;
+    }
+
+    const a = discountedPrice(200, 0.05);
+    const b = discountedPrice(200, 0.10);
+    ```
+  </TabItem>
+  <TabItem label="Python">
+    ```python
+    # Before
+    def price_with_five_percent_off(price):
+        return price - price * 0.05
+
+    def price_with_ten_percent_off(price):
+        return price - price * 0.10
+
+    a = price_with_five_percent_off(200)
+    b = price_with_ten_percent_off(200)
+
+    # After
+    def discounted_price(price, rate):
+        return price - price * rate
+
+    a = discounted_price(200, 0.05)
+    b = discounted_price(200, 0.10)
+    ```
+  </TabItem>
+  <TabItem label="Go">
+    ```go
+    // Before
+    func PriceWithFivePercentOff(price float64) float64 {
+        return price - price*0.05
+    }
+
+    func PriceWithTenPercentOff(price float64) float64 {
+        return price - price*0.10
+    }
+
+    a := PriceWithFivePercentOff(200)
+    b := PriceWithTenPercentOff(200)
+
+    // After
+    func DiscountedPrice(price, rate float64) float64 {
+        return price - price*rate
+    }
+
+    a := DiscountedPrice(200, 0.05)
+    b := DiscountedPrice(200, 0.10)
+    ```
+  </TabItem>
+  <TabItem label="Rust">
+    ```rust
+    // Before
+    fn price_with_five_percent_off(price: f64) -> f64 {
+        price - price * 0.05
+    }
+
+    fn price_with_ten_percent_off(price: f64) -> f64 {
+        price - price * 0.10
+    }
+
+    let a = price_with_five_percent_off(200.0);
+    let b = price_with_ten_percent_off(200.0);
+
+    // After
+    fn discounted_price(price: f64, rate: f64) -> f64 {
+        price - price * rate
+    }
+
+    let a = discounted_price(200.0, 0.05);
+    let b = discounted_price(200.0, 0.10);
+    ```
+  </TabItem>
+</Tabs>
+
+## Mechanics
+
+1. Pick one of the near-identical functions to be the template.
+2. Add a parameter for the value that varies. Give it a descriptive name like `rate` or `threshold`, not `value`.
+3. Inside the body, replace the hard-coded literal with the new parameter. **Run your tests** — behaviour should be unchanged for that one function's original case when you pass its old constant.
+4. For each remaining clone, redirect its callers to the parameterized function, passing the clone's specific literal as the argument.
+5. **Run your tests** after redirecting each clone, so a failure points at one call.
+6. Once nothing calls the old clones, delete them.
+7. Consider whether the new parameter should be validated — for example, a discount rate outside the range zero to one is probably a bug worth rejecting.
+
+## When to use / trade-offs
+
+Reach for this when functions differ only by a constant, when you are about to copy-paste a function and tweak one number, or when a family of named variants keeps growing. Parameterizing kills the duplication and makes the varying dimension explicit and discoverable.
+
+The trade-off is that a literal argument at the call site can be less self-documenting than a well-named function — a bare `0.05` says less than `priceWithFivePercentOff`. If the set of values is small and meaningful, named constants or an enum at the call site restore that clarity. And resist over-parameterizing: a function with eight knobs is harder to use than the clones it replaced.
+
+## Related
+
+- [Remove Flag Argument](/refactoring-from-zero-to-hero/en/simplifying-apis/remove-flag-argument/)
+- [Introduce Parameter Object](/refactoring-from-zero-to-hero/en/simplifying-apis/introduce-parameter-object/)
+- [Extract Function](/refactoring-from-zero-to-hero/en/composing-methods/extract-function/)
+
+<Callout title="Parameterize the value, not the behaviour">
+This move shines when the only difference is *data* — a rate, a limit, a label. When the difference is *behaviour* — one variant logs and the other emails — a single boolean parameter tends to fork the body in two, which is the Flag Argument smell. Keep parameters describing values, and split functions describe behaviour.
+</Callout>
+
+export const quizParameterize = [
+  {
+    q: 'What pattern signals that Parameterize Function applies?',
+    options: [
+      'A single very long function',
+      'Two or more functions with identical bodies that differ only by a literal value',
+      'A function with no parameters',
+      'A function that returns nothing',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'After adding the parameter to the template function, what confirms you have not changed its behaviour?',
+    options: [
+      'The code compiles',
+      'Passing the original constant and seeing the tests still pass',
+      'The function name is shorter',
+      'The literal is removed',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'What is a downside of a bare literal argument at the call site?',
+    options: [
+      'It runs slower',
+      'It can be less self-documenting than a descriptively named variant function',
+      'It cannot be tested',
+      'It increases memory usage',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'When does a difference between functions suggest splitting rather than parameterizing?',
+    options: [
+      'When the difference is only a number',
+      'When the difference is in behaviour, which a boolean parameter would fork inside the body',
+      'When the functions have the same name',
+      'When both functions are short',
+    ],
+    answer: 1,
+  },
+];
+
+<Quiz client:visible id="simplifying-apis/parameterize-function" questions={quizParameterize} />
+
+<ProgressTracker client:visible id="simplifying-apis/parameterize-function" />

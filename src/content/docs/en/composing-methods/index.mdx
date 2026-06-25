@@ -1,5 +1,82 @@
 ---
 title: Composing Methods
-description: Extract and reshape functions to remove duplication and clarify intent.
+description: Reshape the inside of functions to remove duplication and reveal intent — Extract, Inline, and the moves that make code read like a story.
+sidebar:
+  order: 1
 ---
-Coming soon.
+
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+export const overviewDiagram = `flowchart TD
+  A["A long, tangled function"] --> B{"What is wrong?"}
+  B -->|"A block does one named thing"| C["Extract Function"]
+  B -->|"A helper adds no clarity"| D["Inline Function"]
+  B -->|"A sub-expression is cryptic"| E["Extract Variable"]
+  B -->|"A temp holds a computed value"| F["Replace Temp with Query"]
+  B -->|"Two unrelated jobs in one flow"| G["Split Phase"]
+  C --> H["Code that reads like intent"]
+  D --> H
+  E --> H
+  F --> H
+  G --> H`;
+
+## Intent
+
+The **composing methods** family is about the *inside* of a function: how its statements are grouped, named, and ordered. These refactorings do not change behaviour. They change how easily a human can follow what the function is trying to say.
+
+## The smell
+
+A function grows over time. It accumulates a temporary variable here, a clever one-line condition there, a loop that quietly does three jobs. Eventually nobody can read it top-to-bottom and explain it in a sentence. The cures in this module attack that directly: they pull tangled fragments apart, give the important pieces names, and let the leftover code read like a short summary of intent.
+
+<Mermaid code={overviewDiagram} title="Choosing a composing-methods move by what is wrong" />
+
+## What this module covers
+
+Five refactorings, each small and reversible:
+
+- **Extract Function** — lift a fragment into its own well-named function so the caller reads as a list of intentions. The most fundamental move of all.
+- **Inline Function** — the inverse: when a helper's body is as plain as its name, fold it back in.
+- **Extract Variable** — give a confusing sub-expression a name so the line explains itself.
+- **Replace Temp with Query** — turn a local that holds a computed value into a function, so the calculation is reusable and easy to extract.
+- **Split Phase** — when one block does two different jobs, separate them into ordered phases joined by a clear intermediate value.
+
+Each lesson shows the same before-and-after in TypeScript, Python, Go, and Rust, then walks through the safe, ordered mechanics — running your tests between every step.
+
+<Callout title="Behaviour-preserving by design">
+Every move here keeps the program's observable behaviour identical. If a refactoring changes what the code *does*, it is a bug, not a refactoring. Your test suite is what lets you make these changes with confidence.
+</Callout>
+
+export const quizIndex = [
+  {
+    q: 'What do "composing methods" refactorings primarily change?',
+    options: [
+      'The observable behaviour of the program',
+      'The internal shape of functions — grouping, naming, and ordering of statements',
+      'The database schema',
+      'The public network protocol',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'Which refactoring is described as the most fundamental move in this module?',
+    options: ['Split Phase', 'Inline Function', 'Extract Function', 'Replace Temp with Query'],
+    answer: 2,
+  },
+  {
+    q: 'Why is a test suite important when applying these refactorings?',
+    options: [
+      'It makes the code run faster',
+      'It proves the behaviour stayed the same after each small step',
+      'It is required by the compiler',
+      'It generates the refactored code automatically',
+    ],
+    answer: 1,
+  },
+];
+
+<Quiz client:visible id="composing-methods/index" questions={quizIndex} />
+
+<ProgressTracker client:visible id="composing-methods/index" />

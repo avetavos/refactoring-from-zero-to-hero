@@ -1,0 +1,205 @@
+---
+title: Replace Magic Literal
+description: Give an unexplained number or string a symbolic name, so the literal documents its own meaning and changes in exactly one place.
+sidebar:
+  order: 3
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+export const literalDiagram = `flowchart LR
+  subgraph Before["Before"]
+    A["code: weight * 9.80665"]
+    B["code: if status == 2"]
+  end
+  subgraph After["After"]
+    C["GRAVITY = 9.80665"]
+    D["STATUS_SHIPPED = 2"]
+    C --> E["code: weight * GRAVITY"]
+    D --> F["code: if status == STATUS_SHIPPED"]
+  end
+  Before -.->|"Replace Magic Literal"| After`;
+
+## Intent
+
+Find a bare literal — a number like `9.80665` or `86400`, a string like `"ADMIN"` — that carries meaning the reader has to guess at, and replace it with a named constant. The name explains *what the value is for*, and the single definition becomes the one place to change it if it ever must change.
+
+## The smell
+
+This cures the **Magic Number** (and its sibling, the magic string). The tell is a literal whose meaning is not obvious from context, especially one that appears in more than one place. When `0.07` shows up in the pricing module and again in the invoice module, two problems lurk: a reader cannot tell that both mean "the sales tax rate," and the day the rate changes, you must find and edit every copy — and you *will* miss one.
+
+## Before → After
+
+A shipping-cost calculation peppered with unexplained numbers. After, each literal is a named constant whose name carries the intent.
+
+<Tabs syncKey="lang">
+  <TabItem label="TypeScript">
+    ```ts
+    // Before
+    function shippingCost(weightKg: number): number {
+      if (weightKg > 30) {
+        return weightKg * 2.5 + 15;
+      }
+      return weightKg * 2.5;
+    }
+
+    // After
+    const RATE_PER_KG = 2.5;
+    const HEAVY_THRESHOLD_KG = 30;
+    const HEAVY_SURCHARGE = 15;
+
+    function shippingCost(weightKg: number): number {
+      const base = weightKg * RATE_PER_KG;
+      return weightKg > HEAVY_THRESHOLD_KG ? base + HEAVY_SURCHARGE : base;
+    }
+    ```
+  </TabItem>
+  <TabItem label="Python">
+    ```python
+    # Before
+    def shipping_cost(weight_kg):
+        if weight_kg > 30:
+            return weight_kg * 2.5 + 15
+        return weight_kg * 2.5
+
+    # After
+    RATE_PER_KG = 2.5
+    HEAVY_THRESHOLD_KG = 30
+    HEAVY_SURCHARGE = 15
+
+    def shipping_cost(weight_kg):
+        base = weight_kg * RATE_PER_KG
+        return base + HEAVY_SURCHARGE if weight_kg > HEAVY_THRESHOLD_KG else base
+    ```
+  </TabItem>
+  <TabItem label="Go">
+    ```go
+    // Before
+    func ShippingCost(weightKg float64) float64 {
+        if weightKg > 30 {
+            return weightKg*2.5 + 15
+        }
+        return weightKg * 2.5
+    }
+
+    // After
+    const (
+        ratePerKg       = 2.5
+        heavyThresholdKg = 30.0
+        heavySurcharge   = 15.0
+    )
+
+    func ShippingCost(weightKg float64) float64 {
+        base := weightKg * ratePerKg
+        if weightKg > heavyThresholdKg {
+            return base + heavySurcharge
+        }
+        return base
+    }
+    ```
+  </TabItem>
+  <TabItem label="Rust">
+    ```rust
+    // Before
+    fn shipping_cost(weight_kg: f64) -> f64 {
+        if weight_kg > 30.0 {
+            weight_kg * 2.5 + 15.0
+        } else {
+            weight_kg * 2.5
+        }
+    }
+
+    // After
+    const RATE_PER_KG: f64 = 2.5;
+    const HEAVY_THRESHOLD_KG: f64 = 30.0;
+    const HEAVY_SURCHARGE: f64 = 15.0;
+
+    fn shipping_cost(weight_kg: f64) -> f64 {
+        let base = weight_kg * RATE_PER_KG;
+        if weight_kg > HEAVY_THRESHOLD_KG {
+            base + HEAVY_SURCHARGE
+        } else {
+            base
+        }
+    }
+    ```
+  </TabItem>
+</Tabs>
+
+<Mermaid code={literalDiagram} title="Bare literals become named constants used at each call site" />
+
+## Mechanics
+
+1. Declare a constant and assign it the literal value. Give it a name that says what the value *means*, not what it is — `HEAVY_THRESHOLD_KG`, not `THIRTY`.
+2. Find one use of the literal. Confirm it truly means the same thing as the constant — two unrelated `2`s are not the same magic number.
+3. Replace that use with the constant.
+4. **Run your tests.**
+5. Repeat for each remaining use that shares the meaning.
+6. When all matching uses are replaced, the literal lives in exactly one place. Changing the value is now a one-line edit.
+
+## When to use / trade-offs
+
+Replace a literal whenever its meaning is not self-evident, and especially whenever the same meaningful value appears more than once. The named constant doubles as documentation and as a single point of change.
+
+Two cautions. First, do not replace genuinely self-explanatory literals: `index + 1` or multiplying by `2` to double a value needs no constant — a name like `ONE` only adds noise. Second, watch for *coincidental* equality: if two `100`s mean "percent scale" and "max retries," they must become two different constants, never one shared name, or a future edit to one will silently corrupt the other.
+
+## Related
+
+- [Encapsulate Variable](/refactoring-from-zero-to-hero/en/organizing-data/encapsulate-variable/)
+- [Replace Primitive with Object](/refactoring-from-zero-to-hero/en/organizing-data/replace-primitive-with-object/)
+- [Replace Type Code with Subclasses](/refactoring-from-zero-to-hero/en/organizing-data/replace-type-code-with-subclasses/)
+
+<Callout title="Name the meaning, not the value">
+A constant called `THIRTY` is no better than the bare `30` — it just moves the mystery. Name it `HEAVY_THRESHOLD_KG` and the reader learns *why* thirty matters. If the value later becomes thirty-five, the name still fits, which is the whole point.
+</Callout>
+
+export const quizLiteral = [
+  {
+    q: 'What problem does Replace Magic Literal solve?',
+    options: [
+      'Slow function calls',
+      'An unexplained literal whose meaning the reader must guess, often duplicated',
+      'Too many functions in a file',
+      'Missing error handling',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'What should the constant be named after?',
+    options: [
+      'The literal value itself, like THIRTY',
+      'The meaning or purpose of the value',
+      'The function that uses it',
+      'The data type of the value',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'Two literals happen to share the value 100 but mean different things. What should you do?',
+    options: [
+      'Use one shared constant for both',
+      'Create two separate constants, one per meaning',
+      'Leave both as bare literals forever',
+      'Delete one of them',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'Which literal is the best candidate to leave un-named?',
+    options: [
+      'A tax rate used in three modules',
+      'A self-explanatory + 1 used to move to the next index',
+      'A retry limit referenced in five files',
+      'A magic status code compared in many places',
+    ],
+    answer: 1,
+  },
+];
+
+<Quiz client:visible id="organizing-data/replace-magic-literal" questions={quizLiteral} />
+
+<ProgressTracker client:visible id="organizing-data/replace-magic-literal" />

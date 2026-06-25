@@ -1,0 +1,227 @@
+---
+title: Encapsulate Variable
+description: Wrap direct access to a piece of data behind accessor functions so you have a single place to validate, intercept, or change the representation later.
+sidebar:
+  order: 2
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+export const encapsulateDiagram = `flowchart LR
+  subgraph Before["Before"]
+    A["caller A"] --> D[("data field<br/>read & written directly")]
+    B["caller B"] --> D
+    C["caller C"] --> D
+  end
+  subgraph After["After"]
+    A2["caller A"] --> G["get() / set()"]
+    B2["caller B"] --> G
+    C2["caller C"] --> G
+    G --> D2[("data field")]
+  end
+  Before -.->|"Encapsulate Variable"| After`;
+
+## Intent
+
+Take a piece of data that callers reach into directly and route every access through a pair of accessor functions — a getter and a setter. Once all reads and writes flow through one place, that place becomes a hook: you can validate inputs, log changes, compute the value lazily, or swap the underlying representation entirely, and no caller needs to know.
+
+## The smell
+
+The trigger is **widely-shared mutable data**: a field, a module-level variable, or a global that many parts of the code read and write at will. While access is scattered, you cannot change anything about how the data is stored or guarded without hunting down every reference. There is no single seam to add a rule like "this can never be negative" or "normalise the string on the way in." Encapsulation creates that seam.
+
+## Before → After
+
+A configuration object whose `taxRate` field is read and assigned directly across the codebase. After, the field is private behind accessors, so the setter can reject nonsense values.
+
+<Tabs syncKey="lang">
+  <TabItem label="TypeScript">
+    ```ts
+    // Before
+    export const config = {
+      taxRate: 0.07,
+    };
+    // ...elsewhere, scattered and unguarded:
+    config.taxRate = 1.5; // nobody stops this
+    const r = config.taxRate;
+
+    // After
+    class Config {
+      #taxRate = 0.07;
+
+      get taxRate(): number {
+        return this.#taxRate;
+      }
+
+      set taxRate(value: number) {
+        if (value < 0 || value > 1) {
+          throw new RangeError('taxRate must be between 0 and 1');
+        }
+        this.#taxRate = value;
+      }
+    }
+
+    export const config = new Config();
+    const r = config.taxRate;
+    ```
+  </TabItem>
+  <TabItem label="Python">
+    ```python
+    # Before
+    class Config:
+        def __init__(self):
+            self.tax_rate = 0.07
+    # ...elsewhere, scattered and unguarded:
+    config = Config()
+    config.tax_rate = 1.5  # nobody stops this
+    r = config.tax_rate
+
+    # After
+    class Config:
+        def __init__(self):
+            self._tax_rate = 0.07
+
+        @property
+        def tax_rate(self):
+            return self._tax_rate
+
+        @tax_rate.setter
+        def tax_rate(self, value):
+            if not 0 <= value <= 1:
+                raise ValueError("tax_rate must be between 0 and 1")
+            self._tax_rate = value
+
+    config = Config()
+    r = config.tax_rate
+    ```
+  </TabItem>
+  <TabItem label="Go">
+    ```go
+    // Before
+    type Config struct {
+        TaxRate float64 // exported, written anywhere
+    }
+    // ...elsewhere:
+    cfg.TaxRate = 1.5 // nobody stops this
+    r := cfg.TaxRate
+
+    // After
+    type Config struct {
+        taxRate float64 // unexported: only accessors reach it
+    }
+
+    func (c *Config) TaxRate() float64 {
+        return c.taxRate
+    }
+
+    func (c *Config) SetTaxRate(value float64) error {
+        if value < 0 || value > 1 {
+            return fmt.Errorf("taxRate must be between 0 and 1, got %v", value)
+        }
+        c.taxRate = value
+        return nil
+    }
+    ```
+  </TabItem>
+  <TabItem label="Rust">
+    ```rust
+    // Before
+    pub struct Config {
+        pub tax_rate: f64, // public: written anywhere
+    }
+    // ...elsewhere:
+    // cfg.tax_rate = 1.5; // nobody stops this
+
+    // After
+    pub struct Config {
+        tax_rate: f64, // private: only accessors reach it
+    }
+
+    impl Config {
+        pub fn tax_rate(&self) -> f64 {
+            self.tax_rate
+        }
+
+        pub fn set_tax_rate(&mut self, value: f64) -> Result<(), String> {
+            if !(0.0..=1.0).contains(&value) {
+                return Err(format!("tax_rate must be between 0 and 1, got {value}"));
+            }
+            self.tax_rate = value;
+            Ok(())
+        }
+    }
+    ```
+  </TabItem>
+</Tabs>
+
+<Mermaid code={encapsulateDiagram} title="Direct access becomes access through a single accessor pair" />
+
+## Mechanics
+
+1. Create the getter and setter (or accessor functions) that read and write the variable. At first they do nothing but return and assign.
+2. Find every reference to the raw variable. Replace each read with a call to the getter and each write with a call to the setter. Do this in small batches.
+3. **Run your tests** after each batch.
+4. Restrict access to the variable itself — make the field private, unexported, or otherwise unreachable from outside — so the accessors are the only path in.
+5. **Run your tests** again. Nothing should break, because every site already goes through the accessors.
+6. Now you have a seam. Add validation, logging, or lazy computation inside the accessors as a separate, deliberate change.
+
+## When to use / trade-offs
+
+Reach for Encapsulate Variable when data is mutable and shared, when you want to add a rule about valid values, or when you suspect the storage representation may change. It is the prerequisite for many later moves: you cannot safely swap a representation until every access funnels through one place.
+
+The cost is a layer of indirection and a little ceremony. For a truly local, immutable, or single-use value, that ceremony buys nothing — leave it bare. Encapsulation earns its keep precisely when the data is shared and long-lived. The related **Encapsulate Collection** applies this same idea to list and map fields, where exposing the raw container is especially dangerous.
+
+## Related
+
+- [Replace Magic Literal](/refactoring-from-zero-to-hero/en/organizing-data/replace-magic-literal/)
+- [Encapsulate Collection](/refactoring-from-zero-to-hero/en/organizing-data/encapsulate-collection/)
+- [Replace Primitive with Object](/refactoring-from-zero-to-hero/en/organizing-data/replace-primitive-with-object/)
+
+<Callout title="The getter is your future-proofing">
+The moment all access runs through an accessor, you have bought yourself an option you may never exercise — and that is fine. The point is not that you *will* add validation; it is that when the day comes that you must, there is exactly one place to add it, instead of forty.
+</Callout>
+
+export const quizEncapsulate = [
+  {
+    q: 'What is the main goal of Encapsulate Variable?',
+    options: [
+      'To make the variable run faster',
+      'To route all access through one place so you can later validate or change the representation',
+      'To delete the variable entirely',
+      'To make the variable global',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'After introducing the accessors, what is the crucial next step?',
+    options: [
+      'Make the variable public so anyone can still reach it',
+      'Restrict direct access to the variable so accessors are the only path in',
+      'Remove the getter',
+      'Add the variable to every module',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'Which kind of data most justifies Encapsulate Variable?',
+    options: ['A truly local, single-use temporary', 'Widely-shared mutable data', 'A compile-time constant used once', 'An unused field'],
+    answer: 1,
+  },
+  {
+    q: 'What does the single access seam most usefully enable?',
+    options: [
+      'Adding validation, logging, or a representation change in one spot',
+      'Renaming the whole project',
+      'Removing the test suite',
+      'Making the program single-threaded',
+    ],
+    answer: 0,
+  },
+];
+
+<Quiz client:visible id="organizing-data/encapsulate-variable" questions={quizEncapsulate} />
+
+<ProgressTracker client:visible id="organizing-data/encapsulate-variable" />

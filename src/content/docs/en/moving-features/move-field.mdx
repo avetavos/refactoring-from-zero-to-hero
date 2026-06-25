@@ -1,0 +1,283 @@
+---
+title: Move Field
+description: When a field is read and written from another record more than from its own, relocate it to the record that actually uses it.
+sidebar:
+  order: 3
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+export const moveFieldDiagram = `flowchart LR
+  subgraph Before["Before"]
+    A["Customer<br/>name<br/>discountRate"]
+    B["PricingPlan"]
+    A -.->|"plan logic reads<br/>discountRate"| B
+  end
+  subgraph After["After"]
+    C["Customer<br/>name<br/>plan"]
+    D["PricingPlan<br/>discountRate"]
+    C --> D
+  end
+  Before -.->|"Move Field"| After`;
+
+## Intent
+
+A field lives on one record but is consulted and updated mostly through another. Move it to the record where it is actually used, so the data sits beside the behaviour that depends on it and the two records stop reaching across an artificial boundary.
+
+## The smell
+
+Data structures are the skeleton of a program, and a misplaced field warps everything built on it. The tell-tale signs: a field on record A that is always passed together with record B, a field that B's methods read and write while A merely stores it, or two records that must be updated in lockstep to keep one value consistent. Each is a hint that the field's true owner is B.
+
+## Before → After
+
+A `discountRate` stored on `Customer` but governed entirely by the customer's `PricingPlan`. Before, the rate sits on the customer and the plan reaches over to compute prices. After, the rate lives on the plan, where its rules already are.
+
+<Tabs syncKey="lang">
+  <TabItem label="TypeScript">
+    ```ts
+    // Before
+    class PricingPlan {
+      constructor(public name: string) {}
+
+      finalPrice(base: number, discountRate: number): number {
+        return base * (1 - discountRate);
+      }
+    }
+
+    class Customer {
+      constructor(
+        public name: string,
+        public plan: PricingPlan,
+        public discountRate: number,
+      ) {}
+
+      quote(base: number): number {
+        return this.plan.finalPrice(base, this.discountRate);
+      }
+    }
+
+    // After
+    class PricingPlan {
+      constructor(public name: string, public discountRate: number) {}
+
+      finalPrice(base: number): number {
+        return base * (1 - this.discountRate);
+      }
+    }
+
+    class Customer {
+      constructor(public name: string, public plan: PricingPlan) {}
+
+      quote(base: number): number {
+        return this.plan.finalPrice(base);
+      }
+    }
+    ```
+  </TabItem>
+  <TabItem label="Python">
+    ```python
+    # Before
+    class PricingPlan:
+        def __init__(self, name):
+            self.name = name
+
+        def final_price(self, base, discount_rate):
+            return base * (1 - discount_rate)
+
+    class Customer:
+        def __init__(self, name, plan, discount_rate):
+            self.name = name
+            self.plan = plan
+            self.discount_rate = discount_rate
+
+        def quote(self, base):
+            return self.plan.final_price(base, self.discount_rate)
+
+    # After
+    class PricingPlan:
+        def __init__(self, name, discount_rate):
+            self.name = name
+            self.discount_rate = discount_rate
+
+        def final_price(self, base):
+            return base * (1 - self.discount_rate)
+
+    class Customer:
+        def __init__(self, name, plan):
+            self.name = name
+            self.plan = plan
+
+        def quote(self, base):
+            return self.plan.final_price(base)
+    ```
+  </TabItem>
+  <TabItem label="Go">
+    ```go
+    // Before
+    type PricingPlan struct {
+        Name string
+    }
+
+    func (p PricingPlan) FinalPrice(base, discountRate float64) float64 {
+        return base * (1 - discountRate)
+    }
+
+    type Customer struct {
+        Name         string
+        Plan         PricingPlan
+        DiscountRate float64
+    }
+
+    func (c Customer) Quote(base float64) float64 {
+        return c.Plan.FinalPrice(base, c.DiscountRate)
+    }
+
+    // After
+    type PricingPlan struct {
+        Name         string
+        DiscountRate float64
+    }
+
+    func (p PricingPlan) FinalPrice(base float64) float64 {
+        return base * (1 - p.DiscountRate)
+    }
+
+    type Customer struct {
+        Name string
+        Plan PricingPlan
+    }
+
+    func (c Customer) Quote(base float64) float64 {
+        return c.Plan.FinalPrice(base)
+    }
+    ```
+  </TabItem>
+  <TabItem label="Rust">
+    ```rust
+    // Before
+    struct PricingPlan {
+        name: String,
+    }
+
+    impl PricingPlan {
+        fn final_price(&self, base: f64, discount_rate: f64) -> f64 {
+            base * (1.0 - discount_rate)
+        }
+    }
+
+    struct Customer {
+        name: String,
+        plan: PricingPlan,
+        discount_rate: f64,
+    }
+
+    impl Customer {
+        fn quote(&self, base: f64) -> f64 {
+            self.plan.final_price(base, self.discount_rate)
+        }
+    }
+
+    // After
+    struct PricingPlan {
+        name: String,
+        discount_rate: f64,
+    }
+
+    impl PricingPlan {
+        fn final_price(&self, base: f64) -> f64 {
+            base * (1.0 - self.discount_rate)
+        }
+    }
+
+    struct Customer {
+        name: String,
+        plan: PricingPlan,
+    }
+
+    impl Customer {
+        fn quote(&self, base: f64) -> f64 {
+            self.plan.final_price(base)
+        }
+    }
+    ```
+  </TabItem>
+</Tabs>
+
+<Mermaid code={moveFieldDiagram} title="A field stored on Customer moves to the PricingPlan that uses it" />
+
+## Mechanics
+
+1. If the field is public, encapsulate it behind accessors first so every read and write goes through a single point. This makes the later move a one-place change.
+2. Add the field to the target record, along with an accessor there.
+3. Decide how the target reaches the value: it may compute it, store it on construction, or accept it as a parameter.
+4. Redirect each accessor on the source to delegate to the target's copy of the field.
+5. **Run your tests.** Behaviour must be unchanged at this checkpoint.
+6. Remove the field from the source once nothing reads it locally any more, and drop the parameters that only existed to carry it.
+7. **Run your tests again.** A green suite confirms the value now lives in one place.
+
+## When to use / trade-offs
+
+Move a field when another record's methods use it more than its current owner does, when the field is always passed alongside another object, or when keeping two copies in sync is a recurring source of bugs.
+
+The cost is touching every caller that read the field directly — which is exactly why encapsulating first pays off. There is no separate named inverse: if later changes make the *original* record the heavier user, you simply Move Field back.
+
+## Related
+
+- [Move Function](/refactoring-from-zero-to-hero/en/moving-features/move-function/)
+- [Extract Class](/refactoring-from-zero-to-hero/en/moving-features/extract-class/)
+- [Inline Class](/refactoring-from-zero-to-hero/en/moving-features/inline-class/)
+
+<Callout title="Encapsulate before you move">
+The painful part of moving a field is the direct readers scattered across the code. Wrap the field in a getter and setter first, point everyone at those, and the move itself becomes a single change inside one accessor.
+</Callout>
+
+export const quizMoveField = [
+  {
+    q: 'When should you move a field to another record?',
+    options: [
+      'When the field has a long name',
+      'When another record uses it more than its current owner does',
+      'When the field is a string',
+      'Whenever the record has more than three fields',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'Why encapsulate the field behind accessors before moving it?',
+    options: [
+      'It makes the program run faster',
+      'So every access goes through one point and the move becomes a single change',
+      'Because the compiler requires it',
+      'To hide the field from tests',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'Which is a strong sign a field is in the wrong place?',
+    options: [
+      'It is always passed together with another object',
+      'It is read exactly once',
+      'It is a private field',
+      'It has a default value',
+    ],
+    answer: 0,
+  },
+  {
+    q: 'What should you do at each checkpoint in the mechanics?',
+    options: [
+      'Refactor a second field at the same time',
+      'Run the tests to confirm behaviour is unchanged',
+      'Delete the source record',
+      'Commit and stop',
+    ],
+    answer: 1,
+  },
+];
+
+<Quiz client:visible id="moving-features/move-field" questions={quizMoveField} />
+
+<ProgressTracker client:visible id="moving-features/move-field" />

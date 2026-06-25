@@ -1,0 +1,247 @@
+---
+title: Extract Class
+description: เมื่อคลาสหนึ่งเติบโตจนทำสองงานที่ต่างกัน ให้แยกความรับผิดชอบหนึ่งออกไปเป็นคลาสของมันเอง
+sidebar:
+  order: 4
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+export const extractClassDiagram = `classDiagram
+  class PersonBefore {
+    name
+    areaCode
+    number
+    telephoneNumber()
+  }
+  class PersonAfter {
+    name
+    telephone
+    telephoneNumber()
+  }
+  class TelephoneNumber {
+    areaCode
+    number
+    toString()
+  }
+  PersonAfter --> TelephoneNumber : has a
+  PersonBefore ..> PersonAfter : Extract Class`;
+
+## Intent
+
+คลาสหนึ่งค่อย ๆ รับความรับผิดชอบที่สองเข้ามาอย่างเงียบ ๆ ดึงฟิลด์และเมธอดที่รับใช้งานที่สองนั้นออกไปเป็นคลาสใหม่เอี่ยม และให้คลาสเดิมมี reference ไปยังมัน ตอนนี้แต่ละคลาสมีเหตุผลในการเปลี่ยนแปลงที่ชัดเจนเพียงอย่างเดียว
+
+## The smell
+
+นี่คือยารักษา **Large Class** — และเจาะจงกว่านั้นคือคลาสที่มีสองความรับผิดชอบพันกันอยู่ สัญญาณบ่งชี้: กลุ่มย่อยของฟิลด์ที่เปลี่ยนแปลงด้วยกันเสมอ เมธอดที่ทำงานกับกลุ่มย่อยนั้นเท่านั้น หรือชื่อที่ต้องใช้คำว่า "and" เพื่ออธิบายว่าคลาสทำอะไร เมื่อคุณสามารถลากเส้นที่สะอาดผ่านข้อมูลของคลาสได้ ครึ่งหนึ่งในแต่ละด้านก็ต้องการเป็น type ของตัวเอง
+
+## Before → After
+
+`Person` ที่เก็บและจัดรูปแบบหมายเลขโทรศัพท์ด้วย ก่อนหน้านี้ ฟิลด์โทรศัพท์และการจัดรูปแบบโทรศัพท์อาศัยอยู่บน `Person` หลังจากนั้น พวกมันก่อตัวเป็นคลาส `TelephoneNumber` และ `Person` เพียงถือมันไว้หนึ่งตัว
+
+<Tabs syncKey="lang">
+  <TabItem label="TypeScript">
+    ```ts
+    // Before
+    class Person {
+      constructor(
+        public name: string,
+        public areaCode: string,
+        public number: string,
+      ) {}
+
+      telephoneNumber(): string {
+        return `(${this.areaCode}) ${this.number}`;
+      }
+    }
+
+    // After
+    class TelephoneNumber {
+      constructor(public areaCode: string, public number: string) {}
+
+      toString(): string {
+        return `(${this.areaCode}) ${this.number}`;
+      }
+    }
+
+    class Person {
+      constructor(public name: string, public telephone: TelephoneNumber) {}
+
+      telephoneNumber(): string {
+        return this.telephone.toString();
+      }
+    }
+    ```
+  </TabItem>
+  <TabItem label="Python">
+    ```python
+    # Before
+    class Person:
+        def __init__(self, name, area_code, number):
+            self.name = name
+            self.area_code = area_code
+            self.number = number
+
+        def telephone_number(self):
+            return f"({self.area_code}) {self.number}"
+
+    # After
+    class TelephoneNumber:
+        def __init__(self, area_code, number):
+            self.area_code = area_code
+            self.number = number
+
+        def __str__(self):
+            return f"({self.area_code}) {self.number}"
+
+    class Person:
+        def __init__(self, name, telephone):
+            self.name = name
+            self.telephone = telephone
+
+        def telephone_number(self):
+            return str(self.telephone)
+    ```
+  </TabItem>
+  <TabItem label="Go">
+    ```go
+    // Before
+    type Person struct {
+        Name     string
+        AreaCode string
+        Number   string
+    }
+
+    func (p Person) TelephoneNumber() string {
+        return fmt.Sprintf("(%s) %s", p.AreaCode, p.Number)
+    }
+
+    // After
+    type TelephoneNumber struct {
+        AreaCode string
+        Number   string
+    }
+
+    func (t TelephoneNumber) String() string {
+        return fmt.Sprintf("(%s) %s", t.AreaCode, t.Number)
+    }
+
+    type Person struct {
+        Name      string
+        Telephone TelephoneNumber
+    }
+
+    func (p Person) TelephoneNumber() string {
+        return p.Telephone.String()
+    }
+    ```
+  </TabItem>
+  <TabItem label="Rust">
+    ```rust
+    // Before
+    struct Person {
+        name: String,
+        area_code: String,
+        number: String,
+    }
+
+    impl Person {
+        fn telephone_number(&self) -> String {
+            format!("({}) {}", self.area_code, self.number)
+        }
+    }
+
+    // After
+    struct TelephoneNumber {
+        area_code: String,
+        number: String,
+    }
+
+    impl TelephoneNumber {
+        fn to_string(&self) -> String {
+            format!("({}) {}", self.area_code, self.number)
+        }
+    }
+
+    struct Person {
+        name: String,
+        telephone: TelephoneNumber,
+    }
+
+    impl Person {
+        fn telephone_number(&self) -> String {
+            self.telephone.to_string()
+        }
+    }
+    ```
+  </TabItem>
+</Tabs>
+
+<Mermaid code={extractClassDiagram} title="Person หนึ่งตัวแยกออกเป็น Person บวกกับ TelephoneNumber ที่มันเป็นเจ้าของ" />
+
+## Mechanics
+
+1. ตัดสินใจว่าจะแยกความรับผิดชอบอย่างไร และสร้างคลาสว่างใหม่สำหรับสิ่งที่คุณกำลังแยกออกมา หากชื่อเดิมไม่เหมาะกับคลาสที่เหลืออีกต่อไป ให้เปลี่ยนชื่อมัน
+2. เพิ่มลิงก์จากคลาสเดิมไปยังคลาสใหม่ — โดยทั่วไปเป็นฟิลด์ที่ถือ instance ของคลาสใหม่
+3. ย้ายฟิลด์ที่เกี่ยวข้องข้ามไปทีละตัว โดยใช้ **Move Field** และรักษาให้ชุดเทสต์เป็นสีเขียวหลังแต่ละครั้ง
+4. ย้ายเมธอดที่อยู่กับฟิลด์เหล่านั้นข้ามไป โดยใช้ **Move Function** เริ่มจากตัวที่อยู่ระดับล่างสุด
+5. แทนที่การเข้าถึงฟิลด์โดยตรงของคลาสเดิมด้วยการเรียกผ่าน instance ใหม่
+6. **รันเทสต์ของคุณ** หลังการย้ายทุกครั้ง แต่ละขั้นตอนเล็กพอที่แถบสีแดงจะชี้ไปยังการเปลี่ยนแปลงเดียว
+7. ทบทวนพื้นผิวสาธารณะ (public surface) ของทั้งสองคลาสและทำให้มันแคบลง — คลาสที่แยกออกมาอาจสามารถซ่อนรายละเอียดที่คลาสเดิมต้องเปิดเผยได้
+
+## When to use / trade-offs
+
+แยกคลาสเมื่อกลุ่มย่อยของฟิลด์และเมธอดก่อตัวเป็นกลุ่มก้อนที่ชัดเจน เมื่อคลาสสรุปได้ยากโดยไม่ใช้คำว่า "and" หรือเมื่อความรับผิดชอบหนึ่งเปลี่ยนแปลงด้วยเหตุผลที่ต่างไปจากส่วนที่เหลือโดยสิ้นเชิง
+
+ต้นทุนคือคลาสที่ต้องตั้งชื่อ สร้าง และนำทางเพิ่มขึ้นอีกหนึ่งคลาส บวกกับชั้นของการมอบหมาย (delegation) หากคลาส *ไม่ได้* ทำสองงานจริง ๆ การแยกออกมาก็เพียงเพิ่มพิธีรีตอง สิ่งตรงข้ามคือ **Inline Class**: หากคลาสใหม่ไม่เคยเติบโตเป็นความรับผิดชอบของตัวเอง ก็พับมันกลับเข้าไป
+
+## Related
+
+- [Inline Class](/refactoring-from-zero-to-hero/th/moving-features/inline-class/)
+- [Move Field](/refactoring-from-zero-to-hero/th/moving-features/move-field/)
+- [Move Function](/refactoring-from-zero-to-hero/th/moving-features/move-function/)
+
+<Callout title="เหตุผลเดียวในการเปลี่ยนแปลง">
+คลาสที่สมบูรณ์ดีมีเหตุผลในการเปลี่ยนแปลงเพียงอย่างเดียว หากคุณสามารถอธิบายคลาสได้เพียงโดยการเชื่อมสองวลีด้วยคำว่า "and" — "เก็บตัวตนของบุคคล *และ* จัดรูปแบบหมายเลขโทรศัพท์ของพวกเขา" — คำว่า "and" นั้นคือรอยต่อ แยกตามรอยนั้นแล้วแต่ละคลาสใหม่ก็จะได้รับความรับผิดชอบที่ชัดเจนหนึ่งอย่าง
+</Callout>
+
+export const quizExtractClass = [
+  {
+    q: 'Extract Class แก้ smell ใดเป็นหลัก?',
+    options: ['Long Function', 'Large Class ที่มีสองความรับผิดชอบ', 'Magic Numbers', 'Switch Statements'],
+    answer: 1,
+  },
+  {
+    q: 'อะไรคือสัญญาณที่หนักแน่นว่าคลาสควรถูกแยก?',
+    options: [
+      'มันมี constructor',
+      'กลุ่มย่อยของฟิลด์และเมธอดของมันเปลี่ยนแปลงด้วยกันเป็นกลุ่มก้อนเสมอ',
+      'มันถูกใช้ในมากกว่าหนึ่งไฟล์',
+      'มันมี getter และ setter',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'การ refactor ใดที่ทำงานหนักภายในกลไกของ Extract Class?',
+    options: [
+      'Inline Variable และ Split Phase',
+      'Move Field และ Move Function',
+      'Extract Variable และ Replace Temp with Query',
+      'Hide Delegate และ Remove Middle Man',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'อะไรคือสิ่งตรงข้ามของ Extract Class?',
+    options: ['Move Field', 'Hide Delegate', 'Inline Class', 'Extract Function'],
+    answer: 2,
+  },
+];
+
+<Quiz client:visible id="moving-features/extract-class" questions={quizExtractClass} />
+
+<ProgressTracker client:visible id="moving-features/extract-class" />

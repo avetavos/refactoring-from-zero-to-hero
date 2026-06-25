@@ -1,0 +1,144 @@
+---
+title: Extract Variable
+description: Name a sub-expression with a local variable so a complex expression or condition explains itself.
+sidebar:
+  order: 4
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+## Intent
+
+Take a piece of a larger expression, assign it to a well-named local variable, and use that name in place of the original sub-expression. Also known as Introduce Explaining Variable.
+
+## The smell
+
+This cures the **cryptic one-liner** — an expression so dense you have to mentally parse it every time you read it. A boolean condition stitched together from three comparisons, or a price formula with magic arithmetic, hides its meaning inside punctuation. Naming each part turns the line into something you can read aloud.
+
+## Before → After
+
+A shipping check buries its meaning in one boolean expression. Naming the parts reveals the rules.
+
+<Tabs syncKey="lang">
+  <TabItem label="TypeScript">
+    ```ts
+    // Before
+    function isEligibleForFreeShipping(order: Order): boolean {
+      return order.total > 50 && order.country === 'TH' && !order.isGift;
+    }
+
+    // After
+    function isEligibleForFreeShipping(order: Order): boolean {
+      const overThreshold = order.total > 50;
+      const domestic = order.country === 'TH';
+      const giftExcluded = !order.isGift;
+      return overThreshold && domestic && giftExcluded;
+    }
+    ```
+  </TabItem>
+  <TabItem label="Python">
+    ```python
+    # Before
+    def is_eligible_for_free_shipping(order):
+        return order.total > 50 and order.country == "TH" and not order.is_gift
+
+    # After
+    def is_eligible_for_free_shipping(order):
+        over_threshold = order.total > 50
+        domestic = order.country == "TH"
+        gift_excluded = not order.is_gift
+        return over_threshold and domestic and gift_excluded
+    ```
+  </TabItem>
+  <TabItem label="Go">
+    ```go
+    // Before
+    func IsEligibleForFreeShipping(order Order) bool {
+        return order.Total > 50 && order.Country == "TH" && !order.IsGift
+    }
+
+    // After
+    func IsEligibleForFreeShipping(order Order) bool {
+        overThreshold := order.Total > 50
+        domestic := order.Country == "TH"
+        giftExcluded := !order.IsGift
+        return overThreshold && domestic && giftExcluded
+    }
+    ```
+  </TabItem>
+  <TabItem label="Rust">
+    ```rust
+    // Before
+    fn is_eligible_for_free_shipping(order: &Order) -> bool {
+        order.total > 50.0 && order.country == "TH" && !order.is_gift
+    }
+
+    // After
+    fn is_eligible_for_free_shipping(order: &Order) -> bool {
+        let over_threshold = order.total > 50.0;
+        let domestic = order.country == "TH";
+        let gift_excluded = !order.is_gift;
+        over_threshold && domestic && gift_excluded
+    }
+    ```
+  </TabItem>
+</Tabs>
+
+## Mechanics
+
+1. Check the sub-expression has no side effects — extracting one that mutates state can change behaviour.
+2. Declare an immutable local variable and assign the sub-expression to it.
+3. Give the variable a name that states what the value *means*, not how it is computed.
+4. Replace the original sub-expression with the new variable.
+5. **Run your tests.**
+6. If the same sub-expression appears more than once in scope, replace each occurrence and test again.
+
+## When to use / trade-offs
+
+Use it for debugging (a named local is easy to inspect), for breaking a long formula into reviewable pieces, and to make a condition self-documenting. Within a single function a local is enough; when the same explanation is useful across the whole object, prefer **Replace Temp with Query** or extracting a method instead.
+
+The inverse is **Inline Variable**: when a variable's name adds nothing over the expression it holds, substitute the expression back and drop the variable.
+
+## Related
+
+- [Replace Temp with Query](/refactoring-from-zero-to-hero/en/composing-methods/replace-temp-with-query/)
+- [Extract Function](/refactoring-from-zero-to-hero/en/composing-methods/extract-function/)
+
+<Callout title="Inverse: Inline Variable">
+Extract Variable adds a name; Inline Variable removes one that earns its keep no longer. If you read `const x = order.total` and `x` is used once right below, the name is just noise — inline it. Names should buy clarity, not ceremony.
+</Callout>
+
+export const quizVariable = [
+  {
+    q: 'What is the goal of Extract Variable?',
+    options: [
+      'To make a function shorter by removing lines',
+      'To give a sub-expression a name that explains its meaning',
+      'To improve runtime performance',
+      'To convert a function into a method',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'What must you check before extracting a sub-expression into a variable?',
+    options: [
+      'That it returns a string',
+      'That it has no side effects',
+      'That it is used only once',
+      'That it is longer than ten characters',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'What is the inverse of Extract Variable?',
+    options: ['Inline Variable', 'Split Phase', 'Inline Function', 'Extract Function'],
+    answer: 0,
+  },
+];
+
+<Quiz client:visible id="composing-methods/extract-variable" questions={quizVariable} />
+
+<ProgressTracker client:visible id="composing-methods/extract-variable" />

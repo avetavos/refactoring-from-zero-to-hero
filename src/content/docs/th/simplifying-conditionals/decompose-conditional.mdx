@@ -1,0 +1,230 @@
+---
+title: Decompose Conditional
+description: แยกการทดสอบ สาขา then และสาขา else ของเงื่อนไขที่ซับซ้อนออกมาเป็นฟังก์ชันที่ตั้งชื่ออย่างดี เพื่อให้โครงสร้างอ่านได้เหมือนภาษาทั่วไป
+sidebar:
+  order: 2
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+export const decomposeDiagram = `flowchart LR
+  subgraph Before["Before"]
+    A["if (date before summer<br/>or date after summer)<br/>charge = qty * winterRate + flat<br/>else<br/>charge = qty * summerRate"]
+  end
+  subgraph After["After"]
+    B["if notSummer(date)"]
+    B --> C["winterCharge(qty)"]
+    B --> D["summerCharge(qty)"]
+  end
+  Before -.->|"Decompose Conditional"| After`;
+
+## เจตนา
+
+เอาเงื่อนไขที่ทั้ง *การทดสอบ* และ *สาขา* ของมันต่างเป็นก้อนรายละเอียด แล้วแทนแต่ละก้อนด้วยการเรียกฟังก์ชันที่ตั้งชื่อตามเจตนาของมัน จากนั้น `if` ก็จะอ่านได้เหมือนประโยค — *ถ้าไม่ใช่หน้าร้อน ให้ใช้ค่าธรรมเนียมฤดูหนาว มิฉะนั้นใช้ค่าธรรมเนียมฤดูร้อน* — และการคำนวณที่รกรุงรังก็ถูกย้ายไปพ้นทาง
+
+## กลิ่นโค้ด
+
+นี่คือวิธีแก้สำหรับ **เงื่อนไขที่ซับซ้อน** — ชนิดที่คุณบอกไม่ได้เลยว่าทำไมสาขาหนึ่งถึงถูกเลือก ถ้าไม่ได้แกะนิพจน์ออกมาดู การทดสอบเป็นการเปรียบเทียบวันที่ที่พันกัน ส่วนสาขาก็เป็นสูตรที่เต็มไปด้วยตัวเลขวิเศษ ลำดับการควบคุมที่คุณสนใจ (กรณีไหนใช้ได้) จมหายไปในการคำนวณ เมื่อเงื่อนไขและแต่ละสาขามีชื่อเป็นของตัวเอง การตัดสินใจก็จะชัดเจน และคณิตศาสตร์ก็ถูกซุกไว้ในตัวช่วยที่คุณอ่านได้เมื่อต้องการ
+
+## Before → After
+
+ฟังก์ชันคิดค่าบริการคิดอัตราฤดูหนาวนอกหน้าร้อน และอัตราฤดูร้อนภายในหน้าร้อน ก่อนหน้านี้ การทดสอบและสาขาทั้งสองเป็นการคำนวณแบบ inline หลังจากนั้น แต่ละส่วนกลายเป็นตัวช่วยที่มีชื่อ
+
+<Tabs syncKey="lang">
+  <TabItem label="TypeScript">
+    ```ts
+    // Before
+    function charge(date: Date, quantity: number): number {
+      let result: number;
+      if (date.getMonth() < 5 || date.getMonth() > 8) {
+        result = quantity * 12 + 100;
+      } else {
+        result = quantity * 8;
+      }
+      return result;
+    }
+
+    // After
+    function charge(date: Date, quantity: number): number {
+      return notSummer(date) ? winterCharge(quantity) : summerCharge(quantity);
+    }
+
+    function notSummer(date: Date): boolean {
+      return date.getMonth() < 5 || date.getMonth() > 8;
+    }
+
+    function winterCharge(quantity: number): number {
+      return quantity * 12 + 100;
+    }
+
+    function summerCharge(quantity: number): number {
+      return quantity * 8;
+    }
+    ```
+  </TabItem>
+  <TabItem label="Python">
+    ```python
+    # Before
+    def charge(date, quantity):
+        if date.month < 6 or date.month > 9:
+            result = quantity * 12 + 100
+        else:
+            result = quantity * 8
+        return result
+
+    # After
+    def charge(date, quantity):
+        return winter_charge(quantity) if not_summer(date) else summer_charge(quantity)
+
+    def not_summer(date):
+        return date.month < 6 or date.month > 9
+
+    def winter_charge(quantity):
+        return quantity * 12 + 100
+
+    def summer_charge(quantity):
+        return quantity * 8
+    ```
+  </TabItem>
+  <TabItem label="Go">
+    ```go
+    // Before
+    func Charge(date time.Time, quantity int) int {
+        var result int
+        if date.Month() < time.June || date.Month() > time.September {
+            result = quantity*12 + 100
+        } else {
+            result = quantity * 8
+        }
+        return result
+    }
+
+    // After
+    func Charge(date time.Time, quantity int) int {
+        if notSummer(date) {
+            return winterCharge(quantity)
+        }
+        return summerCharge(quantity)
+    }
+
+    func notSummer(date time.Time) bool {
+        return date.Month() < time.June || date.Month() > time.September
+    }
+
+    func winterCharge(quantity int) int {
+        return quantity*12 + 100
+    }
+
+    func summerCharge(quantity int) int {
+        return quantity * 8
+    }
+    ```
+  </TabItem>
+  <TabItem label="Rust">
+    ```rust
+    // Before
+    fn charge(month: u32, quantity: i64) -> i64 {
+        let result;
+        if month < 6 || month > 9 {
+            result = quantity * 12 + 100;
+        } else {
+            result = quantity * 8;
+        }
+        result
+    }
+
+    // After
+    fn charge(month: u32, quantity: i64) -> i64 {
+        if not_summer(month) {
+            winter_charge(quantity)
+        } else {
+            summer_charge(quantity)
+        }
+    }
+
+    fn not_summer(month: u32) -> bool {
+        month < 6 || month > 9
+    }
+
+    fn winter_charge(quantity: i64) -> i64 {
+        quantity * 12 + 100
+    }
+
+    fn summer_charge(quantity: i64) -> i64 {
+        quantity * 8
+    }
+    ```
+  </TabItem>
+</Tabs>
+
+<Mermaid code={decomposeDiagram} title="if ที่พันกันกลายเป็นการทดสอบที่มีชื่อบวกกับสองสาขาที่มีชื่อ" />
+
+## กลไก
+
+1. ใช้ **Extract Function** กับเงื่อนไข: ยกการทดสอบบูลีนทั้งก้อนออกมาเป็นฟังก์ชันที่ชื่อตอบคำถาม *ทำไม* สาขานี้ถึงถูกเลือก (`notSummer`) ไม่ใช่ *อย่างไร* ที่มันถูกคำนวณ
+2. ใช้ **Extract Function** กับสาขา then ตั้งชื่อตามผลลัพธ์ที่มันสร้าง (`winterCharge`)
+3. ใช้ **Extract Function** กับสาขา else ในแบบเดียวกัน (`summerCharge`)
+4. **รันเทสต์ของคุณ** หลังการสกัดแต่ละครั้ง พฤติกรรมต้องไม่เปลี่ยนแปลง
+5. เมื่อทั้งสามส่วนมีชื่อแล้ว `if` เดิมก็สั้นพอที่จะปล่อยไว้ตามเดิม หรือยุบให้เป็นนิพจน์เดียวได้หากภาษาของคุณมีนิพจน์เงื่อนไขที่สะอาด
+
+## เมื่อไรควรใช้ / ข้อแลกเปลี่ยน
+
+หยิบ Decompose Conditional มาใช้เมื่อใดก็ตามที่ *การทดสอบ* ของ `if` อ่านยาก หรือเมื่อสาขาหนึ่งเป็นบล็อกการคำนวณที่บดบังการตัดสินใจที่กำลังเกิดขึ้น มันจับคู่ได้อย่างเป็นธรรมชาติกับ **Extract Function** ซึ่งเป็นเครื่องมือที่มันพึ่งพาถึงสามครั้ง
+
+ต้นทุนก็เหมือนการสกัดทั่วไป: สามก้าวสั้น ๆ จาก `if` ไปยังตัวช่วย นั่นแทบจะคุ้มค่าเสมอ เพราะผู้อ่านที่กวาดสายตาหาลำดับการควบคุมตอนนี้สามารถอ่านการตัดสินใจได้โดยไม่ต้องดำดิ่งลงไปในการคำนวณ หากสาขาหนึ่งเป็นนิพจน์ที่ง่ายเล็กน้อยอยู่แล้ว ก็ปล่อยไว้แบบ inline — การตั้งชื่อ `quantity * 8` ไม่ได้เพิ่มอะไรเลย
+
+## ที่เกี่ยวข้อง
+
+- [Extract Function](/refactoring-from-zero-to-hero/th/composing-methods/extract-function/)
+- [Consolidate Conditional Expression](/refactoring-from-zero-to-hero/th/simplifying-conditionals/consolidate-conditional/)
+- [Replace Nested Conditional with Guard Clauses](/refactoring-from-zero-to-hero/th/simplifying-conditionals/replace-nested-conditional-with-guard-clauses/)
+
+<Callout title="ตั้งชื่อการทดสอบตามคำถาม ไม่ใช่ตามการเปรียบเทียบ">
+เงื่อนไขที่ชื่อ `monthIsLessThan6OrGreaterThan9` เป็นเพียงการกล่าวซ้ำตัวดำเนินการ ตั้งชื่อมันว่า `notSummer` แล้ว `if` จะตอบคำถามเชิงธุรกิจ หากตรรกะปฏิทินเปลี่ยนไปในภายหลัง ชื่อก็ยังคงเหมาะสม — มีเพียงเนื้อในของตัวช่วยที่ขยับ
+</Callout>
+
+export const quizDecompose = [
+  {
+    q: 'Decompose Conditional แยกสามส่วนใดของเงื่อนไขออกมา?',
+    options: [
+      'ลูป ตัวนับ และตัวสะสม',
+      'การทดสอบ สาขา then และสาขา else',
+      'imports เนื้อตัว และ return',
+      'คลาส เมธอด และฟิลด์',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'ฟังก์ชันเงื่อนไขที่สกัดออกมาควรตั้งชื่อตามอะไร?',
+    options: [
+      'ตัวดำเนินการเปรียบเทียบที่มันใช้',
+      'ทำไมสาขาถึงถูกเลือก — คำถามที่กำลังถามอยู่',
+      'ตัวแปรที่มันอ่านเป็นตัวแรก',
+      'จำนวนอนุประโยคที่มันมี',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'Decompose Conditional พึ่งพาการ refactor ที่มีอยู่แล้วตัวใด?',
+    options: ['Inline Function', 'Extract Function', 'Split Phase', 'Replace Temp with Query'],
+    answer: 1,
+  },
+  {
+    q: 'เมื่อไรที่คุณควรปล่อยสาขาไว้แบบ inline แทนที่จะสกัดออกมา?',
+    options: [
+      'เมื่อมันยาวหลายบรรทัด',
+      'เมื่อมันเป็นนิพจน์ที่ง่ายเล็กน้อยอยู่แล้วซึ่งชื่อก็ไม่ได้ทำให้กระจ่างขึ้น',
+      'เมื่อมันเรียกฟังก์ชันอื่น',
+      'เสมอ — อย่าสกัดสาขาเด็ดขาด',
+    ],
+    answer: 1,
+  },
+];
+
+<Quiz client:visible id="simplifying-conditionals/decompose-conditional" questions={quizDecompose} />
+
+<ProgressTracker client:visible id="simplifying-conditionals/decompose-conditional" />

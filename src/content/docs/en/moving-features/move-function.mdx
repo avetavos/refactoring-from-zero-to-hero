@@ -1,0 +1,307 @@
+---
+title: Move Function
+description: When a function leans on another object's data more than its own, relocate it to the class it really belongs to.
+sidebar:
+  order: 2
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+export const moveFnDiagram = `flowchart LR
+  subgraph Before["Before"]
+    A["Account"]
+    A --> B["overdraftCharge()<br/>reads plan.tier<br/>reads plan.dailyRate"]
+    C["AccountPlan"]
+  end
+  subgraph After["After"]
+    D["Account"]
+    E["AccountPlan"]
+    E --> F["overdraftCharge()<br/>reads own tier<br/>reads own dailyRate"]
+    D -.->|"delegates"| F
+  end
+  Before -.->|"Move Function"| After`;
+
+## Intent
+
+Take a function that, when you read it, talks mostly about *another* object — its fields, its methods, its rules — and move the function over to that object. The new home owns the data the function needs, so the function gets simpler and the coupling between the two classes drops.
+
+## The smell
+
+This is the cure for **Feature Envy**: a method that seems more interested in a class other than the one it lives in. The tell is the parameter list and the body. If a function takes a `plan` argument and then reads `plan.tier`, `plan.dailyRate`, and `plan.discount` while barely touching its own object, it envies `plan`. Move it there, and the reaches-across calls turn into plain field access.
+
+## Before → After
+
+An overdraft charge that lives on `Account` but is computed almost entirely from the account's `plan`. Before, the function reaches into the plan for everything. After, it lives on the plan, where the data already is.
+
+<Tabs syncKey="lang">
+  <TabItem label="TypeScript">
+    ```ts
+    // Before
+    class AccountPlan {
+      constructor(public tier: string, public dailyRate: number) {}
+    }
+
+    class Account {
+      constructor(private plan: AccountPlan, private daysOverdrawn: number) {}
+
+      overdraftCharge(): number {
+        if (this.plan.tier === "premium") {
+          let base = 10;
+          if (this.daysOverdrawn > 7) {
+            base += (this.daysOverdrawn - 7) * this.plan.dailyRate * 0.85;
+          }
+          return base;
+        }
+        return this.daysOverdrawn * this.plan.dailyRate;
+      }
+    }
+
+    // After
+    class AccountPlan {
+      constructor(public tier: string, public dailyRate: number) {}
+
+      overdraftCharge(daysOverdrawn: number): number {
+        if (this.tier === "premium") {
+          let base = 10;
+          if (daysOverdrawn > 7) {
+            base += (daysOverdrawn - 7) * this.dailyRate * 0.85;
+          }
+          return base;
+        }
+        return daysOverdrawn * this.dailyRate;
+      }
+    }
+
+    class Account {
+      constructor(private plan: AccountPlan, private daysOverdrawn: number) {}
+
+      overdraftCharge(): number {
+        return this.plan.overdraftCharge(this.daysOverdrawn);
+      }
+    }
+    ```
+  </TabItem>
+  <TabItem label="Python">
+    ```python
+    # Before
+    class AccountPlan:
+        def __init__(self, tier, daily_rate):
+            self.tier = tier
+            self.daily_rate = daily_rate
+
+    class Account:
+        def __init__(self, plan, days_overdrawn):
+            self.plan = plan
+            self.days_overdrawn = days_overdrawn
+
+        def overdraft_charge(self):
+            if self.plan.tier == "premium":
+                base = 10
+                if self.days_overdrawn > 7:
+                    base += (self.days_overdrawn - 7) * self.plan.daily_rate * 0.85
+                return base
+            return self.days_overdrawn * self.plan.daily_rate
+
+    # After
+    class AccountPlan:
+        def __init__(self, tier, daily_rate):
+            self.tier = tier
+            self.daily_rate = daily_rate
+
+        def overdraft_charge(self, days_overdrawn):
+            if self.tier == "premium":
+                base = 10
+                if days_overdrawn > 7:
+                    base += (days_overdrawn - 7) * self.daily_rate * 0.85
+                return base
+            return days_overdrawn * self.daily_rate
+
+    class Account:
+        def __init__(self, plan, days_overdrawn):
+            self.plan = plan
+            self.days_overdrawn = days_overdrawn
+
+        def overdraft_charge(self):
+            return self.plan.overdraft_charge(self.days_overdrawn)
+    ```
+  </TabItem>
+  <TabItem label="Go">
+    ```go
+    // Before
+    type AccountPlan struct {
+        Tier      string
+        DailyRate float64
+    }
+
+    type Account struct {
+        Plan          AccountPlan
+        DaysOverdrawn int
+    }
+
+    func (a Account) OverdraftCharge() float64 {
+        if a.Plan.Tier == "premium" {
+            base := 10.0
+            if a.DaysOverdrawn > 7 {
+                base += float64(a.DaysOverdrawn-7) * a.Plan.DailyRate * 0.85
+            }
+            return base
+        }
+        return float64(a.DaysOverdrawn) * a.Plan.DailyRate
+    }
+
+    // After
+    type AccountPlan struct {
+        Tier      string
+        DailyRate float64
+    }
+
+    func (p AccountPlan) OverdraftCharge(daysOverdrawn int) float64 {
+        if p.Tier == "premium" {
+            base := 10.0
+            if daysOverdrawn > 7 {
+                base += float64(daysOverdrawn-7) * p.DailyRate * 0.85
+            }
+            return base
+        }
+        return float64(daysOverdrawn) * p.DailyRate
+    }
+
+    type Account struct {
+        Plan          AccountPlan
+        DaysOverdrawn int
+    }
+
+    func (a Account) OverdraftCharge() float64 {
+        return a.Plan.OverdraftCharge(a.DaysOverdrawn)
+    }
+    ```
+  </TabItem>
+  <TabItem label="Rust">
+    ```rust
+    // Before
+    struct AccountPlan {
+        tier: String,
+        daily_rate: f64,
+    }
+
+    struct Account {
+        plan: AccountPlan,
+        days_overdrawn: i64,
+    }
+
+    impl Account {
+        fn overdraft_charge(&self) -> f64 {
+            if self.plan.tier == "premium" {
+                let mut base = 10.0;
+                if self.days_overdrawn > 7 {
+                    base += (self.days_overdrawn - 7) as f64 * self.plan.daily_rate * 0.85;
+                }
+                base
+            } else {
+                self.days_overdrawn as f64 * self.plan.daily_rate
+            }
+        }
+    }
+
+    // After
+    struct AccountPlan {
+        tier: String,
+        daily_rate: f64,
+    }
+
+    impl AccountPlan {
+        fn overdraft_charge(&self, days_overdrawn: i64) -> f64 {
+            if self.tier == "premium" {
+                let mut base = 10.0;
+                if days_overdrawn > 7 {
+                    base += (days_overdrawn - 7) as f64 * self.daily_rate * 0.85;
+                }
+                base
+            } else {
+                days_overdrawn as f64 * self.daily_rate
+            }
+        }
+    }
+
+    struct Account {
+        plan: AccountPlan,
+        days_overdrawn: i64,
+    }
+
+    impl Account {
+        fn overdraft_charge(&self) -> f64 {
+            self.plan.overdraft_charge(self.days_overdrawn)
+        }
+    }
+    ```
+  </TabItem>
+</Tabs>
+
+<Mermaid code={moveFnDiagram} title="A function that envies the plan moves onto the plan" />
+
+## Mechanics
+
+1. Examine everything the function uses in its current home and confirm most of it belongs to the target class. List the few things that still come from the source.
+2. Check whether those source-side elements should travel with the function or be passed in as parameters.
+3. Copy the function into the target class and adjust the body to use the target's own fields directly.
+4. Compile and resolve any references — the target may need a new parameter for the leftover source data.
+5. Turn the original function into a thin delegator that calls the new home, or replace its callers directly.
+6. **Run your tests.** Behaviour must be unchanged.
+7. Once every caller goes through the new location, remove the delegator if it no longer earns its place.
+
+## When to use / trade-offs
+
+Move a function when it consistently reaches across to another object, when several functions on one class would be simpler grouped on another, or when relocating it lets you delete a parameter that was only there to ferry data in.
+
+The cost is that callers may now need a reference to the target object, and a function moved too eagerly can scatter related logic. The inverse is simply moving it back: if the function turns out to depend more on its *original* context after later changes, Move Function it home again.
+
+## Related
+
+- [Move Field](/refactoring-from-zero-to-hero/en/moving-features/move-field/)
+- [Extract Class](/refactoring-from-zero-to-hero/en/moving-features/extract-class/)
+- [Hide Delegate and Remove Middle Man](/refactoring-from-zero-to-hero/en/moving-features/hide-delegate-and-remove-middle-man/)
+
+<Callout title="Follow the data">
+The single best signal for where a function belongs is the data it touches. Count the fields it reads: whichever object owns most of them is the function's true home. Move the behaviour to the data, not the data to the behaviour.
+</Callout>
+
+export const quizMoveFn = [
+  {
+    q: 'Which code smell does Move Function most directly cure?',
+    options: ['Long Parameter List', 'Feature Envy', 'Shotgun Surgery', 'Dead Code'],
+    answer: 1,
+  },
+  {
+    q: 'What is the clearest signal that a function belongs on a different class?',
+    options: [
+      'It has a long name',
+      'It reads another object\'s data and methods more than its own',
+      'It is called only once',
+      'It returns a boolean',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'After moving the function, what often happens to the original method?',
+    options: [
+      'It is duplicated verbatim',
+      'It becomes a thin delegator or is removed once callers are updated',
+      'It is converted to a global function',
+      'It must stay exactly as it was',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'What is the inverse of Move Function?',
+    options: ['Inline Class', 'Extract Class', 'Moving the function back to its original context', 'Hide Delegate'],
+    answer: 2,
+  },
+];
+
+<Quiz client:visible id="moving-features/move-function" questions={quizMoveFn} />
+
+<ProgressTracker client:visible id="moving-features/move-function" />

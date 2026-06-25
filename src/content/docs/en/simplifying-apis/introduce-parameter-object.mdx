@@ -1,0 +1,235 @@
+---
+title: Introduce Parameter Object
+description: When a clump of arguments always travels together, group them into a single object so the relationship becomes explicit and the call gets shorter.
+sidebar:
+  order: 4
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+export const paramObjectDiagram = `flowchart LR
+  subgraph Before["Before"]
+    A["bookFlight(<br/>from, to,<br/>startDate, endDate)"]
+  end
+  subgraph After["After"]
+    B["bookFlight(trip)"]
+    B --> C["Trip<br/>{ from, to,<br/>startDate, endDate }"]
+  end
+  Before -.->|"Introduce Parameter Object"| After`;
+
+## Intent
+
+Find a group of arguments that keep appearing together across several functions, and replace them with a single object that holds them all. The cluster gets a name, the relationship between the values becomes explicit, and every function that took the loose arguments now takes one tidy parameter.
+
+## The smell
+
+This cures the **Long Parameter List** and its cousin the **Data Clump** — the same two or three values passed side by side, in the same order, to function after function. A `start` and `end` that are really a date *range*. A `latitude` and `longitude` that are really a *location*. When values travel as a pack, that pack is a concept the code has not named yet. Worse, a long bare list invites the classic mistake of passing the arguments in the wrong order.
+
+## Before → After
+
+A flight booking that drags four loosely-related arguments around. After, they become a single `Trip` object.
+
+<Tabs syncKey="lang">
+  <TabItem label="TypeScript">
+    ```ts
+    // Before
+    function bookFlight(
+      from: string,
+      to: string,
+      startDate: string,
+      endDate: string,
+    ): string {
+      return `Flight ${from}->${to} from ${startDate} to ${endDate}`;
+    }
+
+    const summary = bookFlight("BKK", "NRT", "2026-07-01", "2026-07-09");
+
+    // After
+    interface Trip {
+      from: string;
+      to: string;
+      startDate: string;
+      endDate: string;
+    }
+
+    function bookFlight(trip: Trip): string {
+      return `Flight ${trip.from}->${trip.to} from ${trip.startDate} to ${trip.endDate}`;
+    }
+
+    const summary = bookFlight({
+      from: "BKK",
+      to: "NRT",
+      startDate: "2026-07-01",
+      endDate: "2026-07-09",
+    });
+    ```
+  </TabItem>
+  <TabItem label="Python">
+    ```python
+    # Before
+    def book_flight(origin, destination, start_date, end_date):
+        return f"Flight {origin}->{destination} from {start_date} to {end_date}"
+
+    summary = book_flight("BKK", "NRT", "2026-07-01", "2026-07-09")
+
+    # After
+    from dataclasses import dataclass
+
+    @dataclass
+    class Trip:
+        origin: str
+        destination: str
+        start_date: str
+        end_date: str
+
+    def book_flight(trip):
+        return (
+            f"Flight {trip.origin}->{trip.destination} "
+            f"from {trip.start_date} to {trip.end_date}"
+        )
+
+    summary = book_flight(Trip("BKK", "NRT", "2026-07-01", "2026-07-09"))
+    ```
+  </TabItem>
+  <TabItem label="Go">
+    ```go
+    // Before
+    func BookFlight(from, to, startDate, endDate string) string {
+        return fmt.Sprintf("Flight %s->%s from %s to %s", from, to, startDate, endDate)
+    }
+
+    summary := BookFlight("BKK", "NRT", "2026-07-01", "2026-07-09")
+
+    // After
+    type Trip struct {
+        From      string
+        To        string
+        StartDate string
+        EndDate   string
+    }
+
+    func BookFlight(t Trip) string {
+        return fmt.Sprintf("Flight %s->%s from %s to %s", t.From, t.To, t.StartDate, t.EndDate)
+    }
+
+    summary := BookFlight(Trip{
+        From:      "BKK",
+        To:        "NRT",
+        StartDate: "2026-07-01",
+        EndDate:   "2026-07-09",
+    })
+    ```
+  </TabItem>
+  <TabItem label="Rust">
+    ```rust
+    // Before
+    fn book_flight(from: &str, to: &str, start_date: &str, end_date: &str) -> String {
+        format!("Flight {from}->{to} from {start_date} to {end_date}")
+    }
+
+    let summary = book_flight("BKK", "NRT", "2026-07-01", "2026-07-09");
+
+    // After
+    struct Trip {
+        from: String,
+        to: String,
+        start_date: String,
+        end_date: String,
+    }
+
+    fn book_flight(trip: &Trip) -> String {
+        format!(
+            "Flight {}->{} from {} to {}",
+            trip.from, trip.to, trip.start_date, trip.end_date
+        )
+    }
+
+    let trip = Trip {
+        from: "BKK".to_string(),
+        to: "NRT".to_string(),
+        start_date: "2026-07-01".to_string(),
+        end_date: "2026-07-09".to_string(),
+    };
+    let summary = book_flight(&trip);
+    ```
+  </TabItem>
+</Tabs>
+
+<Mermaid code={paramObjectDiagram} title="Four loose arguments become one named Trip object" />
+
+## Mechanics
+
+1. Identify the clump — the arguments that always appear together. Pick a name for the concept they represent.
+2. Create a new structure (a class, struct, record, or interface) with a field for each member of the clump.
+3. Add the new object as a parameter to one target function, alongside the existing arguments at first. **Run your tests.**
+4. Inside the body, start reading from the object's fields instead of the loose parameters, one field at a time, testing as you go.
+5. Once the body reads only from the object, remove the now-unused loose parameters from the signature, then update that function's callers to build and pass the object.
+6. Repeat for the other functions that share the same clump, so they all take the object.
+7. **Run your tests** after each function. Watch for new behaviour to emerge: once the data lives together, logic that operated on it often wants to move onto the object too.
+
+## When to use / trade-offs
+
+Introduce a parameter object when the same values are passed together repeatedly, when a parameter list has grown long enough that callers get the order wrong, or when you sense an unnamed concept hiding inside the argument list. The object documents the relationship and gives behaviour that belongs to the group a natural home.
+
+The trade-off is an extra type to define and a small amount of ceremony to construct it at each call. For a one-off two-argument call that never recurs, that ceremony may not pay for itself. The win grows with reuse: the more functions share the clump, the more the object earns its keep — and the more it becomes a magnet for related methods.
+
+## Related
+
+- [Remove Flag Argument](/refactoring-from-zero-to-hero/en/simplifying-apis/remove-flag-argument/)
+- [Parameterize Function](/refactoring-from-zero-to-hero/en/simplifying-apis/parameterize-function/)
+- [Rename Function/Variable](/refactoring-from-zero-to-hero/en/simplifying-apis/rename-function/)
+
+<Callout title="A clump of data is a concept waiting for a name">
+When two values are always passed together, they are not two things — they are one thing the code has not named. Naming it (a `Range`, a `Location`, a `Trip`) does more than shorten the call: it gives that concept a place where its own validation and helpers can finally live.
+</Callout>
+
+export const quizParamObject = [
+  {
+    q: 'Which smells does Introduce Parameter Object primarily address?',
+    options: [
+      'Slow loops and duplicated queries',
+      'Long Parameter List and Data Clump',
+      'Missing tests',
+      'Global mutable state',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'Why is a group of arguments that always travel together significant?',
+    options: [
+      'It always indicates a performance bug',
+      'It usually represents an unnamed concept that wants to become an object',
+      'It means the function is too short',
+      'It means the arguments are unused',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'What often happens after the data is grouped into one object?',
+    options: [
+      'The object becomes a natural home for logic that operated on that data',
+      'The program slows down',
+      'The tests must be deleted',
+      'The arguments must be passed in reverse order',
+    ],
+    answer: 0,
+  },
+  {
+    q: 'When might introducing a parameter object not pay off?',
+    options: [
+      'When many functions share the same clump',
+      'For a one-off call whose arguments never recur elsewhere',
+      'When the argument order is easy to confuse',
+      'When the values represent a clear concept',
+    ],
+    answer: 1,
+  },
+];
+
+<Quiz client:visible id="simplifying-apis/introduce-parameter-object" questions={quizParamObject} />
+
+<ProgressTracker client:visible id="simplifying-apis/introduce-parameter-object" />

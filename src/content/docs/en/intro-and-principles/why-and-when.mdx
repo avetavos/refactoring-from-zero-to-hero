@@ -1,0 +1,119 @@
+---
+title: Why and When to Refactor
+description: The payoff of refactoring — readability, fewer bugs, cheaper change — plus technical debt, the boy-scout rule, the three occasions to refactor, and when to hold off.
+sidebar:
+  order: 3
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+export const debtDiagram = `flowchart LR
+  A["Ship a shortcut"] --> B["Debt accrues<br/>(harder to change)"]
+  B --> C{"Pay it down?"}
+  C -->|"Refactor"| D["Interest cleared,<br/>code stays cheap"]
+  C -->|"Ignore"| E["Interest compounds,<br/>every change slows"]
+  E --> B`;
+
+## Why bother?
+
+Refactoring does not add features and does not delight users directly, so it is fair to ask what you get for the effort. Three things, all of which compound over the life of a project.
+
+- **Readability.** Most of a developer's time is spent reading code, not writing it. Code shaped to reveal its intent is read faster and misunderstood less. Every minute spent making code clear is repaid many times by everyone who reads it later — including you, next month.
+- **Fewer bugs.** Clear structure exposes flaws that tangled code hides. When each function does one nameable thing, a wrong assumption has nowhere to lurk. Refactoring does not fix bugs by itself, but it makes them visible — and it makes the eventual fix safe.
+- **Cheaper change.** The real payoff. Well-structured code is cheap to extend; tangled code makes every new feature an archaeology project. Refactoring is an investment that keeps the cost of future change low.
+
+## Technical debt
+
+A useful way to think about messy code is **technical debt**. When you take a shortcut to ship faster, you borrow against the future: the code works now, but it is harder to change. Like financial debt, it charges *interest* — every future change in that area costs a little more than it should.
+
+A small, deliberate loan can be smart; it gets a feature out the door. The danger is never paying it down. Ignored, the interest compounds until a one-line change takes a week. Refactoring is how you repay the principal and stop the interest.
+
+<Mermaid code={debtDiagram} title="Technical debt: refactoring pays down the principal before interest compounds" />
+
+## The boy-scout rule
+
+> Always leave the code a little cleaner than you found it.
+
+You do not need a dedicated "refactoring sprint." The most sustainable improvement comes from tiny acts of tidying woven into normal work: rename one confusing variable, extract one tangled block, delete one dead branch each time you pass through. The codebase trends toward clean without anyone ever scheduling it.
+
+## The three occasions to refactor
+
+In practice, good refactoring is *opportunistic* — it rides along with work you were already doing. There are three natural moments:
+
+- **Preparatory refactoring** — *"make the change easy, then make the easy change."* Before adding a feature, reshape the surrounding code so the feature drops in cleanly. You are about to read this code anyway; spend a few minutes making it ready.
+- **Comprehension refactoring** — when you finally understand a confusing piece of code, encode that understanding back into it. Rename things, extract the part you just figured out, so the next reader does not have to repeat your struggle.
+- **Litter-pickup refactoring** — you spot some unrelated mess while passing through. If it is small, fix it on the spot. If it is large, note it and come back; do not let a cleanup balloon into an unreviewable diff.
+
+## When *not* to refactor
+
+Refactoring is not free, and there are times to put the hat down.
+
+| Situation | Why hold off |
+| --- | --- |
+| **No tests** | Without a safety net you cannot prove behavior was preserved. Add characterization tests first, *then* refactor. |
+| **Throwaway code** | A one-off script or a spike you will delete tomorrow does not earn the investment. |
+| **Mid-deadline crunch** | If a fix must ship in the next hour, ship it. Note the debt and pay it down deliberately afterward — not under pressure. |
+| **Code you are about to delete** | Restructuring code that is being removed in the next ticket is wasted effort. |
+
+The honest version of the boy-scout rule includes knowing when the campsite is on fire and now is not the moment to tidy.
+
+## Related
+
+- [What is refactoring?](/refactoring-from-zero-to-hero/en/intro-and-principles/what-is-refactoring/)
+- [Small steps and tests](/refactoring-from-zero-to-hero/en/intro-and-principles/small-steps-and-tests/)
+- [Reading code smells](/refactoring-from-zero-to-hero/en/intro-and-principles/reading-code-smells/)
+
+<Callout title="Make the change easy, then make the easy change">
+The single most valuable habit is preparatory refactoring. When a feature feels awkward to add, do not force it in. Stop, reshape the code so the feature fits naturally, and only then add it. The reshaping is almost always faster than fighting the awkward version.
+</Callout>
+
+export const quizWhy = [
+  {
+    q: 'Which is the deepest long-term payoff of refactoring?',
+    options: [
+      'It guarantees faster runtime performance',
+      'It lowers the cost of future change',
+      'It removes the need for tests',
+      'It adds features for free',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'What does "technical debt" charge over time if never repaid?',
+    options: [
+      'A one-time penalty only',
+      'Nothing — debt is harmless',
+      'Compounding interest: every change in that area costs more',
+      'A fixed monthly fee',
+    ],
+    answer: 2,
+  },
+  {
+    q: 'Which describes preparatory refactoring?',
+    options: [
+      'Refactor everything before writing any code, ever',
+      'Make the change easy, then make the easy change',
+      'Refactor only during a dedicated sprint',
+      'Delete tests before adding a feature',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'When is it best to hold off on refactoring?',
+    options: [
+      'When you understand the code well',
+      'When you have a solid test suite',
+      'When there are no tests to prove behavior was preserved',
+      'When the boy-scout rule applies',
+    ],
+    answer: 2,
+  },
+];
+
+<Quiz client:visible id="intro-and-principles/why-and-when" questions={quizWhy} />
+
+<ProgressTracker client:visible id="intro-and-principles/why-and-when" />
