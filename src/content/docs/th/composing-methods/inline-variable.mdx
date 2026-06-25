@@ -1,0 +1,155 @@
+---
+title: Inline Variable
+description: ลบตัวแปรที่เป็นเพียงเสียงสะท้อนของ expression และไม่ได้เพิ่มความชัดเจนใด ๆ โดยใส่ expression กลับไปยังที่ที่มันถูกใช้
+sidebar:
+  order: 7
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+## เจตนา
+
+บางครั้งตัวแปร local ก็เป็นเพียงชื่อที่สองของ expression ที่คุณเข้าใจอยู่แล้ว มันไม่ได้ทำให้อะไรชัดเจนขึ้นและไม่ได้ถูกนำกลับมาใช้ซ้ำ — มันแค่ขวางอยู่ระหว่างคุณกับโค้ดที่สำคัญ Inline Variable กำจัดตัวกลางนั้น: แทนที่ตัวแปรด้วย expression แล้วลบการประกาศตัวแปรทิ้ง ผลลัพธ์คือชื่อที่ต้องคอยติดตามน้อยลงหนึ่งชื่อ
+
+## smell
+
+คุณเจอตัวแปรที่ชื่อของมันไม่ได้บอกอะไรมากไปกว่า expression ที่มันเก็บไว้ `let basePrice = order.basePrice;` ตามด้วยการใช้ `basePrice` เพียงครั้งเดียวคือเสียงรบกวน — ผู้อ่านต้องเลื่อนขึ้นไปยืนยันว่า `basePrice` คือ `order.basePrice` จริง ๆ และไม่มีอะไรมากกว่านั้น ตัวแปรนั้นสัญญาว่าจะอธิบายแต่กลับให้เพียงคำพ้องความหมาย
+
+นี่คือสิ่งที่ตรงกันข้ามกับ **Extract Variable** อย่างชัดเจน ที่นั่นคุณเพิ่มชื่อเพราะ sub-expression ลึกลับ ที่นี่คุณกำจัดชื่อเพราะมันไม่เคยคุ้มค่ากับที่ของมัน การตัดสินใจเหมือนกันทั้งสองทิศทาง: ชื่อนั้นทำให้โค้ดชัดเจนกว่า expression ดิบหรือไม่? ถ้าไม่ ก็ inline มันเสีย
+
+## Before → After
+
+การตรวจสอบเรื่องการจัดส่งที่ผูกตัวแปรสองตัวซึ่งเป็นเพียงภาพสะท้อนของฟิลด์ แล้วใช้แต่ละตัวเพียงครั้งเดียว
+
+<Tabs syncKey="lang">
+  <TabItem label="TypeScript">
+    ```ts
+    // Before
+    function canShipFree(order: Order): boolean {
+      const basePrice = order.basePrice;
+      const overThreshold = basePrice > 100;
+      return overThreshold;
+    }
+
+    // After
+    function canShipFree(order: Order): boolean {
+      return order.basePrice > 100;
+    }
+    ```
+  </TabItem>
+  <TabItem label="Python">
+    ```python
+    # Before
+    def can_ship_free(order):
+        base_price = order.base_price
+        over_threshold = base_price > 100
+        return over_threshold
+
+    # After
+    def can_ship_free(order):
+        return order.base_price > 100
+    ```
+  </TabItem>
+  <TabItem label="Go">
+    ```go
+    // Before
+    func CanShipFree(order Order) bool {
+        basePrice := order.BasePrice
+        overThreshold := basePrice > 100
+        return overThreshold
+    }
+
+    // After
+    func CanShipFree(order Order) bool {
+        return order.BasePrice > 100
+    }
+    ```
+  </TabItem>
+  <TabItem label="Rust">
+    ```rust
+    // Before
+    fn can_ship_free(order: &Order) -> bool {
+        let base_price = order.base_price;
+        let over_threshold = base_price > 100.0;
+        over_threshold
+    }
+
+    // After
+    fn can_ship_free(order: &Order) -> bool {
+        order.base_price > 100.0
+    }
+    ```
+  </TabItem>
+</Tabs>
+
+## Mechanics
+
+1. ตรวจสอบว่า expression ที่กำหนดให้กับตัวแปรไม่มี side effect — การ inline ต้องไม่เปลี่ยน *เมื่อใด* หรือ *บ่อยแค่ไหน* ที่ expression นั้นทำงาน
+2. ถ้าตัวแปรยังไม่ใช่ read-only ให้ทำให้มันเป็นอย่างนั้น (เป็น `const`, `final`, หรือ binding ที่กำหนดค่าได้ครั้งเดียว) ถ้า compiler บ่น แสดงว่าตัวแปรถูกกำหนดค่าใหม่ และคุณควรหยุด: มันทำมากกว่าการสะท้อนภาพ
+3. หาที่แรกที่ตัวแปรถูกอ่าน แล้วแทนที่การอ่านนั้นด้วย expression
+4. **รันเทสต์ของคุณ**
+5. ทำซ้ำสำหรับการอ่านที่เหลือแต่ละครั้ง ทีละครั้ง โดยทดสอบไปตลอดทาง
+6. เมื่อไม่มีการอ่านเหลืออยู่ ให้ลบการประกาศตัวแปรทิ้ง
+7. **รันเทสต์ของคุณ** อีกครั้ง
+
+## เมื่อใดควรใช้ / ข้อแลกเปลี่ยน
+
+inline ตัวแปรเมื่อชื่อของมันไม่ได้พกพาข้อมูลที่ expression ไม่ได้พกพาอยู่แล้ว และเมื่อมันถูกใช้ในเพียงหนึ่งหรือสองที่ที่อยู่ใกล้กัน การถอดมันออกทำให้ฟังก์ชันสั้นลงและกำจัดการกระโดดไปมาหนึ่งครั้งสำหรับผู้อ่าน
+
+อย่า inline เมื่อชื่อของตัวแปรอธิบายความหมายที่ไม่ชัดเจนในตัว เมื่อ expression ถูกใช้ซ้ำหลายครั้ง (ชื่อจะช่วยหลีกเลี่ยงทั้งความซ้ำซ้อนและการคำนวณซ้ำ) หรือเมื่อ expression มีต้นทุนสูงและตัวแปรเก็บผลลัพธ์ไว้เป็น cache ในกรณีเหล่านั้น สิ่งที่ตรงกันข้าม — **Extract Variable** — คือการเคลื่อนไหวที่คุณต้องการแทน
+
+## Related
+
+- [Extract Variable](/refactoring-from-zero-to-hero/th/composing-methods/extract-variable/)
+- [Inline Function](/refactoring-from-zero-to-hero/th/composing-methods/inline-function/)
+- [Replace Temp with Query](/refactoring-from-zero-to-hero/th/composing-methods/replace-temp-with-query/)
+
+<Callout title="คำพ้องความหมายไม่ใช่คำอธิบาย">
+ตัวแปรได้ที่ของมันมาด้วยการบอกบางอย่างที่ expression ไม่ได้บอก ถ้า `total` หมายถึงแค่ `a + b` ในบรรทัดถัดไปทันที ชื่อนั้นเพิ่มการค้นหา ไม่ใช่ความเข้าใจ เก็บชื่อที่อธิบายไว้ และ inline ชื่อที่เป็นเพียงการพูดซ้ำ
+</Callout>
+
+export const quizInlineVariable = [
+  {
+    q: 'เมื่อใดที่ตัวแปรเป็นตัวเลือกที่ดีในการ inline?',
+    options: [
+      'เมื่อชื่อของมันไม่ได้บอกอะไรมากไปกว่า expression ที่มันเก็บไว้ และมันถูกใช้หนึ่งหรือสองครั้ง',
+      'เมื่อมันถูกอ่านในหลายที่ที่อยู่ห่างไกล',
+      'เมื่อ expression ที่มันเก็บไว้มีต้นทุนสูงในการคำนวณ',
+      'เมื่อมันถูกกำหนดค่าใหม่หลายครั้ง',
+    ],
+    answer: 0,
+  },
+  {
+    q: 'Inline Variable เป็นสิ่งที่ตรงกันข้ามกับ refactoring แบบใด?',
+    options: ['Inline Function', 'Extract Variable', 'Split Phase', 'Slide Statements'],
+    answer: 1,
+  },
+  {
+    q: 'คุณต้องยืนยันอะไรเกี่ยวกับ expression ก่อน inline มัน?',
+    options: [
+      'ว่ามันคืนค่าเป็นตัวเลข',
+      'ว่ามันไม่มี side effect ดังนั้นการรันมันแบบ inline จะไม่เปลี่ยนพฤติกรรม',
+      'ว่ามันยาวอย่างน้อยสามบรรทัด',
+      'ว่ามันถูกใช้โดยโมดูลอื่น',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'เมื่อใดที่คุณไม่ควร inline ตัวแปร?',
+    options: [
+      'เมื่อชื่อของมันอธิบายความหมายที่ไม่ชัดเจนในตัว หรือมันเก็บผลลัพธ์ที่มีต้นทุนสูงไว้เป็น cache',
+      'เมื่อมันถูกอ่านเพียงครั้งเดียวพอดี',
+      'เมื่อ expression เป็นเพียงการเข้าถึงฟิลด์อย่างง่าย',
+      'เมื่อฟังก์ชันสั้น',
+    ],
+    answer: 0,
+  },
+];
+
+<Quiz client:visible id="composing-methods/inline-variable" questions={quizInlineVariable} />
+
+<ProgressTracker client:visible id="composing-methods/inline-variable" />

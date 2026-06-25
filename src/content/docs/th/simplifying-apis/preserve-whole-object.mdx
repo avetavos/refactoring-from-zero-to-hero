@@ -1,0 +1,187 @@
+---
+title: Preserve Whole Object
+description: หยุดแกะค่าหลายตัวออกจากออบเจกต์แค่เพื่อส่งมันเป็นอาร์กิวเมนต์แยกกัน — ส่งทั้งออบเจกต์ไปแล้วปล่อยให้ผู้ถูกเรียกหยิบเอาเอง
+sidebar:
+  order: 8
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+export const preserveDiagram = `flowchart LR
+  subgraph Before["Before"]
+    A["caller pulls low + high<br/>from range"] --> B["fits(low, high)"]
+  end
+  subgraph After["After"]
+    C["caller passes range"] --> D["fits(range)"]
+  end
+  Before -.->|"Preserve Whole Object"| After`;
+
+## เจตนา
+
+ผู้เรียกใช้ถือออบเจกต์อยู่แล้ว แล้วก็ขุดเอาฟิลด์สองสามตัวออกมาแค่เพื่อส่งมันเข้าฟังก์ชันทีละตัว ให้ส่ง **ทั้งออบเจกต์** ข้ามไปแทน รายการอาร์กิวเมนต์จะหดลง ฟังก์ชันสามารถเอื้อมไปหยิบฟิลด์ใดก็ได้ที่มันต้องการ และถ้าออบเจกต์งอกฟิลด์ใหม่ที่เกี่ยวข้องในภายหลัง ลายเซ็นก็ไม่ต้องเปลี่ยน
+
+## กลิ่นไม่ดี
+
+ที่จุดเรียกใช้คุณจะเห็นชุดของการเรียก accessor ที่ป้อนตรงเข้าไปในอีกการเรียกหนึ่ง: `plot(point.x, point.y)`, `fits(range.low, range.high)` ค่าที่ถูกแกะออกมาทั้งหมดมาจากออบเจกต์เดียวกันและเดินทางไปด้วยกัน รายการพารามิเตอร์ของฟังก์ชันสะท้อนเนื้อในของออบเจกต์ ทั้งสองจึงถูกผูกติดกันอย่างเงียบ ๆ ในขณะที่แกล้งทำเป็นอิสระต่อกัน
+
+## ก่อน → หลัง
+
+ค่าที่อ่านได้ถูกตรวจกับ `range` ของอุณหภูมิ ผู้เรียกใช้ดึง `low` และ `high` ออกจาก range เพื่อส่งเข้าไป แทนที่จะทำอย่างนั้น ให้ส่ง range เองและปล่อยให้การตรวจถามมันโดยตรง
+
+<Tabs syncKey="lang">
+  <TabItem label="TypeScript">
+    ```ts
+    // Before
+    function fitsRange(reading: number, low: number, high: number): boolean {
+      return reading >= low && reading <= high;
+    }
+
+    const ok = fitsRange(today, range.low, range.high);
+
+    // After
+    interface Range { low: number; high: number; }
+
+    function fitsRange(reading: number, range: Range): boolean {
+      return reading >= range.low && reading <= range.high;
+    }
+
+    const ok = fitsRange(today, range);
+    ```
+  </TabItem>
+  <TabItem label="Python">
+    ```python
+    # Before
+    def fits_range(reading, low, high):
+        return low <= reading <= high
+
+    ok = fits_range(today, range_.low, range_.high)
+
+    # After
+    def fits_range(reading, range_):
+        return range_.low <= reading <= range_.high
+
+    ok = fits_range(today, range_)
+    ```
+  </TabItem>
+  <TabItem label="Go">
+    ```go
+    // Before
+    func FitsRange(reading, low, high float64) bool {
+        return reading >= low && reading <= high
+    }
+
+    ok := FitsRange(today, r.Low, r.High)
+
+    // After
+    type Range struct {
+        Low  float64
+        High float64
+    }
+
+    func FitsRange(reading float64, r Range) bool {
+        return reading >= r.Low && reading <= r.High
+    }
+
+    ok := FitsRange(today, r)
+    ```
+  </TabItem>
+  <TabItem label="Rust">
+    ```rust
+    // Before
+    fn fits_range(reading: f64, low: f64, high: f64) -> bool {
+        reading >= low && reading <= high
+    }
+
+    let ok = fits_range(today, range.low, range.high);
+
+    // After
+    struct Range {
+        low: f64,
+        high: f64,
+    }
+
+    fn fits_range(reading: f64, range: &Range) -> bool {
+        reading >= range.low && reading <= range.high
+    }
+
+    let ok = fits_range(today, &range);
+    ```
+  </TabItem>
+</Tabs>
+
+<Mermaid code={preserveDiagram} title="หลายฟิลด์ที่ถูกแกะออกมายุบรวมเป็นอาร์กิวเมนต์ทั้งออบเจกต์เดียว" />
+
+## กลไก
+
+1. เพิ่มพารามิเตอร์ใหม่สำหรับทั้งออบเจกต์ โดยปล่อยพารามิเตอร์ฟิลด์ที่มีอยู่ไว้ก่อน
+2. ภายในฟังก์ชัน แทนที่การใช้ฟิลด์ที่ถูกแกะแต่ละจุดด้วยการอ่านจากทั้งออบเจกต์
+3. อัปเดตผู้เรียกใช้แต่ละจุดให้ส่งออบเจกต์และเลิกส่งฟิลด์แต่ละตัว **รันเทสต์** หลังจากแต่ละจุด
+4. เมื่อแปลงผู้เรียกใช้ทุกจุดแล้ว ให้ลบพารามิเตอร์ฟิลด์ที่ตอนนี้ไม่ถูกใช้แล้วทิ้ง
+5. มองหาตรรกะในผู้เรียกใช้ที่จัดการแค่ฟิลด์เหล่านั้น — มันอาจควรอยู่ภายในฟังก์ชัน หรือเป็นเมท็อดบนตัวออบเจกต์เอง
+
+## เมื่อไรควรใช้ / ข้อแลกเปลี่ยน
+
+หยิบท่านี้มาใช้เมื่อฟิลด์ที่ถูกแกะออกมาทั้งหมดเป็นของออบเจกต์เดียวกัน เมื่อหลายฟังก์ชันดึงกลุ่มฟิลด์เดียวกันออกมา หรือเมื่อฟังก์ชันน่าจะได้ประโยชน์จากการเข้าถึงออบเจกต์มากกว่าที่ได้รับอยู่ในปัจจุบัน มันมักเผยให้เห็น **Feature Envy** — โค้ดที่ไปยุ่งกับข้อมูลของออบเจกต์อื่น — ซึ่งคุณก็สามารถย้ายไปไว้บนออบเจกต์นั้นเป็นเมท็อดได้
+
+ข้อแลกเปลี่ยนคือ dependency ที่แน่นขึ้น: ตอนนี้ฟังก์ชันรู้จัก type ของออบเจกต์ ไม่ใช่แค่ตัวเลขธรรมดาสองตัว ถ้าผู้ถูกเรียกควรไม่รู้จัก type นั้น — เพื่อนำกลับมาใช้ในบริบทที่ไม่เกี่ยวข้องกัน หรือเพื่อเลี่ยง circular dependency — ให้คงพารามิเตอร์แบบหลวมไว้ และถ้าผู้เรียกใช้ยังไม่มีทั้งออบเจกต์อยู่ในมือ การประกอบมันขึ้นมาแค่เพื่อจะเรียกถือเป็นการถอยหลังก้าวหนึ่ง
+
+## ที่เกี่ยวข้อง
+
+- [Introduce Parameter Object](/refactoring-from-zero-to-hero/th/simplifying-apis/introduce-parameter-object/)
+- [Replace Parameter with Query](/refactoring-from-zero-to-hero/th/simplifying-apis/replace-parameter-with-query/)
+- [Parameterize Function](/refactoring-from-zero-to-hero/th/simplifying-apis/parameterize-function/)
+
+<Callout title="Whole object vs parameter object">
+Preserve Whole Object นำออบเจกต์ที่คุณมีอยู่แล้วกลับมาใช้ ส่วน Introduce Parameter Object คิดค้น type *ใหม่* ขึ้นมาเพื่อมัดอาร์กิวเมนต์ที่ก่อนหน้านี้ไม่มีที่อยู่ ทั้งสองต่างก็หดรายการอาร์กิวเมนต์ — เลือกออบเจกต์ที่มีอยู่เมื่อมีตัวหนึ่งจัดกลุ่มค่าให้แล้ว และเลือก type ใหม่เมื่อไม่มีอะไรทำหน้าที่นั้น
+</Callout>
+
+export const quizPreserve = [
+  {
+    q: 'Preserve Whole Object แทนที่อะไรในรายการอาร์กิวเมนต์?',
+    options: [
+      'ออบเจกต์เดียวด้วยฟิลด์แต่ละตัวของมัน',
+      'หลายฟิลด์ที่ถูกแกะออกจากออบเจกต์หนึ่งด้วยตัวออบเจกต์เอง',
+      'flag แบบ boolean ด้วยสองฟังก์ชัน',
+      'constructor ด้วย factory',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'กลิ่นที่จุดเรียกใช้แบบใดที่บ่งบอกถึงการรีแฟกเตอร์นี้?',
+    options: [
+      'สาย if/else ที่ยาว',
+      'หลาย accessor ของออบเจกต์เดียวกันที่ป้อนตรงเข้าไปในการเรียกเดียว',
+      'ฟังก์ชันที่ไม่มีพารามิเตอร์',
+      'string literal ที่ซ้ำกัน',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'Preserve Whole Object มักเผยกลิ่นที่ลึกกว่าแบบใด?',
+    options: [
+      'Feature Envy — โค้ดที่จัดการข้อมูลของออบเจกต์อื่น',
+      'Primitive Obsession ในฐานข้อมูล',
+      'โค้ดที่ตายแล้วในสคริปต์ build',
+      'index ที่ขาดหายไป',
+    ],
+    answer: 0,
+  },
+  {
+    q: 'เมื่อไรที่คุณควรคงการส่งฟิลด์แบบหลวมไว้แทนที่จะส่งทั้งออบเจกต์?',
+    options: [
+      'เมื่อออบเจกต์มีมากกว่าสามฟิลด์',
+      'เมื่อผู้ถูกเรียกควรไม่รู้จัก type ของออบเจกต์ เช่น เพื่อเลี่ยง circular dependency',
+      'เมื่อใดก็ตามที่ฟังก์ชันเป็น private',
+      'เมื่อฟิลด์เป็นตัวเลข',
+    ],
+    answer: 1,
+  },
+];
+
+<Quiz client:visible id="simplifying-apis/preserve-whole-object" questions={quizPreserve} />
+
+<ProgressTracker client:visible id="simplifying-apis/preserve-whole-object" />

@@ -1,0 +1,256 @@
+---
+title: Combine Functions into Class
+description: เมื่อกลุ่มฟังก์ชันคอยส่งข้อมูลชุดเดิมไปมา ให้รวมพวกมันเข้าเป็นคลาสที่ถือข้อมูลนั้นไว้เป็น field
+sidebar:
+  order: 10
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+export const combineDiagram = `flowchart LR
+  subgraph Before["Before"]
+    D["reading data<br/>(customer, quantity, month)"]
+    F1["baseCharge(reading)"]
+    F2["taxableCharge(reading)"]
+    F3["calculateBaseCharge(reading)"]
+    D -.-> F1
+    D -.-> F2
+    D -.-> F3
+  end
+  subgraph After["After"]
+    C["Reading (class)<br/>fields: customer, quantity, month"]
+    C --> M1["baseCharge()"]
+    C --> M2["taxableCharge()"]
+    C --> M3["calculateBaseCharge()"]
+  end
+  Before -.->|"Combine Functions into Class"| After`;
+
+## Intent
+
+เมื่อมีฟังก์ชันอิสระหลายตัวที่ทำงานบนกลุ่มข้อมูลชุดเดียวกัน — แต่ละตัวรับมันเข้ามาเป็น argument แต่ละตัวคำนวณค่าจากมัน — ให้รวมพวกมันเข้าเป็นคลาส ข้อมูลที่ใช้ร่วมกันกลายเป็น field ของอ็อบเจกต์ ฟังก์ชันกลายเป็น method ของมัน และ data clump ก็เลิกถูกร้อยส่งผ่านทุก ๆ การเรียก
+
+## The smell
+
+คุณเห็นกลุ่มฟังก์ชันที่รับ record ตัวเดียวกันและดึงค่าออกจากมัน: `baseCharge(reading)`, `taxableCharge(reading)`, `calculateBaseCharge(reading)` record เดินทางจากฟังก์ชันหนึ่งไปอีกฟังก์ชันในรูป parameter และฟังก์ชันเหล่านี้ก็รวมเป็นครอบครัวรอบ ๆ มันอย่างชัดเจน — แต่ไม่มีอะไรตั้งชื่อให้ครอบครัวนั้น นี่คือ **Data Clump** ที่มีพฤติกรรมโคจรอยู่รอบ ๆ การห่อข้อมูลไว้ในคลาสจะให้บ้านแก่ครอบครัวนี้ ให้ method เรียกกันเองได้โดยไม่ต้องส่งข้อมูลซ้ำ และสร้างที่ชัดเจนให้ฟังก์ชันที่เกี่ยวข้องตัวต่อไปมาลง
+
+## Before → After
+
+ฟังก์ชันสามตัวที่แต่ละตัวรับ `reading` ของมิเตอร์แล้วคำนวณค่าใช้จ่าย เรารวมพวกมันเข้าเป็นคลาส `Reading` ที่มี field เป็นข้อมูลของ reading
+
+<Tabs syncKey="lang">
+  <TabItem label="TypeScript">
+    ```ts
+    // Before — data threaded through every function
+    function baseRate(month: number): number {
+      return month >= 6 && month <= 9 ? 0.12 : 0.1;
+    }
+
+    function baseCharge(reading: Reading): number {
+      return baseRate(reading.month) * reading.quantity;
+    }
+
+    function taxableCharge(reading: Reading): number {
+      return Math.max(0, baseCharge(reading) - 30);
+    }
+
+    // After — data and behaviour live together
+    class ReadingCharge {
+      constructor(private reading: Reading) {}
+
+      private get baseRate(): number {
+        return this.reading.month >= 6 && this.reading.month <= 9 ? 0.12 : 0.1;
+      }
+
+      get baseCharge(): number {
+        return this.baseRate * this.reading.quantity;
+      }
+
+      get taxableCharge(): number {
+        return Math.max(0, this.baseCharge - 30);
+      }
+    }
+    ```
+  </TabItem>
+  <TabItem label="Python">
+    ```python
+    # Before — data threaded through every function
+    def base_rate(month):
+        return 0.12 if 6 <= month <= 9 else 0.10
+
+    def base_charge(reading):
+        return base_rate(reading.month) * reading.quantity
+
+    def taxable_charge(reading):
+        return max(0, base_charge(reading) - 30)
+
+    # After — data and behaviour live together
+    class ReadingCharge:
+        def __init__(self, reading):
+            self.reading = reading
+
+        @property
+        def base_rate(self):
+            return 0.12 if 6 <= self.reading.month <= 9 else 0.10
+
+        @property
+        def base_charge(self):
+            return self.base_rate * self.reading.quantity
+
+        @property
+        def taxable_charge(self):
+            return max(0, self.base_charge - 30)
+    ```
+  </TabItem>
+  <TabItem label="Go">
+    ```go
+    // Before — data threaded through every function
+    func baseRate(month int) float64 {
+        if month >= 6 && month <= 9 {
+            return 0.12
+        }
+        return 0.10
+    }
+
+    func baseCharge(r Reading) float64 {
+        return baseRate(r.Month) * r.Quantity
+    }
+
+    func taxableCharge(r Reading) float64 {
+        return math.Max(0, baseCharge(r)-30)
+    }
+
+    // After — struct holds the data, methods hang off it
+    type ReadingCharge struct {
+        reading Reading
+    }
+
+    func (rc ReadingCharge) baseRate() float64 {
+        if rc.reading.Month >= 6 && rc.reading.Month <= 9 {
+            return 0.12
+        }
+        return 0.10
+    }
+
+    func (rc ReadingCharge) BaseCharge() float64 {
+        return rc.baseRate() * rc.reading.Quantity
+    }
+
+    func (rc ReadingCharge) TaxableCharge() float64 {
+        return math.Max(0, rc.BaseCharge()-30)
+    }
+    ```
+  </TabItem>
+  <TabItem label="Rust">
+    ```rust
+    // Before — data threaded through every function
+    fn base_rate(month: u32) -> f64 {
+        if (6..=9).contains(&month) { 0.12 } else { 0.10 }
+    }
+
+    fn base_charge(reading: &Reading) -> f64 {
+        base_rate(reading.month) * reading.quantity
+    }
+
+    fn taxable_charge(reading: &Reading) -> f64 {
+        (base_charge(reading) - 30.0).max(0.0)
+    }
+
+    // After — struct owns the data, impl holds the methods
+    struct ReadingCharge {
+        reading: Reading,
+    }
+
+    impl ReadingCharge {
+        fn base_rate(&self) -> f64 {
+            if (6..=9).contains(&self.reading.month) { 0.12 } else { 0.10 }
+        }
+
+        fn base_charge(&self) -> f64 {
+            self.base_rate() * self.reading.quantity
+        }
+
+        fn taxable_charge(&self) -> f64 {
+            (self.base_charge() - 30.0).max(0.0)
+        }
+    }
+    ```
+  </TabItem>
+</Tabs>
+
+<Mermaid code={combineDiagram} title="data clump พร้อมฟังก์ชันที่โคจรรอบมันกลายเป็นคลาสเดียว" />
+
+## Mechanics
+
+1. เลือก record ร่วมที่ทุกฟังก์ชันใช้ และทำ **Encapsulate Record** ถ้ามันเป็นโครงสร้างข้อมูลเปล่า ๆ — คุณต้องการอ็อบเจกต์หนึ่งตัวมายึดคลาสไว้
+2. สร้างคลาส (หรือ struct + impl) ที่รับ record นั้นใน constructor และเก็บมันไว้เป็น field
+3. ย้ายแต่ละฟังก์ชันเข้าคลาสทีละตัว เปลี่ยน parameter ข้อมูลของมันให้เป็นการอ้างถึง field ที่เก็บไว้ แล้วรันเทสต์หลังการย้ายแต่ละครั้ง
+4. แทนที่การเข้าถึง parameter เดิม (เช่น `reading.month`) ด้วยการเข้าถึง field บนอ็อบเจกต์
+5. เมื่อ method เริ่มเรียกกันเอง ให้ทิ้ง argument ที่ตอนนี้ซ้ำซ้อนที่เคยส่งกันออกไป
+6. **รันเทสต์** หลังทุกขั้น แล้วอัปเดต call site เดิมแต่ละจุดให้สร้างอ็อบเจกต์และเรียก method
+
+## When to use / trade-offs
+
+ใช้สิ่งนี้เมื่อชุดของฟังก์ชันเป็นของข้อมูลชิ้นเดียวอย่างชัดเจน และคุณคอยส่งข้อมูลนั้นไปมาระหว่างพวกมัน คลาสให้ชื่อแก่กลุ่มก้อนนี้ ลบการร้อย parameter ที่ซ้ำซาก และเสนอบ้านตามธรรมชาติให้ตรรกะที่เกี่ยวข้องซึ่งคุณจะเพิ่มเข้ามาภายหลัง มันยังเข้าคู่ได้ดีกับ **Split Phase** และ **Extract Function** — เมื่อฟังก์ชันใช้อ็อบเจกต์ร่วมกัน ค่าที่คำนวณได้ก็กลายเป็น query ที่สะอาดบนมัน
+
+ข้อแลกเปลี่ยนคือคุณกำลังนำอ็อบเจกต์เข้ามาในที่ที่เคยมีแต่ฟังก์ชันธรรมดา ซึ่งคุ้มก็ต่อเมื่อฟังก์ชันเหล่านั้นเกาะกลุ่มกันรอบข้อมูลร่วมจริง ๆ ถ้าฟังก์ชันเพียงบังเอิญรับ argument คล้ายกันแต่มุ่งเป้าที่ไม่เกี่ยวกัน คลาสก็จะจับสิ่งที่ไม่ได้เป็นพวกเดียวกันมารวมกัน ทางเลือกของการรวบรวม เมื่อฟังก์ชันผลิตค่าออกมาแทนที่จะใช้ state ที่เปลี่ยนได้ร่วมกัน คือ **Combine Functions into Transform**
+
+## Related
+
+- [Split Loop](/refactoring-from-zero-to-hero/th/moving-features/split-loop/)
+- [Extract Class](/refactoring-from-zero-to-hero/th/moving-features/extract-class/)
+- [Extract Function](/refactoring-from-zero-to-hero/th/composing-methods/extract-function/)
+
+<Callout title="จับกลุ่มรอบข้อมูล ไม่ใช่รอบกริยา">
+เหตุผลที่จะรวมฟังก์ชันเหล่านี้คือข้อมูลที่พวกมันใช้ร่วมกัน ไม่ใช่เพราะชื่อมันคล้องจองกัน ถ้าทุกตัวรับ record เดียวกันและอ่านจากมัน คลาสก็เขียนตัวมันเอง ถ้าพวกมันแค่ดูคล้ายกันแต่แตะข้อมูลคนละชุด ก็ปล่อยให้เป็นฟังก์ชันแยกกันไว้
+</Callout>
+
+export const quizCombine = [
+  {
+    q: 'อะไรคือตัวกระตุ้นให้ทำ Combine Functions into Class?',
+    options: [
+      'ฟังก์ชันที่มีชื่อยาว',
+      'ฟังก์ชันหลายตัวที่ใช้ร่วมและคอยส่ง data clump ชุดเดียวกันไปมา',
+      'ฟังก์ชันเดียวที่ยาวเกินไป',
+      'ฟังก์ชันที่อยู่คนละไฟล์',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'เกิดอะไรขึ้นกับข้อมูลที่ใช้ร่วมกันเมื่อฟังก์ชันกลายเป็นคลาส?',
+    options: [
+      'มันถูกลบทิ้ง',
+      'มันกลายเป็น field ของคลาส method จึงอ่านมันโดยตรงแทนที่จะผ่าน parameter',
+      'มันถูกทำซ้ำเข้าไปในแต่ละ method',
+      'มันกลายเป็น global variable',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'ใน Go และ Rust การ refactor นี้แสดงออกมาอย่างไร?',
+    options: [
+      'Go ด้วย inheritance, Rust ด้วย macro',
+      'Go ด้วย struct พร้อม method, Rust ด้วย struct พร้อม impl block',
+      'ทั้งคู่ด้วยฟังก์ชันอิสระล้วน ๆ',
+      'ทั้งคู่ด้วย global state',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'เมื่อไรที่คุณไม่ควรรวมฟังก์ชันเข้าเป็นคลาส?',
+    options: [
+      'เมื่อฟังก์ชันเกาะกลุ่มกันรอบข้อมูลร่วมจริง ๆ',
+      'เมื่อฟังก์ชันแค่ดูคล้ายกันแต่ทำงานบนข้อมูลที่ไม่เกี่ยวกัน',
+      'เมื่อมีพวกมันสามตัว',
+      'เมื่อพวกมันอยู่ใน module เดียวกัน',
+    ],
+    answer: 1,
+  },
+];
+
+<Quiz client:visible id="moving-features/combine-functions-into-class" questions={quizCombine} />
+
+<ProgressTracker client:visible id="moving-features/combine-functions-into-class" />

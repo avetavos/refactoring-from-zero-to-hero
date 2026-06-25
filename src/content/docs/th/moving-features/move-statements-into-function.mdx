@@ -1,0 +1,238 @@
+---
+title: Move Statements into Function
+description: เมื่อคำสั่งเดียวกันรันก่อนหรือหลังการเรียกฟังก์ชันเสมอ ให้พับมันเข้าไปในฟังก์ชันเพื่อให้ผู้เรียกลืมไม่ได้
+sidebar:
+  order: 7
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+## Intent
+
+เมื่อโค้ดบรรทัดหนึ่งจับคู่กับการเรียกฟังก์ชันบางตัวเสมอ — รันก่อนหรือหลังมันทันที ที่ทุก ๆ จุดเรียก — บรรทัดนั้นควรอยู่ *ภายใน* ฟังก์ชัน ย้ายมันเข้าไป ตอนนี้ฟังก์ชันเป็นเจ้าของงานทั้งหมดอย่างครบถ้วน และผู้เรียกก็หดเหลือเพียงการเรียกครั้งเดียวที่ทำพลาดไม่ได้
+
+## The smell
+
+คุณพบคำสั่งเตรียมการหรือคำสั่งปิดท้ายอันเดิมถูก copy-paste ไว้เหนือหรือใต้การเรียกฟังก์ชันทุกที่ที่มันปรากฏ บางทีผู้เรียก `renderName` ทุกตัวเขียน opening tag ก่อน หรือผู้เรียก `fetchOrder` ทุกตัว log บรรทัดเดียวกันหลังจากนั้น คำสั่งที่ทำซ้ำนั้นเป็นส่วนหนึ่งของพฤติกรรมที่ผู้เรียกคาดหวัง แต่กลับอยู่นอกฟังก์ชัน ที่ซึ่งผู้เรียกรายใหม่ทุกรายต้องจำให้เพิ่มมันเข้าไป ลืมสักครั้งเดียวก็ได้บั๊กเงียบ ๆ การทำซ้ำนี้เป็นสัญญาณว่าคำสั่งนั้นอยากจะย้ายเข้าไป
+
+## Before → After
+
+ฟังก์ชันที่ปล่อย HTML รูปภาพของบุคคล ผู้เรียกทุกตัวเขียนบรรทัด heading `<p>` อันเดิมก่อนจะเรียกมันทันที heading นั้นจริง ๆ แล้วเป็นส่วนหนึ่งของ "render บล็อกรูปภาพ" เราจึงย้ายมันเข้าไป
+
+<Tabs syncKey="lang">
+  <TabItem label="TypeScript">
+    ```ts
+    // Before
+    function photoData(photo: Photo): string {
+      return [
+        `<p>location: ${photo.location}</p>`,
+        `<p>date: ${photo.date.toDateString()}</p>`,
+      ].join('\n');
+    }
+
+    function renderPerson(person: Person, photo: Photo): string {
+      return [
+        `<p>${person.name}</p>`,
+        `<p>title: ${photo.title}</p>`, // repeated at every call site
+        photoData(photo),
+      ].join('\n');
+    }
+
+    function emitPhoto(photo: Photo): string {
+      return [
+        `<p>title: ${photo.title}</p>`, // repeated here too
+        photoData(photo),
+      ].join('\n');
+    }
+
+    // After
+    function photoData(photo: Photo): string {
+      return [
+        `<p>title: ${photo.title}</p>`, // moved in — now owned by photoData
+        `<p>location: ${photo.location}</p>`,
+        `<p>date: ${photo.date.toDateString()}</p>`,
+      ].join('\n');
+    }
+
+    function renderPerson(person: Person, photo: Photo): string {
+      return [`<p>${person.name}</p>`, photoData(photo)].join('\n');
+    }
+
+    function emitPhoto(photo: Photo): string {
+      return photoData(photo);
+    }
+    ```
+  </TabItem>
+  <TabItem label="Python">
+    ```python
+    # Before
+    def photo_data(photo):
+        return "\n".join([
+            f"<p>location: {photo.location}</p>",
+            f"<p>date: {photo.date:%Y-%m-%d}</p>",
+        ])
+
+    def render_person(person, photo):
+        return "\n".join([
+            f"<p>{person.name}</p>",
+            f"<p>title: {photo.title}</p>",  # repeated at every call site
+            photo_data(photo),
+        ])
+
+    def emit_photo(photo):
+        return "\n".join([
+            f"<p>title: {photo.title}</p>",  # repeated here too
+            photo_data(photo),
+        ])
+
+    # After
+    def photo_data(photo):
+        return "\n".join([
+            f"<p>title: {photo.title}</p>",  # moved in — now owned by photo_data
+            f"<p>location: {photo.location}</p>",
+            f"<p>date: {photo.date:%Y-%m-%d}</p>",
+        ])
+
+    def render_person(person, photo):
+        return "\n".join([f"<p>{person.name}</p>", photo_data(photo)])
+
+    def emit_photo(photo):
+        return photo_data(photo)
+    ```
+  </TabItem>
+  <TabItem label="Go">
+    ```go
+    // Before
+    func photoData(p Photo) string {
+        return fmt.Sprintf("<p>location: %s</p>\n<p>date: %s</p>",
+            p.Location, p.Date.Format("2006-01-02"))
+    }
+
+    func renderPerson(person Person, p Photo) string {
+        return fmt.Sprintf("<p>%s</p>\n<p>title: %s</p>\n%s",
+            person.Name, p.Title, photoData(p)) // title repeated everywhere
+    }
+
+    func emitPhoto(p Photo) string {
+        return fmt.Sprintf("<p>title: %s</p>\n%s", p.Title, photoData(p))
+    }
+
+    // After
+    func photoData(p Photo) string {
+        return fmt.Sprintf("<p>title: %s</p>\n<p>location: %s</p>\n<p>date: %s</p>",
+            p.Title, p.Location, p.Date.Format("2006-01-02")) // moved in
+    }
+
+    func renderPerson(person Person, p Photo) string {
+        return fmt.Sprintf("<p>%s</p>\n%s", person.Name, photoData(p))
+    }
+
+    func emitPhoto(p Photo) string {
+        return photoData(p)
+    }
+    ```
+  </TabItem>
+  <TabItem label="Rust">
+    ```rust
+    // Before
+    fn photo_data(p: &Photo) -> String {
+        format!("<p>location: {}</p>\n<p>date: {}</p>", p.location, p.date)
+    }
+
+    fn render_person(person: &Person, p: &Photo) -> String {
+        // title line repeated at every call site
+        format!("<p>{}</p>\n<p>title: {}</p>\n{}", person.name, p.title, photo_data(p))
+    }
+
+    fn emit_photo(p: &Photo) -> String {
+        format!("<p>title: {}</p>\n{}", p.title, photo_data(p))
+    }
+
+    // After
+    fn photo_data(p: &Photo) -> String {
+        // moved in — now owned by photo_data
+        format!("<p>title: {}</p>\n<p>location: {}</p>\n<p>date: {}</p>",
+            p.title, p.location, p.date)
+    }
+
+    fn render_person(person: &Person, p: &Photo) -> String {
+        format!("<p>{}</p>\n{}", person.name, photo_data(p))
+    }
+
+    fn emit_photo(p: &Photo) -> String {
+        photo_data(p)
+    }
+    ```
+  </TabItem>
+</Tabs>
+
+## Mechanics
+
+1. ยืนยันว่าคำสั่งที่เป็นตัวเลือกนั้นรันติดกับการเรียกที่ **ทุก** จุด ถ้าแม้เพียงผู้เรียกรายเดียวทำต่างออกไป การย้ายนี้ผิด — ความแตกต่างนั้นเป็นของจริง
+2. ถ้าจุดเรียกมีโค้ดอื่นอยู่ ให้ใช้ **Extract Function** ก่อนเพื่อแยกเฉพาะการเรียกบวกกับคำสั่งที่ทำซ้ำออกเป็น helper เดียว ตอนนี้คุณมีที่ทำงานเพียงที่เดียว
+3. ย้ายคำสั่งที่ทำซ้ำเข้าไปในฟังก์ชันเป้าหมาย — ไว้บนสุดถ้ามันรันก่อนการเรียก ไว้ล่างสุดถ้ามันรันหลังการเรียก
+4. **รันเทสต์ของคุณ**
+5. ลบคำสั่งที่ตอนนี้ซ้ำซ้อนออกจากผู้เรียกแต่ละราย ทีละราย โดยรันเทสต์หลังการลบแต่ละครั้ง
+6. ถ้าคุณสร้าง helper ชั่วคราวในขั้นที่ 2 ให้ inline มันเมื่อผู้เรียกทุกรายสะอาดแล้ว
+
+## When to use / trade-offs
+
+ใช้สิ่งนี้เมื่อคำสั่งหนึ่งเป็นส่วนหนึ่งของความรับผิดชอบของฟังก์ชันอย่างแท้จริง แต่บังเอิญอยู่นอกมัน การพับมันเข้าไปจะกำจัดการทำซ้ำและทำให้ฟังก์ชันเป็นหน่วยที่ครบถ้วนและใช้ผิดได้ยาก
+
+อย่าใช้มันเมื่อผู้เรียกแตกต่างกันในเรื่องว่าจะรันคำสั่งหรือไม่ หรือรันอย่างไร — การบังคับขั้นตอนร่วมลงบนฟังก์ชันที่ผู้เรียกบางรายอยากข้าม เป็นเพียงการแลกการทำซ้ำไปกับ flag parameter ซึ่งแย่กว่า การ refactor ที่ตรงข้ามคือ **Move Statements to Callers**: เมื่อฟังก์ชันมัดขั้นตอนที่มีเพียงผู้เรียก *บางราย* ต้องการ ให้ดันมันออกไป
+
+## Related
+
+- [Move Statements to Callers](/refactoring-from-zero-to-hero/th/moving-features/move-statements-to-callers/)
+- [Move Function](/refactoring-from-zero-to-hero/th/moving-features/move-function/)
+- [Extract Function](/refactoring-from-zero-to-hero/th/composing-methods/extract-function/)
+
+<Callout title="ย้ายเฉพาะสิ่งที่แชร์กันจริง ๆ">
+การทดสอบนั้นง่าย: ผู้เรียก *ทุกราย* รันคำสั่งนี้เหมือนกันเป๊ะ ติดกับการเรียกหรือไม่? ถ้าใช่ ให้ย้ายมันเข้าไป ถ้าคุณต้องเพิ่ม boolean เพื่อรองรับข้อยกเว้น ให้หยุด — คำสั่งนั้นไม่ได้แชร์กัน และมันควรอยู่ที่ผู้เรียก
+</Callout>
+
+export const quizMoveIn = [
+  {
+    q: 'เมื่อใดที่คำสั่งหนึ่งเป็นตัวเลือกที่ดีในการย้ายเข้าไปในฟังก์ชัน?',
+    options: [
+      'เมื่อมันปรากฏครั้งเดียว ที่ใดที่หนึ่งในโค้ดเบส',
+      'เมื่อมันรันเหมือนกันเป๊ะ ก่อนหรือหลังการเรียกที่ทุกจุดเรียก',
+      'เมื่อมันยาวกว่าตัวฟังก์ชัน',
+      'เมื่อมีผู้เรียกเพียงรายเดียวที่ต้องการมัน',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'ถ้าจุดเรียกมีโค้ดอื่นที่ไม่เกี่ยวข้องอยู่ คุณควรทำอะไรก่อน?',
+    options: [
+      'ย้ายทั้งหมดเข้าไปในคราวเดียว',
+      'Extract เฉพาะการเรียกบวกกับคำสั่งที่ทำซ้ำออกเป็น helper แล้วทำงานจากตรงนั้น',
+      'เพิ่ม flag parameter ให้ฟังก์ชัน',
+      'ข้ามการ refactor ไปเลย',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'อะไรคือสิ่งตรงข้ามของ Move Statements into Function?',
+    options: ['Inline Function', 'Move Statements to Callers', 'Extract Class', 'Hide Delegate'],
+    answer: 1,
+  },
+  {
+    q: 'อะไรคือสัญญาณว่าคุณไม่ควรย้ายคำสั่งเข้าไป?',
+    options: [
+      'คำสั่งนั้นสั้น',
+      'ผู้เรียกทุกรายรันมันด้วยวิธีเดียวกัน',
+      'ผู้เรียกบางรายอยากข้ามมัน ทำให้คุณต้องเพิ่ม boolean flag',
+      'ฟังก์ชันมีชื่อที่ดีอยู่แล้ว',
+    ],
+    answer: 2,
+  },
+];
+
+<Quiz client:visible id="moving-features/move-statements-into-function" questions={quizMoveIn} />
+
+<ProgressTracker client:visible id="moving-features/move-statements-into-function" />

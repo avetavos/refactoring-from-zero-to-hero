@@ -1,0 +1,221 @@
+---
+title: Separate Query from Modifier
+description: แยกฟังก์ชันที่ทั้งคืนค่าและเปลี่ยนสถานะออกเป็น query ที่บริสุทธิ์และ command แยกต่างหาก เพื่อให้ผู้เรียกใช้สามารถถามได้โดยไม่ต้องลงมือทำ
+sidebar:
+  order: 7
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+export const separateDiagram = `flowchart LR
+  subgraph Before["Before"]
+    A["findHighScore()<br/>returns the max<br/>AND logs an alert"]
+  end
+  subgraph After["After"]
+    B["highScore()<br/>pure query"]
+    C["alertOnHighScore()<br/>command"]
+  end
+  Before -.->|"Separate Query from Modifier"| After`;
+
+## เจตนา
+
+เมื่อฟังก์ชันหนึ่งตอบคำถาม *และ* เปลี่ยนแปลงโลกในฐานะผลข้างเคียงไปด้วย ผู้เรียกใช้ก็สูญเสียอิสระที่จะแค่ถามเฉย ๆ ให้แยกงานสองอย่างนี้ออกจากกัน: **query** ที่คืนค่าและไม่แตะต้องอะไรเลย และ **command** ที่ดำเนินการเปลี่ยนแปลงและไม่คืนค่าอะไร ตอนนี้ผู้เรียกใช้ที่ต้องการแค่คำตอบก็สามารถเรียก query ได้โดยไม่ไปกระตุ้นผลข้างเคียง
+
+## กลิ่นไม่ดี
+
+คุณอยากเรียกฟังก์ชันเพื่ออ่านผลลัพธ์ของมันเท่านั้น — อาจในเทสต์ ในบรรทัด log หรือใน assertion — แต่คุณทำไม่ได้ เพราะการเรียกมันยังส่งอีเมล เปลี่ยนค่าฟิลด์ หรือเลื่อนเคอร์เซอร์ไปด้วย ลายเซ็นของมันโกหกเรื่องต้นทุน: มันดูเหมือนคำถามแต่แอบเป็นการกระทำ ฟังก์ชันใดก็ตามที่คืนค่าแต่ก็มีผลข้างเคียงที่สังเกตเห็นได้ คือผู้เข้าชิงสำหรับท่านี้
+
+## ก่อน → หลัง
+
+ฟังก์ชันสแกนคะแนน คืนค่าสูงสุด และ — ที่ฝังอยู่ภายใน — ยิงการแจ้งเตือนเมื่อคะแนนสูงสุดข้ามเกณฑ์ เราแยกมันออกเป็น query ที่บริสุทธิ์ชื่อ `highScore` และ command ชื่อ `alertOnHighScore`
+
+<Tabs syncKey="lang">
+  <TabItem label="TypeScript">
+    ```ts
+    // Before
+    function findHighScore(scores: number[]): number {
+      let highest = 0;
+      for (const s of scores) {
+        if (s > highest) highest = s;
+      }
+      if (highest > 9000) {
+        sendAlert(`New record: ${highest}`);
+      }
+      return highest;
+    }
+
+    // After
+    function highScore(scores: number[]): number {
+      return scores.reduce((highest, s) => (s > highest ? s : highest), 0);
+    }
+
+    function alertOnHighScore(scores: number[]): void {
+      if (highScore(scores) > 9000) {
+        sendAlert(`New record: ${highScore(scores)}`);
+      }
+    }
+    ```
+  </TabItem>
+  <TabItem label="Python">
+    ```python
+    # Before
+    def find_high_score(scores):
+        highest = 0
+        for s in scores:
+            if s > highest:
+                highest = s
+        if highest > 9000:
+            send_alert(f"New record: {highest}")
+        return highest
+
+    # After
+    def high_score(scores):
+        return max(scores, default=0)
+
+    def alert_on_high_score(scores):
+        if high_score(scores) > 9000:
+            send_alert(f"New record: {high_score(scores)}")
+    ```
+  </TabItem>
+  <TabItem label="Go">
+    ```go
+    // Before
+    func FindHighScore(scores []int) int {
+        highest := 0
+        for _, s := range scores {
+            if s > highest {
+                highest = s
+            }
+        }
+        if highest > 9000 {
+            sendAlert(fmt.Sprintf("New record: %d", highest))
+        }
+        return highest
+    }
+
+    // After
+    func HighScore(scores []int) int {
+        highest := 0
+        for _, s := range scores {
+            if s > highest {
+                highest = s
+            }
+        }
+        return highest
+    }
+
+    func AlertOnHighScore(scores []int) {
+        if h := HighScore(scores); h > 9000 {
+            sendAlert(fmt.Sprintf("New record: %d", h))
+        }
+    }
+    ```
+  </TabItem>
+  <TabItem label="Rust">
+    ```rust
+    // Before
+    fn find_high_score(scores: &[i32]) -> i32 {
+        let mut highest = 0;
+        for &s in scores {
+            if s > highest {
+                highest = s;
+            }
+        }
+        if highest > 9000 {
+            send_alert(&format!("New record: {highest}"));
+        }
+        highest
+    }
+
+    // After
+    fn high_score(scores: &[i32]) -> i32 {
+        scores.iter().copied().max().unwrap_or(0)
+    }
+
+    fn alert_on_high_score(scores: &[i32]) {
+        let h = high_score(scores);
+        if h > 9000 {
+            send_alert(&format!("New record: {h}"));
+        }
+    }
+    ```
+  </TabItem>
+</Tabs>
+
+<Mermaid code={separateDiagram} title="ฟังก์ชันผสมหนึ่งตัวกลายเป็น query ที่บริสุทธิ์บวกกับ command" />
+
+## กลไก
+
+1. คัดลอกฟังก์ชันแล้วตั้งชื่อสำเนาให้เป็น query ที่บริสุทธิ์ — ตามธรรมเนียมจะเป็นคำนามหรือชื่อสไตล์ `get`/`is` ที่สัญญาว่าให้แค่คำตอบ
+2. ตัดผลข้างเคียงทุกอย่างออกจากสำเนา query โดยเหลือไว้แค่ค่าที่มันคำนวณ ให้มันคืนค่านั้นกลับมา
+3. หาผู้เรียกใช้แต่ละจุดของฟังก์ชันเดิม จุดที่ผู้เรียกใช้ใช้ค่าที่คืนกลับมา ให้สลับไปใช้ query
+4. ปล่อยให้ฟังก์ชันเดิมทำแค่ผลข้างเคียงของมัน ภายในมัน ให้เรียก query ตัวใหม่แทนที่จะคำนวณค่าใหม่
+5. **รันเทสต์** หลังจากย้ายผู้เรียกใช้แต่ละจุดข้ามไปแล้ว
+6. ถ้าฟังก์ชันเดิมตอนนี้คืนค่าที่ไม่มีใครใช้ ให้เปลี่ยนมันให้ไม่คืนค่าอะไร เพื่อให้ลายเซ็นของ command ซื่อสัตย์
+
+## เมื่อไรควรใช้ / ข้อแลกเปลี่ยน
+
+ใช้ท่านี้เมื่อใดก็ตามที่ฟังก์ชันที่มีค่าคืนกลับยังเปลี่ยนสถานะ ทำ I/O หรือยิงอีเวนต์ด้วย — และโดยเฉพาะก่อนคุณจะเขียนเทสต์ เพราะ query ที่บริสุทธิ์ตรวจ assert ได้ง่ายมาก การแยกที่สะอาดยังทำให้ query ปลอดภัยที่จะเรียกซ้ำ ๆ หรือ cache ได้
+
+ต้นทุนคือผู้เรียกใช้ที่ต้องการทั้งสองพฤติกรรมจริง ๆ ตอนนี้ต้องเรียกสองครั้ง และค่าอาจถูกคำนวณสองรอบ การคำนวณซ้ำนั้นมักจะถูก ถ้ามันไม่ถูก ให้คำนวณครั้งเดียวแล้วส่งผลลัพธ์ต่อไป บางการดำเนินการเป็นอะตอมโดยธรรมชาติ — `pop` ที่คืนค่าและลบในขั้นเดียว — และการบังคับให้แยกกันจะเชื้อเชิญ race condition ในกรณีนั้น ให้คงมันไว้ด้วยกันโดยตั้งใจ
+
+## ที่เกี่ยวข้อง
+
+- [Remove Flag Argument](/refactoring-from-zero-to-hero/th/simplifying-apis/remove-flag-argument/)
+- [Replace Parameter with Query](/refactoring-from-zero-to-hero/th/simplifying-apis/replace-parameter-with-query/)
+- [Rename Function/Variable](/refactoring-from-zero-to-hero/th/simplifying-apis/rename-function/)
+
+<Callout title="Command-Query Separation">
+การรีแฟกเตอร์นี้คือรูปแบบเชิงปฏิบัติของหลักการ Command-Query Separation: เมท็อดหนึ่งควรเปลี่ยนสถานะหรือคืนผลลัพธ์อย่างใดอย่างหนึ่ง แต่ไม่ใช่ทั้งสองอย่าง เมื่อคุณเชื่อใจได้ว่า query ปราศจากผลข้างเคียง คุณก็อ่านโค้ดได้โดยไม่ต้องกลัวว่าการเหลือบมองจะไปกระตุ้นการเปลี่ยนแปลง
+</Callout>
+
+export const quizSeparate = [
+  {
+    q: 'ลักษณะที่บ่งบอกฟังก์ชันที่ต้องการ Separate Query from Modifier คืออะไร?',
+    options: [
+      'มันรับพารามิเตอร์มากเกินไป',
+      'มันทั้งคืนค่าและก่อให้เกิดผลข้างเคียงที่สังเกตเห็นได้',
+      'มันไม่เคยถูกเรียกจากเทสต์',
+      'มันมีชื่อที่ชวนเข้าใจผิด',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'หลังจากแยกแล้ว query ที่บริสุทธิ์ควรทำอะไร?',
+    options: [
+      'คืนค่าและ log มัน',
+      'คืนค่าโดยไม่แตะต้องสิ่งอื่นใด',
+      'ทำผลข้างเคียงและไม่คืนค่าอะไร',
+      'รับ flag เพื่อเลือกระหว่างโหมด',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'การรีแฟกเตอร์นี้นำหลักการใดมาปฏิบัติ?',
+    options: [
+      'Don’t Repeat Yourself',
+      'Command-Query Separation',
+      'Single Responsibility สำหรับไฟล์',
+      'Dependency Inversion',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'เมื่อไรที่ยอมรับได้ที่จะคง query และ modifier ไว้ด้วยกัน?',
+    options: [
+      'เมื่อใดก็ตามที่ฟังก์ชันสั้น',
+      'เมื่อการดำเนินการเป็นอะตอมโดยธรรมชาติ เช่น pop ที่คืนค่าและลบ',
+      'เมื่อฟังก์ชันไม่มีพารามิเตอร์',
+      'ไม่มีวัน — มันต้องถูกแยกเสมอ',
+    ],
+    answer: 1,
+  },
+];
+
+<Quiz client:visible id="simplifying-apis/separate-query-from-modifier" questions={quizSeparate} />
+
+<ProgressTracker client:visible id="simplifying-apis/separate-query-from-modifier" />

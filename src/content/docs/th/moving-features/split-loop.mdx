@@ -1,0 +1,223 @@
+---
+title: Split Loop
+description: เมื่อลูปหนึ่งแอบทำสองงานที่ไม่เกี่ยวข้องกัน ให้แยกมันออกเป็นสองลูปที่ทำงานเดียว เพื่อให้แต่ละลูปอ่านเป็นแนวคิดเดียวที่ชัดเจน
+sidebar:
+  order: 9
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+## Intent
+
+ลูปเดียวมักถูกผลักให้ทำสองสิ่งที่ต่างกันพร้อมกัน — รวมค่าสิ่งหนึ่งขณะหาค่ามากที่สุดของอีกสิ่ง หรือเก็บรวบรวมชื่อขณะนับจำนวนที่ตรงกัน ให้แยกมันออกเป็นสองลูป แต่ละลูปวนคอลเล็กชันเดียวกันแต่ทำงานเพียงอย่างเดียวเป๊ะ ๆ ตอนนี้แต่ละลูปอ่านเป็นแนวคิดเดียว และคุณมีอิสระที่จะ refactor หรือย้ายแต่ละอันได้อย่างอิสระ
+
+## The smell
+
+คุณอ่านลูปหนึ่งแล้วพบว่าตัวเองกำลังสางเส้นด้ายสองเส้นในใจ: "ส่วนนี้สร้างยอดรวม… และส่วนนี้ ซึ่งอยู่ในนี้ด้วย ติดตามคนที่อายุน้อยที่สุด" ตัวสะสมสองตัวที่ไม่มีอะไรเกี่ยวข้องกันใช้ตัวลูปร่วมกันเพียงเพราะมันบังเอิญเดินไปบนลิสต์เดียวกัน การจับคู่นั้นทำให้ลูปตั้งชื่อยาก extract ยาก และเปลี่ยนยาก — แตะตรรกะยอดรวมแล้วคุณเสี่ยงกับตรรกะคนที่อายุน้อยที่สุด
+
+## Before → After
+
+ลูปที่วนพนักงานเพื่อคำนวณเงินเดือนรวม *และ* หาอายุที่น้อยที่สุดซึ่งไม่เกี่ยวข้องกัน สองงาน หนึ่งลูป เราแยกมันออก
+
+<Tabs syncKey="lang">
+  <TabItem label="TypeScript">
+    ```ts
+    // Before — one loop, two unrelated jobs
+    function report(people: Person[]): { total: number; youngest: number } {
+      let total = 0;
+      let youngest = people[0]?.age ?? Infinity;
+      for (const p of people) {
+        total += p.salary;
+        if (p.age < youngest) youngest = p.age;
+      }
+      return { total, youngest };
+    }
+
+    // After — each loop has a single purpose
+    function report(people: Person[]): { total: number; youngest: number } {
+      return { total: totalSalary(people), youngest: youngestAge(people) };
+    }
+
+    function totalSalary(people: Person[]): number {
+      let total = 0;
+      for (const p of people) total += p.salary;
+      return total;
+    }
+
+    function youngestAge(people: Person[]): number {
+      let youngest = people[0]?.age ?? Infinity;
+      for (const p of people) {
+        if (p.age < youngest) youngest = p.age;
+      }
+      return youngest;
+    }
+    ```
+  </TabItem>
+  <TabItem label="Python">
+    ```python
+    # Before — one loop, two unrelated jobs
+    def report(people):
+        total = 0
+        youngest = people[0].age if people else float("inf")
+        for p in people:
+            total += p.salary
+            if p.age < youngest:
+                youngest = p.age
+        return {"total": total, "youngest": youngest}
+
+    # After — each loop has a single purpose
+    def report(people):
+        return {"total": total_salary(people), "youngest": youngest_age(people)}
+
+    def total_salary(people):
+        total = 0
+        for p in people:
+            total += p.salary
+        return total
+
+    def youngest_age(people):
+        youngest = people[0].age if people else float("inf")
+        for p in people:
+            if p.age < youngest:
+                youngest = p.age
+        return youngest
+    ```
+  </TabItem>
+  <TabItem label="Go">
+    ```go
+    // Before — one loop, two unrelated jobs
+    func report(people []Person) (total, youngest int) {
+        youngest = math.MaxInt
+        for _, p := range people {
+            total += p.Salary
+            if p.Age < youngest {
+                youngest = p.Age
+            }
+        }
+        return total, youngest
+    }
+
+    // After — each loop has a single purpose
+    func report(people []Person) (int, int) {
+        return totalSalary(people), youngestAge(people)
+    }
+
+    func totalSalary(people []Person) int {
+        total := 0
+        for _, p := range people {
+            total += p.Salary
+        }
+        return total
+    }
+
+    func youngestAge(people []Person) int {
+        youngest := math.MaxInt
+        for _, p := range people {
+            if p.Age < youngest {
+                youngest = p.Age
+            }
+        }
+        return youngest
+    }
+    ```
+  </TabItem>
+  <TabItem label="Rust">
+    ```rust
+    // Before — one loop, two unrelated jobs
+    fn report(people: &[Person]) -> (i64, i64) {
+        let mut total = 0;
+        let mut youngest = i64::MAX;
+        for p in people {
+            total += p.salary;
+            if p.age < youngest {
+                youngest = p.age;
+            }
+        }
+        (total, youngest)
+    }
+
+    // After — each loop has a single purpose
+    fn report(people: &[Person]) -> (i64, i64) {
+        (total_salary(people), youngest_age(people))
+    }
+
+    fn total_salary(people: &[Person]) -> i64 {
+        people.iter().map(|p| p.salary).sum()
+    }
+
+    fn youngest_age(people: &[Person]) -> i64 {
+        people.iter().map(|p| p.age).min().unwrap_or(i64::MAX)
+    }
+    ```
+  </TabItem>
+</Tabs>
+
+## Mechanics
+
+1. Copy ลูปทั้งหมดเพื่อให้คุณมีสองลูปที่เหมือนกันวนคอลเล็กชันเดียวกัน
+2. ในลูปแรก ลบคำสั่งที่เป็นของงาน *ที่สอง* ในลูปที่สอง ลบคำสั่งที่เป็นของงาน *แรก* ตอนนี้แต่ละลูปทำงานเดียว
+3. **รันเทสต์ของคุณ** พฤติกรรมต้องไม่เปลี่ยนแปลง
+4. ใช้ **Extract Function** กับแต่ละลูปเพื่อให้มันกลายเป็น query ที่มีชื่อดีอย่าง `totalSalary` หรือ `youngestAge`
+5. **รันเทสต์ของคุณ** อีกครั้ง — ตอนนี้ผู้เรียกอ่านเป็นผลลัพธ์ที่มีชื่อสองอย่างแทนที่จะเป็นลูปเดียวที่พันกัน
+
+## When to use / trade-offs
+
+แยกลูปเมื่อใดก็ตามที่ตัวมันแบกความรับผิดชอบสองอย่างที่คุณจะอธิบายด้วยคำว่า "และ" ผลตอบแทนคือความชัดเจนและการนำกลับมาใช้ใหม่: แต่ละลูปตั้งชื่อง่าย extract ง่าย และเปลี่ยนได้อย่างอิสระ — และ Split Loop มักเป็นก้าวแรกสู่การแทนที่แต่ละชิ้นด้วย pipeline operation ที่ชัดเจน
+
+ข้อโต้แย้งที่ชัดเจนคือเรื่องประสิทธิภาพ: ตอนนี้คุณวนสองครั้ง ในโค้ดจริงเกือบทั้งหมด ค่าใช้จ่ายนั้นแทบไม่มีนัยเมื่อเทียบกับสิ่งที่ได้มาด้านความอ่านง่าย และการวนครั้งเดียวคือ premature optimisation ถ้าภายหลังการ profile พิสูจน์ว่าลูปที่ร้อนแรงนั้นสำคัญ คุณก็รวมมันกลับได้ — แต่จงปรับ optimize จากโค้ดที่สะอาดและมีชื่อดี ไม่ใช่จากความพันกัน
+
+## Related
+
+- [Move Statements to Callers](/refactoring-from-zero-to-hero/th/moving-features/move-statements-to-callers/)
+- [Combine Functions into Class](/refactoring-from-zero-to-hero/th/moving-features/combine-functions-into-class/)
+- [Extract Function](/refactoring-from-zero-to-hero/th/composing-methods/extract-function/)
+
+<Callout title="ชัดเจนก่อน แล้วค่อยวัด">
+สองลูปรู้สึกเปลือง แต่ค่าใช้จ่ายเกือบทุกครั้งเป็นเพียงจินตนาการ แยกเพื่อความชัดเจน ตั้งชื่อแต่ละลูป แล้วปล่อยให้ profiler — ไม่ใช่ลางสังหรณ์ — เป็นผู้ตัดสินว่าจะมีอันไหนที่จำเป็นต้องรวมกลับเข้าด้วยกันอีกครั้งเพื่อความเร็วหรือไม่
+</Callout>
+
+export const quizSplitLoop = [
+  {
+    q: 'Split Loop แก้ปัญหาอะไร?',
+    options: [
+      'ลูปที่รันน้อยครั้งเกินไป',
+      'ตัวลูปเดียวที่ทำสองงานที่ไม่เกี่ยวข้องกันซึ่งสางออกจากกันยาก',
+      'ลูปที่ไม่มีตัว',
+      'ตัวแปร index ที่หายไป',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'ขั้นตอนเชิงกลไกแรกของ Split Loop คืออะไร?',
+    options: [
+      'ลบลูปทิ้ง',
+      'ทำซ้ำลูปเพื่อให้คุณมีสองลูปที่เหมือนกัน แล้วตัดแต่ละอันให้เหลืองานเดียว',
+      'เพิ่ม flag parameter',
+      'แปลงมันเป็น recursion',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'ข้อโต้แย้งที่พบบ่อยต่อ Split Loop คืออะไร และคำตอบที่มักใช้คืออะไร?',
+    options: [
+      'มันเปลี่ยนพฤติกรรม คุณต้องเพิ่มเทสต์',
+      'มันวนสองครั้ง แต่ค่าใช้จ่ายเกือบทุกครั้งไม่มีนัยเมื่อเทียบกับความชัดเจนที่ได้มา',
+      'มันต้องใช้ฐานข้อมูล ใช้ caching',
+      'มันทำให้ type พัง เพิ่ม generics',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'Split Loop มักตามด้วยการ refactor ใดบนแต่ละลูปที่ได้ออกมา?',
+    options: ['Inline Class', 'Extract Function', 'Hide Delegate', 'Move Field'],
+    answer: 1,
+  },
+];
+
+<Quiz client:visible id="moving-features/split-loop" questions={quizSplitLoop} />
+
+<ProgressTracker client:visible id="moving-features/split-loop" />

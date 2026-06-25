@@ -1,0 +1,233 @@
+---
+title: Self-Encapsulate Field
+description: แม้แต่ภายในคลาสที่เป็นเจ้าของฟิลด์ ก็อ่านและเขียนมันผ่าน getter และ setter ของตัวมันเอง เพื่อให้ subclass การกำหนดค่าแบบ lazy และการตรวจสอบความถูกต้องมีจุดเดียวให้เกาะเกี่ยว
+sidebar:
+  order: 7
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+## เจตนา
+
+เมื่อคลาสแตะต้องฟิลด์ของตัวเองโดยตรง — `this.low`, `self.low`, `e.low` — ทุกเมท็อดภายในจะถูกเดินสายตรงไปยังที่จัดเก็บแบบดิบ ๆ Self-Encapsulate Field เดินทางแม้แต่การอ่านและเขียนภายในเหล่านั้นผ่านเมท็อด accessor ของฟิลด์เอง เมื่อทุกการเข้าถึงผ่าน getter หนึ่งตัวและ setter หนึ่งตัว คู่นั้นเพียงคู่เดียวจะกลายเป็นจุดสำหรับเพิ่มการตรวจสอบความถูกต้อง การกำหนดค่าแบบ lazy ค่าเริ่มต้น หรือพฤติกรรมที่ subclass สามารถ override ได้
+
+## กลิ่นเหม็น
+
+กลิ่นเหม็นคือ **การเข้าถึงฟิลด์โดยตรงภายในคลาสที่เป็นเจ้าของ** ในสถานการณ์ที่ hook จะช่วยได้ คุณต้องการให้ subclass คำนวณค่าด้วยวิธีต่างออกไป หรือคุณต้องการตรวจสอบความถูกต้องในทุกการกำหนดค่า หรือคุณต้องการสร้างค่าแบบ lazy ในการอ่านครั้งแรก — แต่ฟิลด์ถูกแหย่จากจุดภายในนับสิบจุด จึงไม่มีรอยต่อเดียวให้แทรกลอจิกนั้น การเข้าถึงโดยตรงนั้นดีอยู่จนกระทั่งคุณต้องการ hook ในวินาทีที่คุณต้องการ การอ่าน `this.field` ที่กระจัดกระจายจะมาขวางทางคุณ
+
+## ก่อน → หลัง
+
+ช่วงอุณหภูมิที่เปิดเผย `width` ตอนก่อน getter อ่านฟิลด์โดยตรง ดังนั้น subclass จึงไม่สามารถตีความขอบเขตใหม่ได้ ตอนหลัง โค้ดภายในเดินผ่าน accessor และ subclass สามารถ override `low()` เพื่อใช้ค่าชดเชยจากการสอบเทียบ (calibration offset) ได้
+
+<Tabs syncKey="lang">
+  <TabItem label="TypeScript">
+    ```ts
+    // Before
+    class Range {
+      constructor(private _low: number, private _high: number) {}
+      width(): number {
+        return this._high - this._low;
+      }
+    }
+
+    // After
+    class Range {
+      constructor(private _low: number, private _high: number) {}
+      get low(): number { return this._low; }
+      get high(): number { return this._high; }
+      set low(v: number) { this._low = v; }
+      set high(v: number) { this._high = v; }
+      width(): number {
+        return this.high - this.low; // routed through accessors
+      }
+    }
+
+    class CalibratedRange extends Range {
+      constructor(low: number, high: number, private offset: number) {
+        super(low, high);
+      }
+      get low(): number { return super.low + this.offset; }
+    }
+    ```
+  </TabItem>
+  <TabItem label="Python">
+    ```python
+    # Before
+    class Range:
+        def __init__(self, low, high):
+            self._low = low
+            self._high = high
+        def width(self):
+            return self._high - self._low
+
+    # After
+    class Range:
+        def __init__(self, low, high):
+            self._low = low
+            self._high = high
+        @property
+        def low(self):
+            return self._low
+        @property
+        def high(self):
+            return self._high
+        def width(self):
+            return self.high - self.low  # routed through accessors
+
+    class CalibratedRange(Range):
+        def __init__(self, low, high, offset):
+            super().__init__(low, high)
+            self._offset = offset
+        @property
+        def low(self):
+            return self._low + self._offset
+    ```
+  </TabItem>
+  <TabItem label="Go">
+    ```go
+    // Before
+    type Range struct {
+        low  float64
+        high float64
+    }
+    func (r Range) Width() float64 {
+        return r.high - r.low
+    }
+
+    // After — accessor methods so a wrapping type can reinterpret a bound
+    type Range struct {
+        low  float64
+        high float64
+    }
+    func (r Range) Low() float64  { return r.low }
+    func (r Range) High() float64 { return r.high }
+
+    // Width depends on the accessor, not the raw field.
+    func WidthOf(r interface{ Low() float64; High() float64 }) float64 {
+        return r.High() - r.Low()
+    }
+
+    type CalibratedRange struct {
+        Range
+        offset float64
+    }
+    func (c CalibratedRange) Low() float64 { return c.Range.Low() + c.offset }
+    ```
+  </TabItem>
+  <TabItem label="Rust">
+    ```rust
+    // Before
+    struct Range {
+        low: f64,
+        high: f64,
+    }
+    impl Range {
+        fn width(&self) -> f64 {
+            self.high - self.low
+        }
+    }
+
+    // After — a trait of accessors lets width() ignore the storage
+    trait Bounds {
+        fn low(&self) -> f64;
+        fn high(&self) -> f64;
+        fn width(&self) -> f64 {
+            self.high() - self.low() // routed through accessors
+        }
+    }
+
+    struct Range {
+        low: f64,
+        high: f64,
+    }
+    impl Bounds for Range {
+        fn low(&self) -> f64 { self.low }
+        fn high(&self) -> f64 { self.high }
+    }
+
+    struct CalibratedRange {
+        inner: Range,
+        offset: f64,
+    }
+    impl Bounds for CalibratedRange {
+        fn low(&self) -> f64 { self.inner.low() + self.offset }
+        fn high(&self) -> f64 { self.inner.high() }
+    }
+    ```
+  </TabItem>
+</Tabs>
+
+## กลไก
+
+1. สร้าง getter และ (ถ้าฟิลด์ถูกเปลี่ยนค่า) setter สำหรับฟิลด์นั้น ถ้ายังไม่มีอยู่
+2. หาทุกที่ที่คลาสเจ้าของอ่านฟิลด์โดยตรง แล้วแทนที่ด้วยการเรียก getter
+3. หาทุกที่ที่คลาสเขียนฟิลด์โดยตรง แล้วแทนที่ด้วยการเรียก setter
+4. **รันเทสต์ของคุณ** หลังการแทนที่แต่ละครั้ง เพื่อให้ความล้มเหลวชี้ไปที่การเปลี่ยนแปลงเล็ก ๆ เพียงจุดเดียว
+5. ทำให้ฟิลด์ดิบ ๆ เป็น private เท่าที่ภาษาจะอนุญาต เพื่อให้มีเพียง accessor เท่านั้นที่เข้าถึงมันได้
+6. ตอนนี้เพิ่ม hook ของคุณ — การตรวจสอบความถูกต้องใน setter ค่าเริ่มต้นหรือการสร้างแบบ lazy ใน getter หรือการ override ใน subclass — โดยมั่นใจว่าทุกการเข้าถึงไหลผ่านมัน
+
+## เมื่อใดควรใช้ / ข้อแลกเปลี่ยน
+
+หยิบ Self-Encapsulate Field มาใช้เมื่อคุณต้องการให้ subclass ตีความค่าใหม่ เมื่อคุณต้องการจุดเดียวที่รับประกันสำหรับการตรวจสอบความถูกต้องหรือการกำหนดค่าแบบ lazy หรือเป็นขั้นตอนเตรียมการก่อนที่จะเปลี่ยนวิธีจัดเก็บฟิลด์ มันเข้ากันได้อย่างเป็นธรรมชาติกับ **Replace Type Code with Subclasses** ซึ่ง subclass ต้องสามารถ override วิธีที่ค่าถูกสร้างขึ้นได้
+
+ต้นทุนคือการอ้อม (indirection) และพิธีการเล็กน้อย — การเรียก getter แทนการอ่านฟิลด์เปล่า ๆ หลายทีมชอบการเข้าถึงโดยตรงจนกว่าความจำเป็นที่เป็นรูปธรรมสำหรับ hook จะปรากฏ แล้วจึงใช้ท่านี้ ใน Go และ Rust ที่ไม่มีการสืบทอด สิ่งที่เทียบเท่าคือการนิยามเมท็อด accessor (มักอยู่หลัง interface หรือ trait) เพื่อให้ type ที่ห่อหุ้มสามารถซ้อนพฤติกรรมของตัวเองทับลงไปได้
+
+## ที่เกี่ยวข้อง
+
+- [Encapsulate Variable](/refactoring-from-zero-to-hero/th/organizing-data/encapsulate-variable/)
+- [Replace Type Code with Subclasses](/refactoring-from-zero-to-hero/th/organizing-data/replace-type-code-with-subclasses/)
+- [Replace Primitive with Object](/refactoring-from-zero-to-hero/th/organizing-data/replace-primitive-with-object/)
+
+<Callout title="Encapsulate Variable แต่ชี้เข้าด้านใน">
+Encapsulate Variable วางขอบเขตระหว่างฟิลด์กับโลก *ภายนอก* ส่วน Self-Encapsulate Field วางขอบเขตเดียวกันนั้นระหว่างฟิลด์กับ *ตัวคลาสเอง* — เพื่อให้แม้แต่เมท็อดของเจ้าของเองก็เดินผ่าน accessor ทำให้ subclass และการตรวจสอบความถูกต้องมีรอยต่อให้เกาะเกี่ยว
+</Callout>
+
+export const quizSelfEncapsulate = [
+  {
+    q: 'Self-Encapsulate Field เดินทางอะไรผ่าน accessor ที่ Encapsulate Variable ไม่ทำ?',
+    options: [
+      'การเรียกเครือข่าย',
+      'การอ่านและเขียนฟิลด์ภายในของคลาสเจ้าของเอง',
+      'test fixture',
+      'พารามิเตอร์ของ constructor เท่านั้น',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'ทำไมคู่ getter/setter เพียงคู่เดียวจึงมีค่า?',
+    options: [
+      'มันทำให้คลาส compile เร็วขึ้น',
+      'มันให้จุดเดียวแก่คุณสำหรับเพิ่มการตรวจสอบความถูกต้อง การกำหนดค่าแบบ lazy หรือการ override ใน subclass',
+      'มันลบความจำเป็นในการมี constructor',
+      'มันลบฟิลด์ที่อยู่เบื้องล่างทิ้ง',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'ใน Go หรือ Rust ที่ไม่มีการสืบทอด อะไรทำหน้าที่เป็น accessor ที่ override ได้?',
+    options: [
+      'ตัวแปร global',
+      'เมท็อด accessor ซึ่งมักอยู่หลัง interface หรือ trait ที่ type ห่อหุ้มสามารถ re-implement ได้',
+      'การ panic ใน getter',
+      'การทำให้ทุกฟิลด์เป็น public',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'Self-Encapsulate Field เตรียมการสำหรับท่าใดได้อย่างเป็นธรรมชาติที่สุด?',
+    options: [
+      'Replace Type Code with Subclasses ซึ่ง subclass override วิธีที่ค่าถูกสร้างขึ้น',
+      'การลบคลาสทิ้ง',
+      'การ inline ทุกฟังก์ชัน',
+      'การลบเทสต์ทั้งหมด',
+    ],
+    answer: 0,
+  },
+];
+
+<Quiz client:visible id="organizing-data/self-encapsulate-field" questions={quizSelfEncapsulate} />
+
+<ProgressTracker client:visible id="organizing-data/self-encapsulate-field" />

@@ -1,0 +1,240 @@
+---
+title: Replace Subclass with Fields
+description: เมื่อ subclass ต่างกันเพียงข้อมูลคงที่ที่ถูกคืนกลับจากเมท็อดที่ override ให้ยุบมันเป็นคลาสเดียวที่มีฟิลด์ถือข้อมูลนั้นไว้
+sidebar:
+  order: 7
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+export const fieldsDiagram = `classDiagram
+  class Person {
+    <<abstract>>
+    +isMale() bool
+    +code() string
+  }
+  class Male
+  class Female
+  Person <|-- Male
+  Person <|-- Female
+  class PersonAfter["Person"] {
+    -male: bool
+    -code: string
+    +isMale() bool
+    +code() string
+  }`;
+
+## เจตนา
+
+**Replace Subclass with Fields** สลายลำดับชั้นเล็ก ๆ ที่ subclass ไม่มีพฤติกรรมใด ๆ — มีเพียง *ค่าคงที่ที่ต่างกัน* ที่ถูกคืนกลับจากเมท็อดที่ override เท่านั้น แต่ละเมท็อดแบบนั้นกลายเป็นฟิลด์บนคลาส concrete เดียว และค่าที่แยกความต่างของ subclass ก็ย้ายเข้าไปอยู่ใน constructor ของคลาสนั้น ลำดับชั้นหายไป ส่วนข้อมูลที่มันเข้ารหัสไว้ยังคงอยู่ในรูปฟิลด์ธรรมดา
+
+## กลิ่นไม่ดี
+
+คุณเจอ subclass ที่ทุก override เป็นบรรทัดเดียวคืนค่า literal: `isMale() { return true; }`, `code() { return "M"; }` subclass นั้นไม่เพิ่มตรรกะใด ไม่ถือ state ต่อ instance และไม่เคยเปลี่ยนคำตอบ ทั้ง type — พร้อมไฟล์ของตัวเอง constructor ของตัวเอง ช่องของตัวเองในลำดับชั้น — มีอยู่เพียงเพื่อ hard-code ค่าคงที่สองค่า นั่นคือ **Lazy Class** ที่แต่งตัวเป็น subtype และมันทำให้ความแตกต่างระหว่าง variant มองเห็นได้ยากกว่าการเขียนฟิลด์เรียงกันเป็นแถว
+
+## Before → After
+
+`Person` ถูกแยกเป็น subclass `Male` กับ `Female` แต่ละตัว override เมท็อดเพื่อคืนค่าคงที่ตายตัว หลังจากนั้น `Person` เดียวถือค่าคงที่เหล่านั้นไว้เป็นฟิลด์ที่ factory ตั้งให้
+
+<Tabs syncKey="lang">
+  <TabItem label="TypeScript">
+    ```ts
+    // Before — subclasses that only return constants
+    abstract class Person {
+      abstract isMale(): boolean;
+      abstract code(): string;
+    }
+
+    class Male extends Person {
+      isMale(): boolean { return true; }
+      code(): string { return "M"; }
+    }
+
+    class Female extends Person {
+      isMale(): boolean { return false; }
+      code(): string { return "F"; }
+    }
+
+    // After — one class, the constants become fields
+    class Person {
+      private constructor(
+        private readonly male: boolean,
+        private readonly genderCode: string,
+      ) {}
+
+      static createMale(): Person { return new Person(true, "M"); }
+      static createFemale(): Person { return new Person(false, "F"); }
+
+      isMale(): boolean { return this.male; }
+      code(): string { return this.genderCode; }
+    }
+    ```
+  </TabItem>
+  <TabItem label="Python">
+    ```python
+    # Before — subclasses that only return constants
+    class Person:
+        def is_male(self):
+            raise NotImplementedError
+
+        def code(self):
+            raise NotImplementedError
+
+    class Male(Person):
+        def is_male(self):
+            return True
+
+        def code(self):
+            return "M"
+
+    class Female(Person):
+        def is_male(self):
+            return False
+
+        def code(self):
+            return "F"
+
+    # After — one class, the constants become fields
+    class Person:
+        def __init__(self, male, code):
+            self._male = male
+            self._code = code
+
+        @classmethod
+        def create_male(cls):
+            return cls(True, "M")
+
+        @classmethod
+        def create_female(cls):
+            return cls(False, "F")
+
+        def is_male(self):
+            return self._male
+
+        def code(self):
+            return self._code
+    ```
+  </TabItem>
+  <TabItem label="Go">
+    ```go
+    // Go has no inheritance, so the "before" would already be modelled with an
+    // interface plus two empty structs whose methods return constants — pure
+    // boilerplate. The idiomatic shape is the "after": one struct with fields,
+    // built by constructor functions.
+
+    type Person struct {
+        male bool
+        code string
+    }
+
+    func NewMale() Person   { return Person{male: true, code: "M"} }
+    func NewFemale() Person { return Person{male: false, code: "F"} }
+
+    func (p Person) IsMale() bool { return p.male }
+    func (p Person) Code() string { return p.code }
+    ```
+  </TabItem>
+  <TabItem label="Rust">
+    ```rust
+    // Rust has no inheritance. The "before" — a trait with two unit structs
+    // whose impls return constants — adds nothing but ceremony. The idiomatic
+    // form holds the data in fields on one struct, with constructor functions.
+
+    struct Person {
+        male: bool,
+        code: char,
+    }
+
+    impl Person {
+        fn new_male() -> Self {
+            Person { male: true, code: 'M' }
+        }
+
+        fn new_female() -> Self {
+            Person { male: false, code: 'F' }
+        }
+
+        fn is_male(&self) -> bool {
+            self.male
+        }
+
+        fn code(&self) -> char {
+            self.code
+        }
+    }
+    ```
+  </TabItem>
+</Tabs>
+
+<Mermaid code={fieldsDiagram} title="subclass ที่มีแต่ข้อมูลสองตัวยุบรวมเป็นคลาสเดียวที่มีฟิลด์" />
+
+## กลไก
+
+1. ใช้ **Replace Constructor with Factory Function** กับ superclass เพื่อให้ผู้เรียกสร้าง instance ผ่านเมท็อด factory แทนการเรียก `new Subclass()` ตรง ๆ
+2. สำหรับแต่ละเมท็อดที่ subclass override เพื่อคืนค่าคงที่ ให้เพิ่มฟิลด์บน superclass ที่ถือค่านั้นไว้
+3. ทำให้แต่ละเมท็อด factory ส่งค่าคงที่ที่เหมาะสมตอนสร้าง instance ของ superclass
+4. เปลี่ยนเมท็อดของ superclass ให้คืนค่าฟิลด์ใหม่แทนการเป็น abstract
+5. **รันเทสต์ของคุณ** ทุกจุดเรียกควรสร้าง instance ของ superclass ด้วยค่าฟิลด์ที่ถูกต้องแล้ว
+6. ลบ subclass ที่ว่างเปล่าทิ้งเมื่อไม่มีอะไรอ้างถึงมันแล้ว
+
+## เมื่อไรควรใช้ / ข้อแลกเปลี่ยน
+
+หยิบสิ่งนี้มาใช้เมื่อใดก็ตามที่งานเดียวของ subclass คือการ hard-code ค่าคืนกลับ — ไม่มีฟิลด์เพิ่ม ไม่มีพฤติกรรมจริง ไม่มีตรรกะต่อการเรียก การพับค่าเหล่านั้นเข้าไปเป็นฟิลด์จะลบ type หนึ่งออก ทำให้ลำดับชั้นแบนลง และจัดเรียง variant ให้ความแตกต่างของมันอ่านได้เป็นข้อมูลแทนที่จะเป็นนิยามคลาส
+
+*อย่า* นำมาใช้ถ้า subclass มีพฤติกรรมจริงที่แตกต่างกัน หรือถ้าคุณคาดว่ามันจะงอกพฤติกรรมขึ้นมา เพราะถ้าเป็นเช่นนั้น ลำดับชั้น (หรือ strategy) ก็ยังคุ้มค่าที่จะมีอยู่ สิ่งตรงข้ามคือ **Replace Fields with Subclass** — เลื่อนฟิลด์ที่แยกความต่างกลับขึ้นไปเป็น subtype เมื่อพฤติกรรม ไม่ใช่เพียงข้อมูล เริ่มแยกตัวออกตามฟิลด์นั้น
+
+## ที่เกี่ยวข้อง
+
+- [Collapse Hierarchy](/refactoring-from-zero-to-hero/th/generalization-and-inheritance/collapse-hierarchy/)
+- [Replace Subclass with Delegation](/refactoring-from-zero-to-hero/th/generalization-and-inheritance/replace-subclass-with-delegation/)
+- [Pull Up & Push Down](/refactoring-from-zero-to-hero/th/generalization-and-inheritance/pull-up-and-push-down/)
+
+<Callout title="subclass ควรเพิ่มพฤติกรรม ไม่ใช่เพียงค่าคงที่">
+ถ้าคุณอธิบายความแตกต่างระหว่าง subclass สองตัวได้ครบถ้วนว่า "ตัวนี้คืน M ตัวนั้นคืน F" แสดงว่าคุณกำลังใช้ระบบ type มาเก็บข้อมูล ข้อมูลควรอยู่ในฟิลด์ เก็บ subclass ไว้สำหรับกรณีที่ *สิ่งที่ออบเจกต์ทำ* แตกต่างกัน — ไม่ใช่เพียงแค่สิ่งที่มันตอบ
+</Callout>
+
+export const quizReplaceFields = [
+  {
+    q: 'subclass แบบใดเป็นตัวเลือกสำหรับ Replace Subclass with Fields?',
+    options: [
+      'subclass ที่มีพฤติกรรมซับซ้อนและแตกต่างกัน',
+      'subclass ที่ override เพียงเพื่อคืนค่าคงที่ที่ต่างกัน',
+      'subclass ที่ถือ state ที่เปลี่ยนแปลงได้จำนวนมาก',
+      'subclass ใด ๆ ก็ได้',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'อะไรเข้ามาแทนที่แต่ละเมท็อดที่ override เพื่อคืนค่าคงที่หลังจาก refactoring?',
+    options: ['ตัวแปร global', 'ฟิลด์บนคลาสเดียวที่เหลืออยู่', 'subclass อีกตัว', 'static method บน helper'],
+    answer: 1,
+  },
+  {
+    q: 'ขั้นแรกตามปกติที่ทำให้ผู้เรียกเลิกใช้ new Subclass() ตรง ๆ คืออะไร?',
+    options: [
+      'Replace Constructor with Factory Function',
+      'Inline Function',
+      'Extract Interface',
+      'Pull Up Field',
+    ],
+    answer: 0,
+  },
+  {
+    q: 'Go และ Rust สัมพันธ์กับ refactoring นี้อย่างไร?',
+    options: [
+      'ใช้ class inheritance ดังนั้น before/after จึงเหมือนกับ TypeScript ทุกประการ',
+      'ไม่มี inheritance ดังนั้น struct ที่ถือฟิลด์พร้อม constructor function จึงเป็นรูปแบบ idiomatic อยู่แล้ว',
+      'ไม่สามารถแสดงเจตนาได้เลย',
+      'ห้ามใช้ constructor function',
+    ],
+    answer: 1,
+  },
+];
+
+<Quiz client:visible id="generalization-and-inheritance/replace-subclass-with-fields" questions={quizReplaceFields} />
+
+<ProgressTracker client:visible id="generalization-and-inheritance/replace-subclass-with-fields" />

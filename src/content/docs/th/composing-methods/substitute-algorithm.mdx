@@ -1,0 +1,181 @@
+---
+title: Substitute Algorithm
+description: แทนที่วิธีทำบางอย่างที่พันกันยุ่งเหยิงด้วยวิธีที่ชัดเจนกว่าซึ่งให้ผลลัพธ์เหมือนกันทุกประการ
+sidebar:
+  order: 9
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+## เจตนา
+
+ฟังก์ชันบางอันอ่านยากไม่ใช่เพราะมันยาว แต่เพราะ *วิธีการ* นั้นซับซ้อนยุ่งเหยิง — ลูปที่เขียนเองทั้งที่การ lookup ก็ทำได้ โซ่ของเงื่อนไขที่เขียนซ้ำสิ่งที่ standard library มีให้อยู่แล้ว Substitute Algorithm สลับ body ทั้งหมดเป็นอันที่เรียบง่ายกว่าซึ่งให้ผลลัพธ์เหมือนกัน ไม่เหมือนการเคลื่อนไหวแบบ composing ที่เล็กกว่า อันนี้แทนที่ *กลยุทธ์* ไม่ใช่แค่ถ้อยคำ ดังนั้นมันจึงพึ่งพาเทสต์ของคุณอย่างหนักเพื่อพิสูจน์ว่าทั้งสองวิธีให้ผลตรงกัน
+
+## smell
+
+ฟังก์ชันทำงานได้ แต่เมื่ออ่านมันคุณพบว่าตัวเองต้องจำลองมันในหัวเพื่อให้แน่ใจว่าถูกต้อง ตรรกะรู้สึกหนักหน่วงกว่าที่ปัญหาสมควรได้รับ: การค้นหาด้วยมือผ่าน list ทั้งที่การตรวจสอบสมาชิกใน set ก็ตอบได้ หรือลำดับของ `if` แตกแขนงที่สรุปได้ว่า "ค่านี้เป็นหนึ่งในไม่กี่ค่านี้หรือไม่?" เมื่อคุณอธิบายงานของฟังก์ชันได้ในประโยคเรียบ ๆ ประโยคเดียวแต่โค้ดกลับใช้ทั้งย่อหน้า มีอัลกอริทึมที่ชัดเจนกว่ารออยู่แน่นอน
+
+## Before → After
+
+ฟังก์ชันตัดสินใจว่ารหัสประเทศได้รับการรองรับหรือไม่ด้วยการวนลูปและพลิก flag ตัวแทนใช้การตรวจสอบสมาชิกโดยตรงกับ set ที่กำหนดไว้ตายตัว — คำตอบเดียวกัน อ่านน้อยกว่ามาก
+
+<Tabs syncKey="lang">
+  <TabItem label="TypeScript">
+    ```ts
+    // Before
+    function isSupported(code: string): boolean {
+      const supported = ['US', 'CA', 'GB', 'DE'];
+      let found = false;
+      for (const c of supported) {
+        if (c === code) {
+          found = true;
+        }
+      }
+      return found;
+    }
+
+    // After
+    const SUPPORTED = new Set(['US', 'CA', 'GB', 'DE']);
+
+    function isSupported(code: string): boolean {
+      return SUPPORTED.has(code);
+    }
+    ```
+  </TabItem>
+  <TabItem label="Python">
+    ```python
+    # Before
+    def is_supported(code):
+        supported = ["US", "CA", "GB", "DE"]
+        found = False
+        for c in supported:
+            if c == code:
+                found = True
+        return found
+
+    # After
+    SUPPORTED = {"US", "CA", "GB", "DE"}
+
+    def is_supported(code):
+        return code in SUPPORTED
+    ```
+  </TabItem>
+  <TabItem label="Go">
+    ```go
+    // Before
+    func IsSupported(code string) bool {
+        supported := []string{"US", "CA", "GB", "DE"}
+        found := false
+        for _, c := range supported {
+            if c == code {
+                found = true
+            }
+        }
+        return found
+    }
+
+    // After
+    var supported = map[string]bool{"US": true, "CA": true, "GB": true, "DE": true}
+
+    func IsSupported(code string) bool {
+        return supported[code]
+    }
+    ```
+  </TabItem>
+  <TabItem label="Rust">
+    ```rust
+    // Before
+    fn is_supported(code: &str) -> bool {
+        let supported = ["US", "CA", "GB", "DE"];
+        let mut found = false;
+        for c in supported {
+            if c == code {
+                found = true;
+            }
+        }
+        found
+    }
+
+    // After
+    fn is_supported(code: &str) -> bool {
+        matches!(code, "US" | "CA" | "GB" | "DE")
+    }
+    ```
+  </TabItem>
+</Tabs>
+
+## Mechanics
+
+1. ทำให้แน่ใจว่าฟังก์ชันที่คุณกำลังจะแทนที่ถูกครอบคลุมด้วยเทสต์อย่างเต็มที่ รวมถึง edge case ของมัน — input ว่าง, ไม่พบ match, ค่าที่ขอบเขต ถ้าความครอบคลุมยังบาง ให้เพิ่มเทสต์ *ก่อน* และยืนยันว่าผ่านเมื่อทดสอบกับโค้ดที่มีอยู่
+2. คิดอัลกอริทึมตัวแทนให้ครบถ้วนแล้วเขียนมัน ในอุดมคติคือเขียนเป็นฟังก์ชันแยกอยู่ข้างอันเดิม
+3. เปรียบเทียบพฤติกรรมทั้งสอง สำหรับฟังก์ชันที่มี input space เล็กและนับได้ ให้รันทั้งสองอันกับทุก input แล้ว assert ว่าให้ผลตรงกัน มิฉะนั้นพึ่งพาชุดเทสต์ของคุณบวกกับ case เฉพาะเจาะจงไม่กี่กรณี
+4. สลับ body เก่าเป็นอันใหม่
+5. **รันเทสต์ของคุณ** ทุก case ต้องยังคงผ่าน
+6. กำจัดอัลกอริทึมเก่าและ helper ใด ๆ ที่มันต้องการเมื่อไม่มีอะไรอ้างถึงพวกมันแล้ว
+
+## เมื่อใดควรใช้ / ข้อแลกเปลี่ยน
+
+Substitute Algorithm คุ้มค่าเมื่อมีวิธีที่ชัดเจนกว่าหรือเป็นมาตรฐานที่ให้ผลลัพธ์เดียวกัน — แทนที่ลูปที่ทำเองด้วยการเรียก library หรือเงื่อนไขที่แผ่ขยายด้วยการ lookup จากตาราง เวอร์ชันใหม่อ่านง่ายกว่าและมักจะขยายต่อได้ง่ายกว่า
+
+ความเสี่ยงสูงกว่าการเคลื่อนไหวที่เล็กกว่าเพราะคุณกำลังเปลี่ยนกลยุทธ์ทั้งหมด ดังนั้นพฤติกรรมที่แยบยลอาจแตกต่างกัน — ลำดับการตัดสินเสมอที่ต่างกัน การจัดการค่าซ้ำหรือ input ว่างที่เปลี่ยนไป จงลองทำเฉพาะเมื่อมีเทสต์ที่หนักแน่น และเลือกที่จะแยกฟังก์ชันยักษ์ที่ซับซ้อนยุ่งเหยิงออกเป็นชิ้นเล็ก ๆ *ก่อน* ที่จะแทนที่ เพื่อให้การแทนที่แต่ละครั้งเล็กและตรวจสอบได้
+
+## Related
+
+- [Extract Function](/refactoring-from-zero-to-hero/th/composing-methods/extract-function/)
+- [Replace Loop with Pipeline](/refactoring-from-zero-to-hero/th/composing-methods/replace-loop-with-pipeline/)
+- [Replace Temp with Query](/refactoring-from-zero-to-hero/th/composing-methods/replace-temp-with-query/)
+
+<Callout title="ผลลัพธ์เหมือนกัน ไม่งั้นก็เป็นบั๊ก">
+การแทนที่จะเป็น refactoring ก็ต่อเมื่ออัลกอริทึมใหม่คืนค่าตรงกับที่อันเก่าคืนทุกประการสำหรับทุก input ที่สำคัญ — รวมถึงอันที่เก้กังด้วย วินาทีที่ผลลัพธ์เริ่มแยกออกจากกัน คุณได้เปลี่ยนพฤติกรรมแล้ว เทสต์ที่ครอบ edge case คือสิ่งที่ทำให้คุณทำการแลกเปลี่ยนนี้ได้อย่างปลอดภัย
+</Callout>
+
+export const quizSubstituteAlgorithm = [
+  {
+    q: 'Substitute Algorithm แทนที่อะไร?',
+    options: [
+      'ชื่อตัวแปรไม่กี่ตัว',
+      'วิธีการทั้งหมดภายในฟังก์ชัน โดยรักษาผลลัพธ์เดิมไว้',
+      'ชื่อสาธารณะของฟังก์ชัน',
+      'ลำดับของสอง statement ที่อยู่ติดกัน',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'ทำไม refactoring นี้จึงพึ่งพาเทสต์อย่างหนักเป็นพิเศษ?',
+    options: [
+      'เพราะมันทำให้โค้ดยาวขึ้น',
+      'เพราะมันเปลี่ยนกลยุทธ์ทั้งหมด ดังนั้นความแตกต่างของพฤติกรรมที่แยบยลอาจแทรกเข้ามาได้',
+      'เพราะ compiler รันมันไม่ได้',
+      'เพราะมันเปลี่ยนชนิดของค่าคืนเสมอ',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'อะไรคือขั้นเตรียมการที่ดีก่อนแทนที่อัลกอริทึม?',
+    options: [
+      'ลบเทสต์ที่มีอยู่',
+      'ทำให้แน่ใจว่าฟังก์ชันถูกครอบคลุมด้วยเทสต์ รวมถึง edge case โดยเพิ่มเทสต์ก่อนถ้าจำเป็น',
+      'เปลี่ยนชื่อตัวแปรทุกตัว',
+      'inline ผู้เรียกทั้งหมดของมัน',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'คุณควรจัดการกับฟังก์ชันยักษ์ที่ซับซ้อนยุ่งเหยิงซึ่งคุณต้องการทำให้เรียบง่ายอย่างไร?',
+    options: [
+      'แทนที่ทั้งหมดในก้าวเดียวที่เสี่ยง',
+      'แยกมันออกเป็นชิ้นเล็ก ๆ ก่อน แล้วแทนที่แต่ละส่วนเล็ก ๆ อย่างตรวจสอบได้',
+      'ปล่อยมันไว้อย่างนั้นตลอดไป',
+      'แปลงมันเป็นคอมเมนต์',
+    ],
+    answer: 1,
+  },
+];
+
+<Quiz client:visible id="composing-methods/substitute-algorithm" questions={quizSubstituteAlgorithm} />
+
+<ProgressTracker client:visible id="composing-methods/substitute-algorithm" />

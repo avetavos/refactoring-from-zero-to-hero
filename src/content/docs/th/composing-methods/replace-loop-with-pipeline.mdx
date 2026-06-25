@@ -1,0 +1,195 @@
+---
+title: Replace Loop with Pipeline
+description: เปลี่ยน loop แบบ imperative ที่ทั้ง filter และ transform ให้เป็น collection pipeline ของขั้นตอนที่มีชื่อ อ่านไล่จากบนลงล่าง
+sidebar:
+  order: 10
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+## Intent
+
+loop ที่เดินไปบน collection, ข้ามบางสมาชิก, แปลงบางตัว แล้วสะสมผลลัพธ์ กำลังทำงานหลายอย่างพันกันอยู่ collection pipeline จะคลายมันออก: แต่ละ operation — `filter`, `map`, `reduce` — กลายเป็นขั้นตอนที่แยกกันและมีชื่อ และข้อมูลก็ไหลผ่านมันตามลำดับ ผู้อ่านติดตามข้อมูลแทนที่จะคอยตาม accumulator ที่เปลี่ยนค่าได้กับ index พฤติกรรมเหมือนเดิมทุกอย่าง เปลี่ยนแค่รูปทรงจาก "จะวน loop ยังไง" เป็น "แต่ละขั้นทำอะไร"
+
+## The smell
+
+คุณเห็น `for` loop ที่มีตัวแปรผลลัพธ์ประกาศไว้เหนือมัน, มี `continue` หรือ `if` ที่คอยกั้นอยู่ข้างใน และมีการแปลงค่าฝังอยู่ตรงกลาง เพื่อจะเข้าใจมันคุณต้องรันมันในหัว คอยจำ state ปัจจุบันของ accumulator เอาไว้ loop นี้รวม *การเลือก* ว่าสมาชิกตัวไหนนับ, *การแปลง* พวกมัน และ *การรวม* เข้าด้วยกัน — สามแนวคิดที่ต่างกันโดยไม่มีรอยต่อให้เห็น
+
+## Before → After
+
+เก็บชื่อของลูกค้า premium ที่ active จาก region หนึ่ง แบบ imperative คือ loop เดียวที่มี guard, การเข้าถึง field และการ append ส่วนแบบ pipeline คือ filter แล้ว filter แล้ว map
+
+<Tabs syncKey="lang">
+  <TabItem label="TypeScript">
+    ```ts
+    // Before
+    function premiumNames(customers: Customer[], region: string): string[] {
+      const names: string[] = [];
+      for (const c of customers) {
+        if (c.region !== region) continue;
+        if (!c.isPremium) continue;
+        names.push(c.name.toUpperCase());
+      }
+      return names;
+    }
+
+    // After
+    function premiumNames(customers: Customer[], region: string): string[] {
+      return customers
+        .filter((c) => c.region === region)
+        .filter((c) => c.isPremium)
+        .map((c) => c.name.toUpperCase());
+    }
+    ```
+  </TabItem>
+  <TabItem label="Python">
+    ```python
+    # Before
+    def premium_names(customers, region):
+        names = []
+        for c in customers:
+            if c.region != region:
+                continue
+            if not c.is_premium:
+                continue
+            names.append(c.name.upper())
+        return names
+
+    # After
+    def premium_names(customers, region):
+        in_region = (c for c in customers if c.region == region)
+        premium = (c for c in in_region if c.is_premium)
+        return [c.name.upper() for c in premium]
+    ```
+  </TabItem>
+  <TabItem label="Go">
+    ```go
+    // Before
+    func PremiumNames(customers []Customer, region string) []string {
+        names := []string{}
+        for _, c := range customers {
+            if c.Region != region {
+                continue
+            }
+            if !c.IsPremium {
+                continue
+            }
+            names = append(names, strings.ToUpper(c.Name))
+        }
+        return names
+    }
+
+    // After — Go has no built-in pipeline, so keep one loop with named steps
+    func PremiumNames(customers []Customer, region string) []string {
+        names := []string{}
+        for _, c := range customers {
+            inRegion := c.Region == region
+            isPremium := c.IsPremium
+            if inRegion && isPremium {
+                names = append(names, strings.ToUpper(c.Name))
+            }
+        }
+        return names
+    }
+    ```
+  </TabItem>
+  <TabItem label="Rust">
+    ```rust
+    // Before
+    fn premium_names(customers: &[Customer], region: &str) -> Vec<String> {
+        let mut names = Vec::new();
+        for c in customers {
+            if c.region != region {
+                continue;
+            }
+            if !c.is_premium {
+                continue;
+            }
+            names.push(c.name.to_uppercase());
+        }
+        names
+    }
+
+    // After
+    fn premium_names(customers: &[Customer], region: &str) -> Vec<String> {
+        customers
+            .iter()
+            .filter(|c| c.region == region)
+            .filter(|c| c.is_premium)
+            .map(|c| c.name.to_uppercase())
+            .collect()
+    }
+    ```
+  </TabItem>
+</Tabs>
+
+## Mechanics
+
+1. หา collection ที่ loop เดินผ่าน และระบุผลลัพธ์ที่มันสร้างขึ้น
+2. แปลตรรกะแต่ละส่วนของ loop ให้เป็นขั้นตอนหนึ่ง guard แบบ `continue` กลายเป็น `filter`; การแปลงค่าต่อสมาชิกกลายเป็น `map`; การสะสมค่าเดียวกลายเป็น `reduce` (หรือ `sum`, `join` และเพื่อน ๆ)
+3. สร้าง pipeline ทีละขั้น โดยปล่อย loop ไว้ข้าง ๆ ถ้ามันช่วยให้คุณเปรียบเทียบได้
+4. แทนที่ loop ด้วย pipeline ที่เสร็จแล้ว แล้ว return ผลของมัน
+5. **รันเทสต์ของคุณ** ผลลัพธ์ต้องตรงกับ loop เป๊ะ รวมถึงกรณี input ว่างด้วย
+6. ในภาษาที่ไม่มี pipeline ในตัว เช่น Go อย่าฝืนสร้างมันขึ้นมา: ใช้ loop เดียวต่อไปแต่ยกแต่ละเงื่อนไขขึ้นเป็น boolean ที่มีชื่อชัดเจน เพื่อให้ขั้นตอนยังอ่านเป็นแนวคิดที่แยกจากกัน
+
+## When to use / trade-offs
+
+หยิบ pipeline มาใช้เมื่อ loop ปนการ filter, transform และ accumulate เข้าด้วยกัน — ขั้นตอนต่าง ๆ จะทำให้แต่ละเจตนาชัดเจน และให้คุณอ่านเส้นทางการเดินทางของข้อมูลจากบนลงล่าง มันโดดเด่นเมื่อ operation เป็น pure และไม่ขึ้นกับลำดับ
+
+ข้อแลกเปลี่ยน: loop ที่มี `break` ออกก่อน, index ที่มีความหมาย หรือ side effect ใน body อาจกลายเป็น pipeline ที่ดูอึดอัดหรือชวนเข้าใจผิด และ chain ที่ยาวมากก็กลายเป็นปริศนาแบบของมันเองได้ pipeline บางตัวยังจัดสรร collection กลางขึ้นมาด้วย ใช้มันตรงที่มันทำให้ชัดขึ้น และจำหมายเหตุของ Go ข้างบนไว้ — loop ที่มีขั้นตอนมีชื่อคือสิ่งที่เทียบเท่าและเป็นสไตล์ที่เหมาะกับ Go
+
+## Related
+
+- [Extract Function](/refactoring-from-zero-to-hero/th/composing-methods/extract-function/)
+- [Substitute Algorithm](/refactoring-from-zero-to-hero/th/composing-methods/substitute-algorithm/)
+- [Split Phase](/refactoring-from-zero-to-hero/th/composing-methods/split-phase/)
+
+<Callout title="แต่ละขั้นทำงานเดียว">
+ชัยชนะของ pipeline คือการที่ filter, transform และ combine เลิกซ้อนทับกัน เมื่อคุณอ่าน `filter(...).map(...)` คุณรู้แน่ชัดว่าการเลือกจบตรงไหนและการแปลงเริ่มตรงไหน ถ้าขั้นไหนเริ่มทำสองอย่าง ให้แยกมันออกเป็นขั้นที่มีชื่อของตัวเอง
+</Callout>
+
+export const quizReplaceLoopWithPipeline = [
+  {
+    q: 'Replace Loop with Pipeline ทำให้อะไรชัดเจนขึ้น?',
+    options: [
+      'ตำแหน่ง memory address ของแต่ละสมาชิก',
+      'ขั้นตอนที่แยกกันของการ filter, transform และ combine',
+      'จำนวน CPU core ที่ใช้',
+      'ตัวแปร index ของ loop',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'guard แบบ "continue" ข้างใน loop มักกลายเป็นขั้นตอน pipeline แบบใด?',
+    options: ['map', 'filter', 'reduce', 'sort'],
+    answer: 1,
+  },
+  {
+    q: 'บทเรียนแนะนำให้จัดการเรื่องนี้ใน Go ซึ่งไม่มี pipeline ในตัวอย่างไร?',
+    options: [
+      'import ไลบรารี pipeline ของบุคคลที่สามเสมอ',
+      'ใช้ loop เดียวต่อไปแต่ยกแต่ละเงื่อนไขขึ้นเป็นขั้นตอน boolean ที่มีชื่อชัดเจน',
+      'เลี่ยงการ refactor นี้ไปเลยและปล่อย loop เดิมไว้',
+      'เขียนใหม่โดยใช้ goroutine',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'เมื่อไรที่ loop เป็นตัวเลือกที่ไม่ดีสำหรับ pipeline?',
+    options: [
+      'เมื่อมัน filter และ map บน collection ล้วน ๆ',
+      'เมื่อมี break ออกก่อน, index ที่มีความหมาย หรือ side effect ใน body',
+      'เมื่อ collection ไม่ว่าง',
+      'เมื่อการแปลงเป็นเพียงการเข้าถึง field ง่าย ๆ',
+    ],
+    answer: 1,
+  },
+];
+
+<Quiz client:visible id="composing-methods/replace-loop-with-pipeline" questions={quizReplaceLoopWithPipeline} />
+
+<ProgressTracker client:visible id="composing-methods/replace-loop-with-pipeline" />

@@ -35,13 +35,17 @@ export const overviewDiagram = `flowchart TD
 
 ## What this module covers
 
-การ refactor ห้าแบบ ซึ่งแต่ละแบบย้อนกลับได้:
+การ refactor เก้าแบบ ซึ่งแต่ละแบบย้อนกลับได้:
 
-- **Move Function** — เมื่อฟังก์ชันอ้างอิงข้อมูลและเมธอดของอ็อบเจกต์อื่นมากกว่าของตัวเอง (Feature Envy) ให้ย้ายมันไปยังคลาสที่มันอิจฉา
-- **Move Field** — เมื่อฟิลด์ถูกอ่านและเขียนจาก record อื่นมากกว่าบ้านปัจจุบันของมัน ให้ย้ายมันไปยังที่ที่ถูกใช้งาน
-- **Extract Class** — เมื่อคลาสหนึ่งเติบโตจนทำสองงานที่ต่างกัน (Large Class) ให้แยกความรับผิดชอบหนึ่งออกไปเป็นคลาสใหม่
-- **Inline Class** — สิ่งตรงข้าม: เมื่อคลาสไม่คุ้มกับการมีอยู่อีกต่อไป ให้พับมันกลับเข้าไปในคลาสที่ใช้มัน
-- **Hide Delegate** (และสิ่งตรงข้ามคือ **Remove Middle Man**) — ห่อหุ้มการมอบหมาย (delegation) เพื่อให้ผู้เรียกเลิกเดินไล่ตามสายของอ็อบเจกต์ ตามหลัก Law of Demeter
+- **[Move Function](/refactoring-from-zero-to-hero/th/moving-features/move-function/)** — เมื่อฟังก์ชันอ้างอิงข้อมูลและเมธอดของอ็อบเจกต์อื่นมากกว่าของตัวเอง (Feature Envy) ให้ย้ายมันไปยังคลาสที่มันอิจฉา
+- **[Move Field](/refactoring-from-zero-to-hero/th/moving-features/move-field/)** — เมื่อฟิลด์ถูกอ่านและเขียนจาก record อื่นมากกว่าบ้านปัจจุบันของมัน ให้ย้ายมันไปยังที่ที่ถูกใช้งาน
+- **[Extract Class](/refactoring-from-zero-to-hero/th/moving-features/extract-class/)** — เมื่อคลาสหนึ่งเติบโตจนทำสองงานที่ต่างกัน (Large Class) ให้แยกความรับผิดชอบหนึ่งออกไปเป็นคลาสใหม่
+- **[Inline Class](/refactoring-from-zero-to-hero/th/moving-features/inline-class/)** — สิ่งตรงข้าม: เมื่อคลาสไม่คุ้มกับการมีอยู่อีกต่อไป ให้พับมันกลับเข้าไปในคลาสที่ใช้มัน
+- **[Hide Delegate](/refactoring-from-zero-to-hero/th/moving-features/hide-delegate-and-remove-middle-man/)** (และสิ่งตรงข้ามคือ **Remove Middle Man**) — ห่อหุ้มการมอบหมาย (delegation) เพื่อให้ผู้เรียกเลิกเดินไล่ตามสายของอ็อบเจกต์ ตามหลัก Law of Demeter
+- **[Move Statements into Function](/refactoring-from-zero-to-hero/th/moving-features/move-statements-into-function/)** — เมื่อคำสั่งเดียวกันรันอยู่ข้างการเรียกฟังก์ชันเสมอ ให้พับมันเข้าไปในฟังก์ชันเพื่อให้ผู้เรียกลืมไม่ได้
+- **[Move Statements to Callers](/refactoring-from-zero-to-hero/th/moving-features/move-statements-to-callers/)** — สิ่งตรงข้าม: เมื่อฟังก์ชันทำงานเกินไปหนึ่งอย่างสำหรับผู้เรียกบางราย ให้ดันคำสั่งที่แตกต่างกันออกไปยังผู้เรียกเหล่านั้น
+- **[Split Loop](/refactoring-from-zero-to-hero/th/moving-features/split-loop/)** — เมื่อลูปหนึ่งทำสองงานที่ไม่เกี่ยวข้องกัน ให้แยกมันออกเป็นสองลูปที่ทำงานเดียวเพื่อความชัดเจน
+- **[Combine Functions into Class](/refactoring-from-zero-to-hero/th/moving-features/combine-functions-into-class/)** — เมื่อฟังก์ชันคอยส่งข้อมูลก้อนเดิมไปมา ให้รวบมันเข้าเป็นคลาสที่เก็บข้อมูลนั้นไว้เป็นฟิลด์
 
 แต่ละบทเรียนแสดง before-and-after เดียวกันใน TypeScript, Python, Go และ Rust จากนั้นพาเดินผ่านกลไก (mechanics) ที่ปลอดภัยและเป็นลำดับขั้น — โดยรันเทสต์ของคุณระหว่างทุกขั้นตอน
 

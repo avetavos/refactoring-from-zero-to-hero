@@ -1,0 +1,195 @@
+---
+title: Change Reference to Value (and back)
+description: ปฏิบัติต่ออ็อบเจกต์เล็ก ๆ เป็น value ที่ไม่เปลี่ยนแปลง — เทียบด้วยเนื้อหาและคัดลอกได้อิสระ — เมื่อการแชร์ไม่ได้ให้ประโยชน์อะไร และย้อนทางกลับเมื่อคุณต้องการ instance เดียวที่แชร์และอัปเดตได้จริง ๆ
+sidebar:
+  order: 10
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+## Intent
+
+อ็อบเจกต์เล็ก ๆ สร้างแบบจำลองได้สองทาง แบบ **reference** instance เดียวที่แชร์กันถูกถือโดยเจ้าของหลายคน; การอัปเดตมันอัปเดตมุมมองของทุกคน และ identity (ว่าเป็นอ็อบเจกต์ตัวไหน) มีความหมาย แบบ **value** อ็อบเจกต์ไม่เปลี่ยนแปลง เท่ากับตัวอื่นที่มีเนื้อหาเดียวกัน และคัดลอกได้อิสระ Change Reference to Value เปลี่ยนอ็อบเจกต์ที่แชร์และเปลี่ยนแปลงได้ให้เป็น value ที่ไม่เปลี่ยนแปลงและเทียบด้วย field ของมัน ส่วนทางกลับ — Change Value to Reference — ใช้เมื่อหลายที่ต้องแชร์และเฝ้าดู entity เดียวที่อัปเดตได้จริง ๆ
+
+## The smell
+
+smell ที่ว่า reference-ทั้งที่ควรเป็น-value ปรากฏเป็น **aliasing bug**: สองส่วนของโปรแกรมถืออ็อบเจกต์เล็ก ๆ ตัวเดียวกัน ตัวหนึ่ง mutate มัน และอีกตัวประหลาดใจกับการเปลี่ยนแปลงที่มันไม่เคยขอ `Money`, `Coordinate`, `DateRange` — พวกนี้ไม่มี identity ที่มีความหมาย การแชร์มันจึงแค่ชวนให้เกิด action ระยะไกล smell ตรงข้ามคือ **divergent copies**: คุณมี instance แยกกันหลายตัวของสิ่งที่ในเชิงแนวคิดเป็น entity เดียว (record Customer หนึ่งคน) และการอัปเดต copy ตัวหนึ่งไปไม่ถึงตัวอื่น ๆ
+
+## Before → After
+
+อ็อบเจกต์ `Money` ที่แชร์ด้วย reference ซึ่งการ mutate มันรั่วไปสู่ alias ทุกตัว หลังจากนั้นมันเป็น value ที่ไม่เปลี่ยนแปลง: operation คืน instance ใหม่และความเท่ากันเทียบด้วยเนื้อหา
+
+<Tabs syncKey="lang">
+  <TabItem label="TypeScript">
+    ```ts
+    // Before — mutable, shared by reference
+    class Money {
+      constructor(public amount: number, public currency: string) {}
+      add(other: Money): void {
+        this.amount += other.amount; // mutates in place, surprising aliases
+      }
+    }
+
+    // After — immutable value: operations return new instances
+    class Money {
+      constructor(
+        readonly amount: number,
+        readonly currency: string,
+      ) {}
+      add(other: Money): Money {
+        return new Money(this.amount + other.amount, this.currency);
+      }
+      equals(other: Money): boolean {
+        return this.amount === other.amount && this.currency === other.currency;
+      }
+    }
+    ```
+  </TabItem>
+  <TabItem label="Python">
+    ```python
+    # Before — mutable, shared by reference
+    class Money:
+        def __init__(self, amount, currency):
+            self.amount = amount
+            self.currency = currency
+        def add(self, other):
+            self.amount += other.amount  # mutates in place
+
+    # After — frozen value: equality and hashing come from contents
+    from dataclasses import dataclass
+
+    @dataclass(frozen=True)
+    class Money:
+        amount: int
+        currency: str
+        def add(self, other):
+            return Money(self.amount + other.amount, self.currency)
+    ```
+  </TabItem>
+  <TabItem label="Go">
+    ```go
+    // Before — pointer methods mutate a shared instance
+    type Money struct {
+        Amount   int
+        Currency string
+    }
+    func (m *Money) Add(other Money) {
+        m.Amount += other.Amount // mutates through the pointer
+    }
+
+    // After — value semantics: pass and return by value, never mutate
+    type Money struct {
+        Amount   int
+        Currency string
+    }
+    func (m Money) Add(other Money) Money {
+        return Money{Amount: m.Amount + other.Amount, Currency: m.Currency}
+    }
+    // Comparable structs compare by content with ==.
+    ```
+  </TabItem>
+  <TabItem label="Rust">
+    ```rust
+    // Before — shared and mutated through a reference
+    struct Money {
+        amount: i64,
+        currency: String,
+    }
+    impl Money {
+        fn add(&mut self, other: &Money) {
+            self.amount += other.amount; // mutates in place
+        }
+    }
+
+    // After — a Copy/Clone value compared by contents
+    #[derive(Clone, PartialEq, Eq)]
+    struct Money {
+        amount: i64,
+        currency: String,
+    }
+    impl Money {
+        fn add(&self, other: &Money) -> Money {
+            Money { amount: self.amount + other.amount, currency: self.currency.clone() }
+        }
+    }
+    ```
+  </TabItem>
+</Tabs>
+
+## Mechanics
+
+ในการเปลี่ยน reference ให้เป็น value:
+
+1. ทำให้ field ของอ็อบเจกต์ไม่เปลี่ยนแปลง — `readonly`, `frozen`, value receiver, ไม่มี `&mut`
+2. แทนที่ method ที่ mutate ใด ๆ ด้วย method ที่คืน instance ใหม่ซึ่งถือเนื้อหาที่เปลี่ยนแล้ว
+3. จัดให้มีความเท่ากันแบบอิงเนื้อหา (`equals`, `__eq__`/`frozen`, `==` บน struct ที่เทียบได้, `PartialEq`) เพื่อให้อ็อบเจกต์สองตัวที่มี field เดียวกันเท่ากัน
+4. ลบการแชร์ออก: ให้เจ้าของแต่ละคนถือ copy ของตัวเอง เพราะตอนนี้ copy แยกแยะกันไม่ออก
+5. **รันเทสต์ของคุณ** หลังแต่ละขั้น
+
+ในการเปลี่ยน value ให้เป็น reference (ทางกลับ) ให้นำแหล่งเดียวเข้ามา — repository หรือ registry ที่แจก instance *ตัวนั้น* สำหรับ identity ที่กำหนด — เพื่อให้ผู้เรียกทุกคนดึงอ็อบเจกต์เดียวกัน และการอัปเดตถูกมองเห็นโดยทุกคน
+
+## When to use / trade-offs
+
+เลือก value สำหรับแนวคิดเล็ก ๆ ที่สมบูรณ์ในตัว — เงิน, วันที่, จุด, ช่วง — ที่เนื้อหาเท่ากันสองอันควรใช้แทนกันได้ และไม่มีใครต้องเฝ้าดูการเปลี่ยนแปลงในที่ value ที่ไม่เปลี่ยนแปลงปลอดภัยที่จะแชร์ข้าม thread, ใช้เหตุผลกับมันได้ง่าย และปลอดจากความประหลาดใจของ aliasing; ต้นทุนของมันคือการจัดสรร instance ใหม่ต่อการ "เปลี่ยน" หนึ่งครั้ง ซึ่งน้อยจนแทบไม่นับสำหรับอ็อบเจกต์เล็ก
+
+เลือก reference เมื่ออ็อบเจกต์จำลอง entity จริงในโลกชิ้นเดียวที่หลายส่วนของระบบต้องแชร์และเฝ้าดูขณะที่มันอัปเดต — ผู้ใช้ที่ล็อกอินอยู่, บัญชีที่ยอดเงินสะท้อนในหลายมุมมอง ตรงนี้ divergent copies จะเป็น bug ของความถูกต้อง คำถามชี้ขาด: ถ้าฉันเปลี่ยนอ็อบเจกต์นี้ ทุกคนที่ถือมันควรเห็นการเปลี่ยนแปลงไหม? ใช่ หมายถึง reference; ไม่ — และเนื้อหาเท่ากันคือสิ่งเดียวกัน — หมายถึง value
+
+## Related
+
+- [Replace Primitive with Object](/refactoring-from-zero-to-hero/th/organizing-data/replace-primitive-with-object/)
+- [Encapsulate Variable](/refactoring-from-zero-to-hero/th/organizing-data/encapsulate-variable/)
+- [Replace Magic Literal](/refactoring-from-zero-to-hero/th/organizing-data/replace-magic-literal/)
+
+<Callout title="ถามว่า: การเปลี่ยนแปลงควรถูกเห็นโดยทุกคนไหม?">
+คำถามเดียวนั้นตัดสินทิศทาง ถ้าการอัปเดตอ็อบเจกต์ต้องกระจายไปยังผู้ถือทุกคน มันคือ entity ที่แชร์กันหนึ่งเดียว — reference ถ้าเนื้อหาเท่ากันหมายถึงสิ่งเดียวกันและไม่มีใครควรเห็นการ mutate ให้ทำมันเป็น value ที่ไม่เปลี่ยนแปลงและเลิกแชร์
+</Callout>
+
+export const quizChangeRefToValue = [
+  {
+    q: 'อะไรที่ทำให้ value object ต่างจาก reference?',
+    options: [
+      'มันถูกแชร์โดยเจ้าของหลายคนและถูก mutate ในที่',
+      'มันไม่เปลี่ยนแปลง, เทียบด้วยเนื้อหา และคัดลอกได้อิสระ',
+      'มันอยู่ในฐานข้อมูลเสมอ',
+      'มันมี identity เฉพาะที่ต้องถูกรักษาไว้',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'bug แบบใดที่มักส่งสัญญาณว่า reference ที่แชร์กันควรกลายเป็น value?',
+    options: [
+      'Divergent copies ที่ไม่สามารถ sync กันได้',
+      'Aliasing — ผู้ถือคนหนึ่ง mutate อ็อบเจกต์และทำให้ผู้ถืออีกคนประหลาดใจ',
+      'การเริ่มทำงานช้า',
+      'constructor ที่หายไป',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'เมื่อคุณเปลี่ยน reference ที่ mutate ได้ให้เป็น value อะไรมาแทน method ที่ mutate ในที่?',
+    options: [
+      'global setter',
+      'method ที่คืน instance ใหม่พร้อมเนื้อหาที่เปลี่ยนแล้ว',
+      'method ที่โยน error',
+      'การลบ method ทิ้ง',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'คำถามเดียวใดที่ตัดสินระหว่าง reference กับ value ได้ดีที่สุด?',
+    options: [
+      'อ็อบเจกต์ใหญ่ไหม?',
+      'ถ้าฉันเปลี่ยนอ็อบเจกต์นี้ ทุกคนที่ถือมันควรเห็นการเปลี่ยนแปลงไหม?',
+      'อ็อบเจกต์มีหลาย field ไหม?',
+      'อ็อบเจกต์ถูกใช้ใน loop ไหม?',
+    ],
+    answer: 1,
+  },
+];
+
+<Quiz client:visible id="organizing-data/change-reference-to-value" questions={quizChangeRefToValue} />
+
+<ProgressTracker client:visible id="organizing-data/change-reference-to-value" />

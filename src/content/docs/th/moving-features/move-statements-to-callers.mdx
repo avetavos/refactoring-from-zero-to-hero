@@ -1,0 +1,210 @@
+---
+title: Move Statements to Callers
+description: เมื่อฟังก์ชันทำงานเกินไปหนึ่งอย่างสำหรับผู้เรียกบางราย ให้ยกคำสั่งที่แตกต่างกันออกไปยังผู้เรียกที่ความแตกต่างนั้นควรอยู่
+sidebar:
+  order: 8
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+## Intent
+
+ฟังก์ชันที่เริ่มต้นเป็นหน่วยเดียวที่ชัดเจน สามารถเติบโตจนกระทั่งทำสิ่งที่ *ต่างกัน* เล็กน้อยสำหรับผู้เรียกที่ต่างกัน เมื่อส่วนหนึ่งของตัวมันควรแปรผันไปตามผู้เรียก ให้ดึงส่วนนั้นออกจากฟังก์ชันไปยังผู้เรียกแต่ละราย ฟังก์ชันยังคงเก็บแกนกลางที่แชร์กันไว้ ส่วนพฤติกรรมที่แปรผันย้ายไปยังที่ที่ความแตกต่างนั้นอยู่จริง
+
+## The smell
+
+คุณสังเกตว่าตัวเองกำลังจะเอื้อมไปหา boolean parameter — `render(person, includeFooter)` — หรือหวังว่าผู้เรียกรายหนึ่งจะข้ามฟังก์ชันก้อนหนึ่งได้ ความคันนั้นหมายความว่าฟังก์ชันกำลังมัดขั้นตอนที่ไม่ใช่สากลเข้าด้วยกัน ส่วนที่ใช้ร่วมกันและส่วนที่เฉพาะแต่ละผู้เรียกถูกเชื่อมติดกัน นี่คือสิ่งตรงข้ามเป๊ะ ๆ ของ **Move Statements into Function**: ที่นั่น คำสั่งที่เหมือนกันอยากเข้ามา ที่นี่ คำสั่งที่แตกต่างกันอยากออกไป
+
+## Before → After
+
+`renderPerson` ที่ปล่อยบล็อกรูปภาพไว้ท้ายเสมอ ผู้เรียกรายใหม่ต้องการ heading แต่ต้องการ footer ที่ *ต่างออกไป* แทนที่จะเพิ่ม flag เราย้ายบล็อกรูปภาพออกไปยังผู้เรียก
+
+<Tabs syncKey="lang">
+  <TabItem label="TypeScript">
+    ```ts
+    // Before — one caller wants a different ending, tempting a flag
+    function renderPerson(person: Person): string {
+      return [
+        `<p>${person.name}</p>`,
+        emitPhotoData(person.photo),
+      ].join('\n');
+    }
+
+    const listing = people.map(renderPerson).join('\n');
+
+    // After — shared core stays, the varying tail moves to callers
+    function renderPerson(person: Person): string {
+      return `<p>${person.name}</p>`;
+    }
+
+    const listing = people
+      .map((p) => [renderPerson(p), emitPhotoData(p.photo)].join('\n'))
+      .join('\n');
+
+    // a different caller can now end differently
+    const compact = people.map(renderPerson).join('\n');
+    ```
+  </TabItem>
+  <TabItem label="Python">
+    ```python
+    # Before — one caller wants a different ending, tempting a flag
+    def render_person(person):
+        return "\n".join([
+            f"<p>{person.name}</p>",
+            emit_photo_data(person.photo),
+        ])
+
+    listing = "\n".join(render_person(p) for p in people)
+
+    # After — shared core stays, the varying tail moves to callers
+    def render_person(person):
+        return f"<p>{person.name}</p>"
+
+    listing = "\n".join(
+        "\n".join([render_person(p), emit_photo_data(p.photo)]) for p in people
+    )
+
+    # a different caller can now end differently
+    compact = "\n".join(render_person(p) for p in people)
+    ```
+  </TabItem>
+  <TabItem label="Go">
+    ```go
+    // Before — one caller wants a different ending, tempting a flag
+    func renderPerson(person Person) string {
+        return fmt.Sprintf("<p>%s</p>\n%s", person.Name, emitPhotoData(person.Photo))
+    }
+
+    func listing(people []Person) string {
+        parts := make([]string, len(people))
+        for i, p := range people {
+            parts[i] = renderPerson(p)
+        }
+        return strings.Join(parts, "\n")
+    }
+
+    // After — shared core stays, the varying tail moves to callers
+    func renderPerson(person Person) string {
+        return fmt.Sprintf("<p>%s</p>", person.Name)
+    }
+
+    func listing(people []Person) string {
+        parts := make([]string, len(people))
+        for i, p := range people {
+            parts[i] = renderPerson(p) + "\n" + emitPhotoData(p.Photo)
+        }
+        return strings.Join(parts, "\n")
+    }
+
+    // a different caller can now end differently
+    func compact(people []Person) string {
+        parts := make([]string, len(people))
+        for i, p := range people {
+            parts[i] = renderPerson(p)
+        }
+        return strings.Join(parts, "\n")
+    }
+    ```
+  </TabItem>
+  <TabItem label="Rust">
+    ```rust
+    // Before — one caller wants a different ending, tempting a flag
+    fn render_person(person: &Person) -> String {
+        format!("<p>{}</p>\n{}", person.name, emit_photo_data(&person.photo))
+    }
+
+    fn listing(people: &[Person]) -> String {
+        people.iter().map(render_person).collect::<Vec<_>>().join("\n")
+    }
+
+    // After — shared core stays, the varying tail moves to callers
+    fn render_person(person: &Person) -> String {
+        format!("<p>{}</p>", person.name)
+    }
+
+    fn listing(people: &[Person]) -> String {
+        people
+            .iter()
+            .map(|p| format!("{}\n{}", render_person(p), emit_photo_data(&p.photo)))
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
+
+    // a different caller can now end differently
+    fn compact(people: &[Person]) -> String {
+        people.iter().map(render_person).collect::<Vec<_>>().join("\n")
+    }
+    ```
+  </TabItem>
+</Tabs>
+
+## Mechanics
+
+1. ระบุคำสั่งที่ควรแปรผันไปตามผู้เรียก — มักเป็นส่วนนำหรือส่วนท้ายของฟังก์ชัน ไม่ใช่ตรงกลาง
+2. ถ้ามีผู้เรียกเพียงหนึ่งหรือสองราย ให้ copy คำสั่งเข้าไปยังผู้เรียกแต่ละรายโดยตรง ติดกับการเรียก
+3. เมื่อมีผู้เรียกจำนวนมาก ให้ทำอย่างปลอดภัย: extract ตัว (ที่แชร์กัน) *ส่วนที่เหลือ* ออกเป็นฟังก์ชันใหม่ ปล่อยให้ฟังก์ชันเดิมเรียกฟังก์ชันใหม่นั้นบวกกับคำสั่งที่แปรผัน แล้วชี้ผู้เรียกไปยังฟังก์ชันที่แชร์กันใหม่ทีละราย
+4. **รันเทสต์ของคุณ** หลังต่อสายผู้เรียกแต่ละราย
+5. เมื่อผู้เรียกทุกรายเก็บสำเนาคำสั่งที่ย้ายมาของตัวเองแล้ว ให้ลบมันออกจากฟังก์ชันเดิม
+6. เปลี่ยนชื่อฟังก์ชันที่แชร์กันถ้าความรับผิดชอบที่แคบลงของมันสมควรได้ชื่อที่ชัดเจนกว่า
+
+## When to use / trade-offs
+
+เอื้อมไปหาสิ่งนี้เมื่อฟังก์ชัน *เกือบ* จะถูกต้องแล้ว แต่มีส่วนหนึ่งที่ต้องต่างกันไปตามผู้เรียก และมิฉะนั้นคุณจะเอื้อมไปหา flag parameter การย้ายความแปรผันออกไปทำให้แต่ละฟังก์ชันโฟกัสที่งานเดียวที่สม่ำเสมอ
+
+ค่าใช้จ่ายคือการทำซ้ำบางส่วนที่จุดเรียก — ผู้เรียกแต่ละรายตอนนี้ทำซ้ำคำสั่งที่ย้ายมา นั่นเป็นที่ยอมรับได้เมื่อผู้เรียกแตกต่างกันจริง ๆ การทำซ้ำนั้นซื่อตรง ถ้าสุดท้ายแล้วคำสั่งกลับเหมือนกันทุกที่ คุณเดินผิดทาง: ใช้ **Move Statements into Function** เพื่อพับมันกลับเข้าไป
+
+## Related
+
+- [Move Statements into Function](/refactoring-from-zero-to-hero/th/moving-features/move-statements-into-function/)
+- [Split Loop](/refactoring-from-zero-to-hero/th/moving-features/split-loop/)
+- [Extract Function](/refactoring-from-zero-to-hero/th/composing-methods/extract-function/)
+
+<Callout title="เลือกสิ่งนี้แทน flag parameter">
+เมื่อใดก็ตามที่คุณกำลังจะเพิ่ม boolean อย่าง `includeFooter` เพื่อให้ผู้เรียกรายหนึ่งทำงานต่างออกไป ให้หยุดคิด flag นั้นคือฟังก์ชันกำลังบอกคุณว่ามันทำสองงาน ย้ายคำสั่งที่แตกต่างกันไปยังผู้เรียก แล้วปล่อยให้แต่ละรายขอเฉพาะสิ่งที่มันต้องการ
+</Callout>
+
+export const quizMoveOut = [
+  {
+    q: 'อะไรเป็นสัญญาณว่าคำสั่งควรย้ายไปยังผู้เรียก?',
+    options: [
+      'ผู้เรียกทุกรายรันฟังก์ชันเหมือนกันเป๊ะ',
+      'คุณถูกล่อให้เพิ่ม boolean flag เพื่อให้ผู้เรียกบางรายทำงานต่างออกไป',
+      'ฟังก์ชันมีชื่อที่ดี',
+      'ฟังก์ชันสั้นมาก',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'เมื่อมีผู้เรียกจำนวนมาก วิธีที่ปลอดภัยในการย้ายคำสั่งออกคืออะไร?',
+    options: [
+      'ลบคำสั่งทิ้งแล้วหวังว่าเทสต์จะจับปัญหาได้',
+      'Extract ตัวที่แชร์กันออกเป็นฟังก์ชันใหม่ แล้วเปลี่ยนเส้นทางผู้เรียกทีละราย',
+      'เพิ่มคำสั่งลงใน global hook',
+      'Inline ผู้เรียกทุกรายก่อน',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'Move Statements to Callers เป็นสิ่งตรงข้ามของการ refactor ใด?',
+    options: ['Split Loop', 'Move Statements into Function', 'Inline Class', 'Move Field'],
+    answer: 1,
+  },
+  {
+    q: 'อะไรคือ trade-off ที่ยอมรับได้ของการย้ายคำสั่งไปยังผู้เรียก?',
+    options: [
+      'โปรแกรมรันช้าลง',
+      'การทำซ้ำที่ซื่อตรงบางส่วนปรากฏที่จุดเรียกซึ่งผู้เรียกแตกต่างกันจริง ๆ',
+      'ฟังก์ชันเสียชื่อของมันไป',
+      'ผู้เรียกทุกรายต้องอยู่ในไฟล์เดียวกัน',
+    ],
+    answer: 1,
+  },
+];
+
+<Quiz client:visible id="moving-features/move-statements-to-callers" questions={quizMoveOut} />
+
+<ProgressTracker client:visible id="moving-features/move-statements-to-callers" />

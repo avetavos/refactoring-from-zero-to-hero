@@ -1,0 +1,177 @@
+---
+title: Introduce Assertion
+description: ทำให้ข้อสมมติที่โค้ดส่วนหนึ่งพึ่งพาอยู่เงียบ ๆ ปรากฏชัด เพื่อให้ข้อสมมติที่พังล้มเหลวอย่างดังที่ต้นตอ แทนที่จะทำให้ข้อมูลปลายน้ำเสียหาย
+sidebar:
+  order: 7
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+export const assertionDiagram = `flowchart LR
+  A["Caller passes bad value"] --> B{"Assertion present?"}
+  B -->|"No"| C["Wrong math runs<br/>NaN spreads<br/>fails far away"]
+  B -->|"Yes"| D["Stops here<br/>with a clear message"]`;
+
+## เจตนา
+
+โค้ดชิ้นหนึ่งมักทำงานได้ก็ต่อเมื่อบางอย่างเป็นจริงอยู่ก่อนแล้ว — ส่วนลดอยู่ระหว่าง 0 ถึง 1, ลิสต์ไม่ว่างเปล่า, บัญชีถูกเปิดแล้ว ข้อสมมตินั้นมักอยู่ในหัวของโปรแกรมเมอร์ ไม่ใช่ในโค้ด **Introduce Assertion** เขียนข้อสมมตินั้นออกมาเป็นการตรวจสอบที่ไม่ทำอะไรเลยเมื่อโลกเป็นอย่างที่คาดหวัง และหยุดโปรแกรมอย่างดังเมื่อมันไม่เป็นเช่นนั้น
+
+assertion คือคำกล่าวเกี่ยวกับสิ่งที่ *ต้อง* เป็นจริง ณ จุดหนึ่งในโค้ด มันไม่ใช่การจัดการ error สำหรับอินพุตที่คุณคาดว่าจะผิด แต่เป็นสายสะดุดสำหรับสถานการณ์ที่ควรเป็นไปไม่ได้ ถ้ามันถูกจุดชนวนเมื่อใด แสดงว่าผู้เรียกมีบั๊ก
+
+## กลิ่นเหม็น
+
+คุณอ่านการคำนวณหนึ่งแล้วคิดว่า *"อันนี้จะสมเหตุสมผลก็ต่อเมื่อเรตเป็นบวกเท่านั้น"* — แต่ไม่มีอะไรในโค้ดบอกไว้เลย ข้อสมมตินั้นมองไม่เห็น ดังนั้นวันที่ศูนย์หรือค่าลบเล็ดลอดเข้ามา ฟังก์ชันก็ผลิตขยะออกมาอย่างมีความสุข ความเสียหายโผล่ขึ้นมาห่างไปสามชั้น ในยอดรวมที่ผิดอย่างเงียบ ๆ และคุณก็เสียเวลาทั้งบ่ายไล่ตามมันย้อนกลับมา เงื่อนไขที่โค้ดพึ่งพาไม่เคยถูกกล่าวไว้ จึงไม่มีอะไรเฝ้าระวังมัน
+
+## ก่อน → หลัง
+
+ฟังก์ชันหนึ่งใช้ส่วนลดที่ต้องเป็นเศษส่วนระหว่าง 0 ถึง 1 ก่อนหน้านี้ ข้อจำกัดนั้นไม่ได้เขียนไว้ หลังจากนั้น assertion กล่าวมันออกมา เพื่อให้เรตที่ไม่ดีล้มเหลวตั้งแต่ที่ประตู
+
+<Tabs syncKey="lang">
+  <TabItem label="TypeScript">
+    ```ts
+    // Before
+    function applyDiscount(price: number, rate: number): number {
+      // silently assumes 0 <= rate <= 1
+      return price - price * rate;
+    }
+
+    // After
+    function applyDiscount(price: number, rate: number): number {
+      if (rate < 0 || rate > 1) {
+        throw new Error(`discount rate must be in [0, 1], got ${rate}`);
+      }
+      return price - price * rate;
+    }
+    ```
+  </TabItem>
+  <TabItem label="Python">
+    ```python
+    # Before
+    def apply_discount(price, rate):
+        # silently assumes 0 <= rate <= 1
+        return price - price * rate
+
+    # After
+    def apply_discount(price, rate):
+        assert 0 <= rate <= 1, f"discount rate must be in [0, 1], got {rate}"
+        return price - price * rate
+    ```
+  </TabItem>
+  <TabItem label="Go">
+    ```go
+    // Go has no assert keyword. State the invariant with an explicit
+    // check and panic for a true "this can never happen" bug. If the
+    // bad value can come from outside, return an error instead.
+    //
+    // Before
+    func ApplyDiscount(price, rate float64) float64 {
+        // silently assumes 0 <= rate <= 1
+        return price - price*rate
+    }
+
+    // After
+    func ApplyDiscount(price, rate float64) float64 {
+        if rate < 0 || rate > 1 {
+            panic(fmt.Sprintf("discount rate must be in [0, 1], got %v", rate))
+        }
+        return price - price*rate
+    }
+    ```
+  </TabItem>
+  <TabItem label="Rust">
+    ```rust
+    // Use assert! for an invariant that must hold in every build, or
+    // debug_assert! when the check is only worth paying for in dev builds.
+    //
+    // Before
+    fn apply_discount(price: f64, rate: f64) -> f64 {
+        // silently assumes 0.0 <= rate <= 1.0
+        price - price * rate
+    }
+
+    // After
+    fn apply_discount(price: f64, rate: f64) -> f64 {
+        assert!(
+            (0.0..=1.0).contains(&rate),
+            "discount rate must be in [0, 1], got {rate}"
+        );
+        price - price * rate
+    }
+    ```
+  </TabItem>
+</Tabs>
+
+<Mermaid code={assertionDiagram} title="assertion หยุดข้อสมมติที่พังไว้ที่ต้นตอ" />
+
+## กลไก
+
+1. หาข้อสมมติให้เจอ อ่านโค้ดที่น่าสงสัยแล้วเติมประโยค *"อันนี้ทำงานได้ก็ต่อเมื่อ…"* ให้จบ อนุประโยคนั้นคือ assertion ของคุณ
+2. แสดงมันออกมาเป็นการตรวจสอบที่เป็นจริงในกรณีปกติ วางมันไว้ใกล้กับโค้ดที่พึ่งพามันให้มากที่สุด ก่อนที่งานจะเริ่ม
+3. ทำให้ความล้มเหลวดังและเฉพาะเจาะจง: ใส่ค่าที่ผิดลงในข้อความ เพื่อให้ผู้อ่านในอนาคตเห็นว่า *อะไร* ที่ทำลายข้อสมมติ ไม่ใช่แค่ *ว่า* มันพัง
+4. **รันเทสต์ของคุณ** เส้นทางที่ปกติดีต้องผ่านต่อไปโดยไม่ถูกแตะต้อง — assertion ที่ถูกต้องไม่เปลี่ยนแปลงอะไรสำหรับอินพุตที่ถูกต้อง
+5. เพิ่มเทสต์ที่ป้อนค่าที่ผิดกฎเข้าไป แล้วยืนยันว่า assertion ถูกจุดชนวน นี่พิสูจน์ว่าสายสะดุดถูกต่อไว้แล้ว
+6. ทำซ้ำสำหรับข้อสมมติถัดไปที่ไม่ได้กล่าวไว้ ต้านทานการ assert สิ่งที่ชัดเจนว่าถูกรับประกันโดยชนิดข้อมูลอยู่แล้ว ให้ assert สิ่งที่ *ผู้เรียก* อาจทำผิดได้จริง
+
+## เมื่อใดควรใช้ / ข้อแลกเปลี่ยน
+
+introduce assertion เมื่อโค้ดส่วนหนึ่งพึ่งพาเงื่อนไขอยู่เงียบ ๆ และการละเมิดมันจะทำให้ข้อมูลเสียหายในที่ห่างไกลจากต้นเหตุ assertion ทำหน้าที่เป็นเอกสารไปด้วย: มันบอกผู้อ่านคนต่อไปอย่างชัดเจนว่าโค้ดคาดหวังอะไร และต่างจากคอมเมนต์ตรงที่มันไม่สามารถเคลื่อนคลาดออกจากความจริงได้ เพราะอันที่เป็นเท็จจะล้มเหลว
+
+เส้นที่ต้องเฝ้าระวังคือ **assertion เทียบกับการจัดการ error** assertion เฝ้าระวังความผิดพลาดของ *โปรแกรมเมอร์* — สถานะที่ควรเป็นไปไม่ได้ถ้าผู้เรียกทุกคนถูกต้อง อินพุตที่อาจผิดรูปได้อย่างชอบธรรม (ผู้ใช้พิมพ์ผิด, payload เครือข่ายที่ไม่ดี) ไม่ใช่หน้าที่ของ assertion ให้ตรวจสอบความถูกต้องของมันแล้ว return error จริงออกไป ใน Rust นี่คือทางเลือกระหว่าง `assert!`/`debug_assert!` กับ `Result` ใน Go คือ `panic` เทียบกับ `error` ที่ return ออกมา อย่าใส่ side effect ไว้ใน 
+
+ assertion เพราะ build ที่ถอด assertion ออก (Python's `-O`, Rust's `debug_assert!`) จะเปลี่ยนพฤติกรรมอย่างเงียบ ๆ
+
+## เกี่ยวข้อง
+
+- [Replace Nested Conditional with Guard Clauses](/refactoring-from-zero-to-hero/th/simplifying-conditionals/replace-nested-conditional-with-guard-clauses/)
+- [Replace Error Code with Exception](/refactoring-from-zero-to-hero/th/simplifying-conditionals/replace-error-code-with-exception/)
+- [Decompose Conditional](/refactoring-from-zero-to-hero/th/simplifying-conditionals/decompose-conditional/)
+
+<Callout title="assert สิ่งที่เป็นไปไม่ได้ validate สิ่งที่เป็นไปได้">
+ถ้าค่าที่ไม่ดีสามารถมาถึงฟังก์ชันของคุณได้ระหว่างการทำงานปกติ มันคือ *อินพุต* — ให้ตรวจสอบความถูกต้องและ return error ที่ผู้เรียกของคุณจัดการได้ สงวน assertion ไว้สำหรับเงื่อนไขที่ล้มเหลวได้เพราะบั๊กเท่านั้น assertion ที่ถูกจุดชนวนคือข้อความถึงโปรแกรมเมอร์ ไม่ใช่ถึงผู้ใช้
+</Callout>
+
+export const quizAssertion = [
+  {
+    q: 'assertion มีไว้เพื่อดักจับอะไร?',
+    options: [
+      'อินพุตที่ไม่ดีที่คาดไว้แล้วจากผู้ใช้หรือเครือข่าย',
+      'เงื่อนไขที่ควรเป็นไปไม่ได้ถ้าผู้เรียกทุกคนถูกต้อง',
+      'การถดถอยด้านประสิทธิภาพในลูปที่ร้อนแรง',
+      'คำแปลที่ขาดหายไปใน UI',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'เนื่องจาก Go ไม่มีคีย์เวิร์ด assert บทเรียนนี้กล่าว invariant สำหรับบั๊กแบบ "เป็นไปไม่ได้" จริง ๆ อย่างไร?',
+    options: [
+      'ด้วยการเรียก logging',
+      'ด้วยการตรวจสอบอย่างชัดเจนบวกกับ panic (หรือ return error ถ้าค่ามาจากภายนอกได้)',
+      'ด้วยการเพิกเฉยมันไปทั้งหมด',
+      'ด้วยคอมเมนต์เท่านั้น',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'ใน Rust แมโครใดรันการตรวจสอบเฉพาะใน build สำหรับการพัฒนา?',
+    options: ['assert!', 'debug_assert!', 'panic!', 'expect'],
+    answer: 1,
+  },
+  {
+    q: 'ทำไม assertion จึงไม่ควรมี side effect เลย?',
+    options: [
+      'มันจะทำให้โปรแกรมช้าลง',
+      'build ที่ถอด assertion ออกจะเปลี่ยนพฤติกรรมอย่างเงียบ ๆ',
+      'side effect เป็นข้อผิดพลาดทางไวยากรณ์ใน assertion',
+      'คอมไพเลอร์ห้ามไว้',
+    ],
+    answer: 1,
+  },
+];
+
+<Quiz client:visible id="simplifying-conditionals/introduce-assertion" questions={quizAssertion} />
+
+<ProgressTracker client:visible id="simplifying-conditionals/introduce-assertion" />

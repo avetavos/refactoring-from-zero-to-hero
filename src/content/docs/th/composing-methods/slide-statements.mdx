@@ -1,0 +1,210 @@
+---
+title: Slide Statements
+description: ย้าย statement ที่เกี่ยวข้องกันให้มาอยู่ติดกัน เพื่อให้ชิ้นส่วนที่สอดคล้องกันอยู่รวมกัน พร้อมที่จะถูกอ่านหรือ extract
+sidebar:
+  order: 8
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+## เจตนา
+
+โค้ดอ่านได้ดีที่สุดเมื่อสิ่งที่อยู่ด้วยกันตั้งอยู่ด้วยกัน Slide Statements ย้าย statement ขึ้นหรือลงเพื่อให้บรรทัดที่เกี่ยวข้องกันกลายเป็นเพื่อนบ้าน — ตัวแปรที่ประกาศไว้ตรงที่มันถูกใช้ครั้งแรก บรรทัด setup ที่อยู่ข้างการเรียกที่มันเตรียมไว้ พฤติกรรมไม่เปลี่ยน เปลี่ยนแค่ลำดับ บ่อยครั้งนี่คือก้าวแรกอันเงียบสงบก่อน Extract Function: คุณเลื่อนชิ้นส่วนที่กระจัดกระจายเข้ามาเป็นบล็อกเดียวที่ต่อเนื่องกัน แล้วยกบล็อกออกไปในการเคลื่อนไหวที่สะอาดเพียงครั้งเดียว
+
+## smell
+
+ตัวแปรถูกประกาศไว้ที่ด้านบนของฟังก์ชัน แต่ไม่ถูกแตะต้องจนกระทั่งสามสิบบรรทัดถัดมา สองบรรทัดที่ทำงานเป็นคู่กันอย่างชัดเจนถูกแยกออกจากกันด้วยโค้ดที่ไม่เกี่ยวข้อง เมื่อคุณพยายาม extract ชิ้นส่วนหนึ่ง คุณพบว่าวัตถุดิบของมันกระจายอยู่ทั่วฟังก์ชัน ดังนั้นการ extract จะต้องใช้พารามิเตอร์ที่เก้กังหรือจะลากเอาบรรทัดที่ไม่ควรอยู่ติดมาด้วย
+
+วิธีรักษาคือเลื่อน statement ที่เกี่ยวข้องกันให้มาอยู่ด้วยกันก่อน เมื่อพวกมันอยู่ติดกันแล้ว โครงสร้างของฟังก์ชันจะชัดเจน และ refactoring ขั้นต่อไปจะง่ายเป็นเรื่องเล็ก
+
+## Before → After
+
+การประกาศสองรายการตั้งอยู่ด้านบน แต่แต่ละรายการถูกใช้ในภายหลังมาก เลื่อนการประกาศแต่ละอันลงมาให้อยู่เหนือการใช้ครั้งแรกของมัน วางแต่ละค่าไว้ข้างงานที่ต้องการมัน
+
+<Tabs syncKey="lang">
+  <TabItem label="TypeScript">
+    ```ts
+    // Before
+    function summarize(order: Order): string {
+      const discount = order.basePrice * 0.1;
+      const tax = order.basePrice * 0.07;
+
+      logAccess(order.customerId);
+      const net = order.basePrice - discount;
+
+      recordAudit(order.id);
+      const gross = net + tax;
+      return `Net ${net}, Gross ${gross}`;
+    }
+
+    // After
+    function summarize(order: Order): string {
+      logAccess(order.customerId);
+      const discount = order.basePrice * 0.1;
+      const net = order.basePrice - discount;
+
+      recordAudit(order.id);
+      const tax = order.basePrice * 0.07;
+      const gross = net + tax;
+      return `Net ${net}, Gross ${gross}`;
+    }
+    ```
+  </TabItem>
+  <TabItem label="Python">
+    ```python
+    # Before
+    def summarize(order):
+        discount = order.base_price * 0.1
+        tax = order.base_price * 0.07
+
+        log_access(order.customer_id)
+        net = order.base_price - discount
+
+        record_audit(order.id)
+        gross = net + tax
+        return f"Net {net}, Gross {gross}"
+
+    # After
+    def summarize(order):
+        log_access(order.customer_id)
+        discount = order.base_price * 0.1
+        net = order.base_price - discount
+
+        record_audit(order.id)
+        tax = order.base_price * 0.07
+        gross = net + tax
+        return f"Net {net}, Gross {gross}"
+    ```
+  </TabItem>
+  <TabItem label="Go">
+    ```go
+    // Before
+    func Summarize(order Order) string {
+        discount := order.BasePrice * 0.1
+        tax := order.BasePrice * 0.07
+
+        logAccess(order.CustomerID)
+        net := order.BasePrice - discount
+
+        recordAudit(order.ID)
+        gross := net + tax
+        return fmt.Sprintf("Net %.2f, Gross %.2f", net, gross)
+    }
+
+    // After
+    func Summarize(order Order) string {
+        logAccess(order.CustomerID)
+        discount := order.BasePrice * 0.1
+        net := order.BasePrice - discount
+
+        recordAudit(order.ID)
+        tax := order.BasePrice * 0.07
+        gross := net + tax
+        return fmt.Sprintf("Net %.2f, Gross %.2f", net, gross)
+    }
+    ```
+  </TabItem>
+  <TabItem label="Rust">
+    ```rust
+    // Before
+    fn summarize(order: &Order) -> String {
+        let discount = order.base_price * 0.1;
+        let tax = order.base_price * 0.07;
+
+        log_access(order.customer_id);
+        let net = order.base_price - discount;
+
+        record_audit(order.id);
+        let gross = net + tax;
+        format!("Net {:.2}, Gross {:.2}", net, gross)
+    }
+
+    // After
+    fn summarize(order: &Order) -> String {
+        log_access(order.customer_id);
+        let discount = order.base_price * 0.1;
+        let net = order.base_price - discount;
+
+        record_audit(order.id);
+        let tax = order.base_price * 0.07;
+        let gross = net + tax;
+        format!("Net {:.2}, Gross {:.2}", net, gross)
+    }
+    ```
+  </TabItem>
+</Tabs>
+
+## Mechanics
+
+1. เลือก statement ที่คุณต้องการย้ายและช่องปลายทาง
+2. ตรวจโค้ดที่มันเลื่อนผ่านว่ามีการรบกวนกันหรือไม่ การเลื่อนจะปลอดภัยก็ต่อเมื่อลำดับไม่สำคัญระหว่างกัน: statement ที่ย้ายและทุก statement ที่มันผ่านต้องไม่อ่านค่าที่อีกฝ่ายเขียน และทั้งคู่ต้องไม่มี side effect ที่อีกฝ่ายพึ่งพา
+3. ย้าย statement ไปยังตำแหน่งใหม่ของมัน
+4. **รันเทสต์ของคุณ** ถ้ามีอะไรล้มเหลว แสดงว่าการเลื่อนข้ามการพึ่งพาจริง — ใส่มันกลับและพิจารณาใหม่
+5. ทำซ้ำสำหรับ statement ถัดไป โดยเลื่อนทีละอัน เพื่อให้ความล้มเหลวชี้ไปยังการย้ายเพียงครั้งเดียว
+
+## เมื่อใดควรใช้ / ข้อแลกเปลี่ยน
+
+เลื่อน statement เพื่อวางการประกาศไว้ข้างการใช้ครั้งแรกของมัน เพื่อจัดกลุ่มชิ้นส่วนของฟรากเมนต์ที่กำลังจะถูก extract หรือเพียงเพื่อทำให้ setup-และ-action ที่เป็นคู่กันอ่านได้ด้วยกัน มันเป็นการเคลื่อนไหวที่มีความเสี่ยงต่ำและให้ความชัดเจนสูง และเป็นการอุ่นเครื่องที่เหมาะอย่างยิ่งก่อน Extract Function
+
+อันตรายจริงเพียงอย่างเดียวคือการพึ่งพาที่ซ่อนอยู่: บรรทัดที่ดูเหมือนเป็นอิสระแต่แอบพึ่งพา side effect ก่อนหน้า (flag แบบ global, state ที่เปลี่ยนแปลงได้ที่ใช้ร่วมกัน, ลำดับผ่าน I/O) เทสต์ของคุณคือผู้คุ้มกัน เมื่อสงสัย ให้เลื่อนทีละก้าวเล็ก ๆ แล้วรันเทสต์หลังการย้ายแต่ละครั้ง
+
+## Related
+
+- [Extract Function](/refactoring-from-zero-to-hero/th/composing-methods/extract-function/)
+- [Extract Variable](/refactoring-from-zero-to-hero/th/composing-methods/extract-variable/)
+- [Split Phase](/refactoring-from-zero-to-hero/th/composing-methods/split-phase/)
+
+<Callout title="การเลื่อนจะปลอดภัยก็ต่อเมื่อลำดับไม่สำคัญ">
+สอง statement สลับที่กันได้ก็ต่อเมื่อทั้งคู่ไม่พึ่งพาผลของอีกฝ่าย ถ้าบรรทัดที่คุณย้ายอ่านบางอย่างที่บรรทัดที่ผ่านเขียนไว้ — หรือเขียนบางอย่างที่บรรทัดที่ผ่านอ่าน — การเลื่อนจะเปลี่ยนพฤติกรรม ปล่อยให้เทสต์จับสิ่งที่ตาของคุณมองข้าม
+</Callout>
+
+export const quizSlideStatements = [
+  {
+    q: 'Slide Statements เปลี่ยนอะไรเกี่ยวกับโค้ด?',
+    options: [
+      'ลำดับของ statement โดยรักษาพฤติกรรมไว้',
+      'ชื่อของฟังก์ชันที่เกี่ยวข้อง',
+      'ชนิดข้อมูลของตัวแปร',
+      'ผลลัพธ์ที่สังเกตได้ของโปรแกรม',
+    ],
+    answer: 0,
+  },
+  {
+    q: 'ทำไม Slide Statements จึงมักทำก่อน Extract Function?',
+    options: [
+      'มันเปลี่ยนชื่อตัวแปรให้ตรงกับฟังก์ชันใหม่',
+      'มันรวบรวม statement ที่เกี่ยวข้องกันให้เป็นบล็อกเดียวที่ต่อเนื่องกัน ทำให้ยกออกได้ง่าย',
+      'มันลบ statement ที่จะไม่ถูก extract',
+      'มันเพิ่มพารามิเตอร์โดยอัตโนมัติ',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'เมื่อใดที่การเลื่อน statement ผ่านอีกอันหนึ่งจึงปลอดภัย?',
+    options: [
+      'เสมอ เพราะลำดับไม่เคยสำคัญ',
+      'เฉพาะเมื่อไม่มี statement ใดอ่านค่าที่อีกอันเขียน และไม่มีอันใดพึ่งพา side effect ของอีกอัน',
+      'เฉพาะเมื่อทั้งสอง statement เป็นการประกาศ',
+      'เฉพาะเมื่อฟังก์ชันไม่มีค่าคืน',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'อะไรคือเครื่องป้องกันหลักของคุณต่อการเลื่อนที่ไม่ปลอดภัย?',
+    options: [
+      'type checker ของ compiler เพียงอย่างเดียว',
+      'การรันชุดเทสต์หลังการย้ายเล็ก ๆ แต่ละครั้ง',
+      'การเพิ่มคอมเมนต์ให้มากขึ้น',
+      'การเพิ่มความยาวของฟังก์ชัน',
+    ],
+    answer: 1,
+  },
+];
+
+<Quiz client:visible id="composing-methods/slide-statements" questions={quizSlideStatements} />
+
+<ProgressTracker client:visible id="composing-methods/slide-statements" />

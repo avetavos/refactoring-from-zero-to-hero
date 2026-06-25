@@ -1,0 +1,167 @@
+---
+title: Split Variable
+description: เมื่อตัวแปรหนึ่งถูกกำหนดค่ามากกว่าหนึ่งครั้งเพื่อหมายถึงสองสิ่งที่ต่างกัน ให้แต่ละจุดประสงค์มีตัวแปรที่กำหนดค่าครั้งเดียวเป็นของตัวเอง เพื่อผู้อ่านไม่ต้องถามว่าความหมายไหนกำลังใช้งานอยู่
+sidebar:
+  order: 8
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+## เจตนา
+
+ตัวแปรหนึ่งควรแทนสิ่งเดียว เมื่อชื่อเดียวถูกกำหนดค่าใหม่ระหว่างทาง จนทีแรกมันถือเส้นรอบรูปและต่อมาถือพื้นที่ มันคือสองตัวแปรที่สวมเสื้อโค้ตตัวเดียวกันจริง ๆ Split Variable ให้แต่ละความหมายที่แตกต่างมีชื่อของตัวเอง ซึ่งถูกกำหนดค่าเพียงครั้งเดียว ผู้อ่านจึงสามารถเชื่อได้ว่าชื่อหนึ่งหมายถึงสิ่งเดียวกันในทุกที่ที่มันปรากฏ และการกำหนดค่าครั้งที่สองที่เคยเปลี่ยนค่ามันก็หายไป
+
+## กลิ่นเหม็น
+
+กลิ่นเหม็นคือ **ตัวแปรที่ถูกกำหนดค่ามากกว่าหนึ่งครั้งสำหรับจุดประสงค์ที่ไม่เกี่ยวข้องกัน** — ไม่ใช่ตัวสะสมที่แท้จริงอย่างตัวนับ loop หรือผลรวมที่กำลังดำเนินอยู่ แต่เป็นชื่อที่ถูกนำกลับมาใช้เป็นช่องเขียนชั่วคราวที่สะดวก เบาะแสสองอย่าง: ตัวแปรนั้นไม่ใช่ตัวแปรเก็บรวบรวม (มันไม่ได้บวกหรือสร้างอะไรข้ามรอบการวน) และความหมายของมันเปลี่ยนไประหว่างการกำหนดค่า เมื่อใดก็ตามที่คุณต้องเลื่อนขึ้นไปแล้วถามว่า "ตอนนี้ค่านี้ถืออะไรอยู่?" ตัวแปรนั้นถูกใช้งานเกินหน้าที่และต้องการถูกแยก
+
+## ก่อน → หลัง
+
+การคำนวณทางฟิสิกส์นำตัวแปร `temp` ตัวเดียวมาใช้ซ้ำ ทีแรกสำหรับเส้นรอบรูป แล้วจึงสำหรับพื้นที่ ตอนหลัง ผลลัพธ์แต่ละอันได้ตัวแปรที่ตั้งชื่ออย่างชัดเจน กำหนดค่าครั้งเดียว เป็นของตัวเอง
+
+<Tabs syncKey="lang">
+  <TabItem label="TypeScript">
+    ```ts
+    // Before
+    function describe(height: number, width: number): string {
+      let temp = 2 * (height + width);
+      const out: string[] = [`Perimeter: ${temp}`];
+      temp = height * width;
+      out.push(`Area: ${temp}`);
+      return out.join('\n');
+    }
+
+    // After
+    function describe(height: number, width: number): string {
+      const perimeter = 2 * (height + width);
+      const area = height * width;
+      return [`Perimeter: ${perimeter}`, `Area: ${area}`].join('\n');
+    }
+    ```
+  </TabItem>
+  <TabItem label="Python">
+    ```python
+    # Before
+    def describe(height, width):
+        temp = 2 * (height + width)
+        out = [f"Perimeter: {temp}"]
+        temp = height * width
+        out.append(f"Area: {temp}")
+        return "\n".join(out)
+
+    # After
+    def describe(height, width):
+        perimeter = 2 * (height + width)
+        area = height * width
+        return "\n".join([f"Perimeter: {perimeter}", f"Area: {area}"])
+    ```
+  </TabItem>
+  <TabItem label="Go">
+    ```go
+    // Before
+    func Describe(height, width float64) string {
+        temp := 2 * (height + width)
+        out := fmt.Sprintf("Perimeter: %g", temp)
+        temp = height * width
+        out += fmt.Sprintf("\nArea: %g", temp)
+        return out
+    }
+
+    // After
+    func Describe(height, width float64) string {
+        perimeter := 2 * (height + width)
+        area := height * width
+        return fmt.Sprintf("Perimeter: %g\nArea: %g", perimeter, area)
+    }
+    ```
+  </TabItem>
+  <TabItem label="Rust">
+    ```rust
+    // Before
+    fn describe(height: f64, width: f64) -> String {
+        let mut temp = 2.0 * (height + width);
+        let mut out = format!("Perimeter: {temp}");
+        temp = height * width;
+        out.push_str(&format!("\nArea: {temp}"));
+        out
+    }
+
+    // After
+    fn describe(height: f64, width: f64) -> String {
+        let perimeter = 2.0 * (height + width);
+        let area = height * width;
+        format!("Perimeter: {perimeter}\nArea: {area}")
+    }
+    ```
+  </TabItem>
+</Tabs>
+
+## กลไก
+
+1. หาการกำหนดค่าครั้งแรกให้ตัวแปร แล้วเปลี่ยนชื่อมันเป็นชื่อที่อธิบาย *เฉพาะความหมายแรกนั้น* ที่ภาษาอนุญาต ให้ทำมันเป็นค่าคงที่ (`const`, `let` ที่ไม่เปลี่ยนแปลง, `:=` ที่คุณไม่เคยกำหนดค่าใหม่)
+2. เปลี่ยนทุกการอ้างอิงระหว่างการกำหนดค่าครั้งแรกและครั้งที่สองให้ใช้ชื่อใหม่
+3. **รันเทสต์ของคุณ**
+4. ทำซ้ำที่การกำหนดค่าครั้งที่สอง: ประกาศตัวแปรใหม่ด้วยชื่อสำหรับความหมายที่สอง แล้วชี้การอ้างอิงหลังจากนั้นไปยังชื่อใหม่
+5. ทำต่อไปจนกระทั่งแต่ละจุดประสงค์ที่แตกต่างเป็นเจ้าของตัวแปรที่แยกกัน กำหนดค่าครั้งเดียว
+6. เมื่อตัวแปรที่เปลี่ยนแปลงได้เดิมไม่มีผู้อ่านเหลืออยู่แล้ว ให้ลบมันทิ้ง ใน Rust คุณมักจะตัด `mut` ออกได้ทั้งหมด
+
+## เมื่อใดควรใช้ / ข้อแลกเปลี่ยน
+
+ใช้ Split Variable เมื่อใดก็ตามที่ชื่อหนึ่งถูกกำหนดค่าใหม่เพื่อหมายถึงสิ่งใหม่ — มันกำจัดบั๊กทั้งกลุ่มแบบ "ตอนนี้ค่านี้คืออะไร?" และทำให้แต่ละบรรทัดเข้าใจได้อย่างเป็นอิสระ มันเป็นจุดเริ่มต้นที่เกิดบ่อยของ **Extract Function**: เมื่อแต่ละค่าอยู่ในตัวแปรที่กำหนดค่าครั้งเดียวของตัวเอง ส่วนที่คำนวณมันก็ยกออกได้อย่างสะอาด
+
+ระวังอย่าแยกตัวสะสมที่แท้จริง ตัวนับ loop ผลรวมที่กำลังดำเนินอยู่ หรือตัวสร้างที่เติบโตข้ามรอบการวน *ถูกตั้งใจ* ให้กำหนดค่าใหม่ และการให้แต่ละขั้นมีชื่อของตัวเองจะไร้สาระ จงแยกเฉพาะเมื่อค่าที่ต่อเนื่องกันหมายถึง *สิ่งที่ต่างกัน* ต้นทุนของการแยกคือตัวแปรที่ตั้งชื่อเพิ่มอีกหนึ่งตัว ซึ่งแทบจะถูกกว่าความสับสนจากตัวแปรที่ใช้งานเกินหน้าที่เสมอ
+
+## ที่เกี่ยวข้อง
+
+- [Encapsulate Variable](/refactoring-from-zero-to-hero/th/organizing-data/encapsulate-variable/)
+- [Replace Magic Literal](/refactoring-from-zero-to-hero/th/organizing-data/replace-magic-literal/)
+- [Rename Field](/refactoring-from-zero-to-hero/th/organizing-data/rename-field/)
+
+<Callout title="หนึ่งชื่อ หนึ่งความหมาย หนึ่งการกำหนดค่า">
+ตัวแปรท้องถิ่นที่สะอาดที่สุดคือตัวที่ถูกกำหนดค่าครั้งเดียวและไม่เคยถูกแตะต้องอีกเลย เมื่อคุณพบว่าตัวเองกำลังกำหนดค่าใหม่ให้ตัวแปรเพื่อถือค่าชนิดที่ต่างออกไป นั่นคือสัญญาณ: มันคือสองตัวแปร และแต่ละตัวสมควรมีชื่อของตัวเอง
+</Callout>
+
+export const quizSplitVariable = [
+  {
+    q: 'เมื่อใดที่คุณควรแยกตัวแปรออกเป็นสองตัว?',
+    options: [
+      'เมื่อใดก็ตามที่ตัวแปรปรากฏมากกว่าหนึ่งครั้ง',
+      'เมื่อตัวแปรหนึ่งถูกกำหนดค่ามากกว่าหนึ่งครั้งสำหรับสองจุดประสงค์ที่ต่างกัน',
+      'เฉพาะภายใน loop',
+      'เมื่อชื่อตัวแปรสั้นเกินไป',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'การกำหนดค่าซ้ำชนิดใดที่คุณไม่ควรแยก?',
+    options: [
+      'ชื่อที่ถูกนำกลับมาใช้เป็นช่องเขียนชั่วคราวสำหรับค่าที่ไม่เกี่ยวข้องกัน',
+      'ตัวสะสมที่แท้จริงเช่นตัวนับ loop หรือผลรวมที่กำลังดำเนินอยู่',
+      'ตัวแปรที่ถือเส้นรอบรูปก่อนแล้วจึงถือพื้นที่',
+      'ตัวแปรที่ถูกกำหนดค่าใหม่เป็นแนวคิดที่ต่างออกไป',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'หลังจากแยกแล้ว แต่ละตัวแปรที่ได้ควรมีคุณสมบัติใด?',
+    options: [
+      'มันควรเป็น global',
+      'มันควรถูกกำหนดค่าเพียงครั้งเดียวและถือความหมายเดียว',
+      'มันควรเปลี่ยนแปลงได้เพื่อความยืดหยุ่น',
+      'มันควรคงชื่อทั่วไปเดิมไว้',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'Split Variable มักเป็นจุดเริ่มต้นของการรีแฟคเตอร์ใด?',
+    options: ['Extract Function', 'Encapsulate Collection', 'Replace Type Code with Subclasses', 'Inline Variable'],
+    answer: 0,
+  },
+];
+
+<Quiz client:visible id="organizing-data/split-variable" questions={quizSplitVariable} />
+
+<ProgressTracker client:visible id="organizing-data/split-variable" />

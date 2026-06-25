@@ -1,0 +1,184 @@
+---
+title: Rename Field
+description: เมื่อชื่อ field ของ record หรือ struct ไม่เข้ากับข้อมูลที่มันถืออีกต่อไป ให้เปลี่ยนชื่อมัน — และอัปเดตทุกผู้ใช้ — เพื่อให้ชื่อบอกความจริงเกี่ยวกับเนื้อหาของมันอีกครั้ง
+sidebar:
+  order: 9
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+## Intent
+
+ชื่อ field คือคำศัพท์ของโครงสร้างข้อมูล เมื่อ field ชื่อ `name` แต่จริง ๆ ถือคำนำหน้าของลูกค้า หรือ `date` ทั้งที่จริงเก็บ timestamp ของการสร้าง ชื่อนั้นก็โกหก และผู้อ่านทุกคนต้องจ่ายภาษีเล็ก ๆ เพื่อถอดรหัสมัน Rename Field เปลี่ยน field ให้เป็นชื่อที่ตรงกับสิ่งที่มันถืออยู่ตอนนี้ และอัปเดตทุกอย่างที่อ่านหรือเขียนมัน โครงสร้างข้อมูลก็กลับมาบอกความจริงอีกครั้ง
+
+## The smell
+
+smell คือ **ชื่อ field ที่ไม่ตรงกับข้อมูลของมันอีกต่อไป** ชื่อจะเลื่อนไหลไปเมื่อซอฟต์แวร์เติบโต: field ที่เพิ่มมาเพื่อจุดประสงค์หนึ่งถูกนำไปใช้ซ้ำเพื่ออีกจุดประสงค์, คำในโดเมนเปลี่ยนไป หรือชื่อเดิมก็แค่คลุมเครือตั้งแต่แรก คุณจะสังเกตเห็นมันเมื่อชื่อต้องมี comment มาอธิบาย, เมื่อคนใหม่อ่านผิดอยู่เรื่อย ๆ หรือเมื่อชื่อของ field กับการใช้งานจริงค่อย ๆ แยกออกจากกันเงียบ ๆ ชื่อที่ล้าสมัยคือแหล่งของความเข้าใจผิดที่เล็กแต่คงอยู่ตลอด
+
+## Before → After
+
+record ลูกค้าที่มี field ชื่อ `name` แต่ถือคำนำหน้าทางการ หลังจากนั้นมันถูกเปลี่ยนชื่อเป็น `title` พร้อม accessor ที่อัปเดตให้ผู้เรียกอ่านชื่อที่ชัดเจนกว่า
+
+<Tabs syncKey="lang">
+  <TabItem label="TypeScript">
+    ```ts
+    // Before
+    interface Customer {
+      name: string; // actually a formal title like "Dr."
+      email: string;
+    }
+    function greet(c: Customer): string {
+      return `Welcome, ${c.name}`;
+    }
+
+    // After
+    interface Customer {
+      title: string;
+      email: string;
+    }
+    function greet(c: Customer): string {
+      return `Welcome, ${c.title}`;
+    }
+    ```
+  </TabItem>
+  <TabItem label="Python">
+    ```python
+    # Before
+    from dataclasses import dataclass
+
+    @dataclass
+    class Customer:
+        name: str  # actually a formal title like "Dr."
+        email: str
+
+    def greet(c):
+        return f"Welcome, {c.name}"
+
+    # After
+    @dataclass
+    class Customer:
+        title: str
+        email: str
+
+    def greet(c):
+        return f"Welcome, {c.title}"
+    ```
+  </TabItem>
+  <TabItem label="Go">
+    ```go
+    // Before
+    type Customer struct {
+        Name  string // actually a formal title like "Dr."
+        Email string
+    }
+    func Greet(c Customer) string {
+        return "Welcome, " + c.Name
+    }
+
+    // After
+    type Customer struct {
+        Title string
+        Email string
+    }
+    func Greet(c Customer) string {
+        return "Welcome, " + c.Title
+    }
+    ```
+  </TabItem>
+  <TabItem label="Rust">
+    ```rust
+    // Before
+    struct Customer {
+        name: String, // actually a formal title like "Dr."
+        email: String,
+    }
+    fn greet(c: &Customer) -> String {
+        format!("Welcome, {}", c.name)
+    }
+
+    // After
+    struct Customer {
+        title: String,
+        email: String,
+    }
+    fn greet(c: &Customer) -> String {
+        format!("Welcome, {}", c.title)
+    }
+    ```
+  </TabItem>
+</Tabs>
+
+## Mechanics
+
+1. ถ้า record มีขนาดเล็กและอยู่ในความควบคุมของคุณทั้งหมด การ rename-symbol ของ editor สามารถทำงานทั้งหมดในขั้นเดียวที่ปลอดภัย — ใช้มันแล้วรันเทสต์
+2. สำหรับ record ที่ใช้กว้างขวางหรือแชร์ออกไปข้างนอก ให้ทำแบบค่อยเป็นค่อยไป ขั้นแรก ถ้า field ยังไม่ถูก encapsulate ให้ซ่อนมันไว้หลัง getter และ setter เพื่อให้ผู้เรียกพึ่งพา accessor แทน field ดิบ
+3. เปลี่ยนชื่อ field ที่อยู่ข้างใต้ โดยคง accessor ไว้ชื่อเดิมชั่วคราว **รันเทสต์ของคุณ**
+4. เปลี่ยนชื่อ getter และ setter ให้เป็นชื่อใหม่ อัปเดต call site เป็นชุดเล็ก ๆ **รันเทสต์** หลังแต่ละชุด
+5. ถ้า field ถูก serialize (JSON, คอลัมน์ฐานข้อมูล, รูปแบบ wire) ให้คง key ที่เก็บไว้ให้คงที่ด้วย mapping ที่ชัดเจน — หรือ migrate มันอย่างตั้งใจ — เพื่อไม่ให้ข้อมูลที่เก็บไว้หรือบริการอื่นพัง
+6. เมื่อทุกผู้อ่านและผู้เขียนใช้ชื่อใหม่ และ mapping ของ serialisation ลงตัวแล้ว การเปลี่ยนชื่อก็เสร็จสมบูรณ์
+
+## When to use / trade-offs
+
+Rename Field คุ้มที่จะทำทันทีที่ชื่อทำให้อ่านผิด เพราะต้นทุนของชื่อที่สับสนทบเพิ่มขึ้นกับทุกคนที่อ่านมัน มันถูกที่สุดบนโครงสร้างภายในขนาดเล็กที่การ rename ด้วยเครื่องมือทำได้ทันทีและปลอดภัย
+
+อันตรายคือการเอื้อมไปไกล field หนึ่งอาจถูกอ้างถึงไกลเกินไฟล์ของคุณ: ใน payload ที่ serialize, schema ฐานข้อมูล, สัญญา API หรือ repository อื่นที่คุณไม่ได้ควบคุม สำหรับพวกนั้น การ rename แบบมืดบอดจะทำให้ผู้บริโภคพัง ให้แยกชื่อ *ภายใน* ออกจากชื่อ *ภายนอก* — map ชื่อ field ใหม่ไปยัง key ที่ serialize ของเดิม — หรือทำ migration ที่วางแผนไว้ เมื่อไม่แน่ใจว่าใครอ่านข้อมูลนี้ ให้ encapsulate ก่อนแล้วค่อยเปลี่ยนชื่อหลังขอบเขตนั้น
+
+## Related
+
+- [Encapsulate Variable](/refactoring-from-zero-to-hero/th/organizing-data/encapsulate-variable/)
+- [Self-Encapsulate Field](/refactoring-from-zero-to-hero/th/organizing-data/self-encapsulate-field/)
+- [Replace Primitive with Object](/refactoring-from-zero-to-hero/th/organizing-data/replace-primitive-with-object/)
+
+<Callout title="encapsulate ก่อนเมื่อข้อมูลหลุดออกจาก module ของคุณ">
+การ rename ภายในไฟล์เดียวเป็นเรื่องเล็ก การ rename field ที่ถูก serialize หรือแชร์ข้ามบริการไม่ใช่ — มันอาจทำให้ผู้บริโภคที่คุณไม่เคยเห็นพัง วางขอบเขต accessor รอบ field ก่อน เพื่อให้คุณเปลี่ยนชื่อภายในได้อย่างอิสระขณะที่คงสัญญาภายนอกให้คงที่
+</Callout>
+
+export const quizRenameField = [
+  {
+    q: 'Rename Field แก้ปัญหาอะไร?',
+    options: [
+      'field ที่ไม่เคยถูกใช้',
+      'field ที่ชื่อไม่ตรงกับข้อมูลที่มันถืออีกต่อไป',
+      'ฟังก์ชันที่ยาวเกินไป',
+      'database query ที่ซ้ำกัน',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'สำหรับ record ขนาดเล็กที่อยู่ภายในทั้งหมด อะไรคือวิธีที่ปลอดภัยและเร็วที่สุด?',
+    options: [
+      'ทิ้ง comment อธิบายชื่อที่เรียกผิดไว้',
+      'ใช้ rename-symbol ของ editor แล้วรันเทสต์',
+      'เพิ่ม field ที่สองด้วยชื่อใหม่แล้วคัดลอกค่า',
+      'ทำให้ field เป็น public',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'ทำไมการเปลี่ยนชื่อ field ที่ถูก serialize จึงเสี่ยงกว่าการเปลี่ยนชื่อตัวแปร local?',
+    options: [
+      'field ที่ serialize ทำงานช้ากว่า',
+      'ชื่ออาจปรากฏในข้อมูลที่เก็บไว้, สัญญา API หรือบริการอื่นที่การ rename แบบมืดบอดจะทำให้พัง',
+      'serialisation ห้ามการเปลี่ยนชื่อโดยสิ้นเชิง',
+      'มันเปลี่ยนพฤติกรรมของโปรแกรมโดยตั้งใจ',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'อะไรปกป้องผู้บริโภคเมื่อ field ที่หลุดออกจาก module ของคุณต้องถูกเปลี่ยนชื่อ?',
+    options: [
+      'ลบ field เก่าทันที',
+      'encapsulate field ก่อน และ/หรือ map ชื่อใหม่ไปยัง key ที่ serialize ซึ่งคงที่',
+      'เปลี่ยนชื่อในทุก repository พร้อมกันโดยไม่มีแผน',
+      'ข้ามการทำเทสต์',
+    ],
+    answer: 1,
+  },
+];
+
+<Quiz client:visible id="organizing-data/rename-field" questions={quizRenameField} />
+
+<ProgressTracker client:visible id="organizing-data/rename-field" />
