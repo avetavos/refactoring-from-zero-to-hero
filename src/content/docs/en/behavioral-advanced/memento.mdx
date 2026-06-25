@@ -1,0 +1,317 @@
+---
+title: Memento
+description: 'Capture and restore an object''s internal state without exposing its internals, enabling undo.'
+sidebar:
+  order: 4
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+## Intent
+
+Memento captures an object's internal state into a separate token so the state can be restored later, all without revealing how that state is stored. It is the pattern behind undo.
+
+## Problem
+
+A text editor needs an undo command. To restore a previous state, something has to remember what the document looked like before each edit. The obvious approach — let the undo machinery read and write the editor's private fields directly — breaks encapsulation: now the history code depends on the editor's internal layout, and any change to that layout ripples outward.
+
+Memento keeps the snapshot opaque. The object whose state you want to save (the *originator*) produces a memento that captures its state. A *caretaker* holds onto mementos but treats them as sealed boxes; it can hand one back to the originator to restore, but it cannot peek inside. The originator stays in full control of what gets saved and how, so its internals remain private even though its history is recorded.
+
+## Structure
+
+export const mementoUml = `classDiagram
+  class Editor {
+    -content: string
+    +type(text)
+    +save() Memento
+    +restore(m Memento)
+  }
+  class Memento {
+    -state: string
+    +getState() string
+  }
+  class History {
+    -snapshots: List~Memento~
+    +push(m Memento)
+    +pop() Memento
+  }
+  Editor ..> Memento : creates
+  History o-- Memento : stores
+  Editor ..> History : uses`;
+
+<Mermaid code={mementoUml} title="The originator creates mementos; the caretaker stores them without inspecting them" />
+
+- **Editor (Originator)** — the object whose state matters. It creates a memento capturing its current state and can restore itself from one.
+- **Memento** — the opaque snapshot. Only the originator understands its contents; everyone else treats it as a black box.
+- **History (Caretaker)** — keeps a stack of mementos and decides when to save and when to roll back, without reading the snapshots.
+
+## Example
+
+A tiny editor with undo. Each save pushes a snapshot onto a history stack; undo pops the last snapshot and restores it.
+
+<Tabs syncKey="lang">
+  <TabItem label="TypeScript">
+    ```ts
+    class Memento {
+      constructor(readonly state: string) {}
+    }
+
+    class Editor {
+      private content = '';
+
+      type(text: string): void {
+        this.content += text;
+      }
+
+      read(): string {
+        return this.content;
+      }
+
+      save(): Memento {
+        return new Memento(this.content);
+      }
+
+      restore(m: Memento): void {
+        this.content = m.state;
+      }
+    }
+
+    class History {
+      private snapshots: Memento[] = [];
+      push(m: Memento): void {
+        this.snapshots.push(m);
+      }
+      pop(): Memento | undefined {
+        return this.snapshots.pop();
+      }
+    }
+
+    const editor = new Editor();
+    const history = new History();
+
+    editor.type('hello ');
+    history.push(editor.save());
+    editor.type('world');
+    console.log(editor.read()); // hello world
+
+    const snapshot = history.pop();
+    if (snapshot) editor.restore(snapshot);
+    console.log(editor.read()); // hello
+    ```
+  </TabItem>
+  <TabItem label="Python">
+    ```python
+    from __future__ import annotations
+    from dataclasses import dataclass
+
+
+    @dataclass(frozen=True)
+    class Memento:
+        state: str
+
+
+    class Editor:
+        def __init__(self) -> None:
+            self._content = ""
+
+        def type(self, text: str) -> None:
+            self._content += text
+
+        def read(self) -> str:
+            return self._content
+
+        def save(self) -> Memento:
+            return Memento(self._content)
+
+        def restore(self, m: Memento) -> None:
+            self._content = m.state
+
+
+    class History:
+        def __init__(self) -> None:
+            self._snapshots: list[Memento] = []
+
+        def push(self, m: Memento) -> None:
+            self._snapshots.append(m)
+
+        def pop(self) -> Memento | None:
+            return self._snapshots.pop() if self._snapshots else None
+
+
+    editor = Editor()
+    history = History()
+
+    editor.type("hello ")
+    history.push(editor.save())
+    editor.type("world")
+    print(editor.read())  # hello world
+
+    snapshot = history.pop()
+    if snapshot:
+        editor.restore(snapshot)
+    print(editor.read())  # hello
+    ```
+  </TabItem>
+  <TabItem label="Go">
+    ```go
+    package main
+
+    import "fmt"
+
+    // Memento is an opaque snapshot of the editor's state.
+    type Memento struct {
+        state string
+    }
+
+    type Editor struct {
+        content string
+    }
+
+    func (e *Editor) Type(text string) {
+        e.content += text
+    }
+
+    func (e *Editor) Read() string {
+        return e.content
+    }
+
+    func (e *Editor) Save() Memento {
+        return Memento{state: e.content}
+    }
+
+    func (e *Editor) Restore(m Memento) {
+        e.content = m.state
+    }
+
+    type History struct {
+        snapshots []Memento
+    }
+
+    func (h *History) Push(m Memento) {
+        h.snapshots = append(h.snapshots, m)
+    }
+
+    func (h *History) Pop() (Memento, bool) {
+        if len(h.snapshots) == 0 {
+            return Memento{}, false
+        }
+        last := h.snapshots[len(h.snapshots)-1]
+        h.snapshots = h.snapshots[:len(h.snapshots)-1]
+        return last, true
+    }
+
+    func main() {
+        editor := &Editor{}
+        history := &History{}
+
+        editor.Type("hello ")
+        history.Push(editor.Save())
+        editor.Type("world")
+        fmt.Println(editor.Read()) // hello world
+
+        if snapshot, ok := history.Pop(); ok {
+            editor.Restore(snapshot)
+        }
+        fmt.Println(editor.Read()) // hello
+    }
+    ```
+  </TabItem>
+  <TabItem label="Rust">
+    ```rust
+    // The memento is a plain value; only the editor knows what it means.
+    #[derive(Clone)]
+    struct Memento {
+        state: String,
+    }
+
+    struct Editor {
+        content: String,
+    }
+
+    impl Editor {
+        fn new() -> Self {
+            Editor { content: String::new() }
+        }
+
+        fn type_text(&mut self, text: &str) {
+            self.content.push_str(text);
+        }
+
+        fn save(&self) -> Memento {
+            Memento { state: self.content.clone() }
+        }
+
+        fn restore(&mut self, m: Memento) {
+            self.content = m.state;
+        }
+    }
+
+    fn main() {
+        let mut editor = Editor::new();
+        let mut history: Vec<Memento> = Vec::new();
+
+        editor.type_text("hello ");
+        history.push(editor.save());
+        editor.type_text("world");
+        println!("{}", editor.content); // hello world
+
+        if let Some(snapshot) = history.pop() {
+            editor.restore(snapshot);
+        }
+        println!("{}", editor.content); // hello
+    }
+    ```
+  </TabItem>
+</Tabs>
+
+## When to use / trade-offs
+
+- **Pro:** enables undo, rollback, and checkpoints without exposing the originator's internal fields.
+- **Pro:** the originator keeps full control over what is saved, so encapsulation stays intact.
+- **Con:** storing many full snapshots can be expensive in memory; large states may need diffing or limits.
+- **Con:** the caretaker must manage the lifetime of mementos, and stale snapshots can pile up if never discarded.
+
+## Related patterns
+
+- [Command](/design-patterns-from-zero-to-hero/en/behavioral-essentials/) and Memento are natural partners for undo: a command can keep a memento of the state it changed and restore it when reversed.
+- [Iterator](/design-patterns-from-zero-to-hero/en/behavioral-essentials/) can use a memento to capture its position when traversal state must survive outside the iterator.
+
+<Callout title="Keep the snapshot opaque">
+The whole value of Memento is that the caretaker cannot read or alter the snapshot. If the history code starts inspecting the saved state, you have reintroduced the coupling the pattern exists to remove. Let only the originator interpret a memento.
+</Callout>
+
+export const quiz = [
+  {
+    q: 'What does the Memento pattern protect while saving state?',
+    options: [
+      'The speed of the program',
+      'The encapsulation of the originator’s internal state',
+      'The order of method calls',
+      'The number of object instances',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'What is the role of the caretaker?',
+    options: [
+      'It reads and modifies the saved state directly',
+      'It stores mementos without inspecting their contents',
+      'It creates the originator',
+      'It defines the originator’s interface',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'Which pattern most commonly pairs with Memento to implement undo?',
+    options: ['Singleton', 'Command', 'Adapter', 'Flyweight'],
+    answer: 1,
+  },
+];
+
+<Quiz client:visible id="behavioral-advanced/memento" questions={quiz} />
+
+<ProgressTracker client:visible id="behavioral-advanced/memento" />

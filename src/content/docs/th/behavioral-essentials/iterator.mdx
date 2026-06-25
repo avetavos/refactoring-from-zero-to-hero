@@ -1,0 +1,246 @@
+---
+title: Iterator
+description: 'ให้การเข้าถึงสมาชิกของคอลเล็กชันตามลำดับโดยไม่เปิดเผยว่าคอลเล็กชันเก็บข้อมูลไว้อย่างไร'
+sidebar:
+  order: 7
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+## Intent
+
+Iterator ให้วิธีเข้าถึงสมาชิกของคอลเล็กชันทีละตัวตามลำดับ โดยไม่เปิดเผยการแทนค่าภายในของคอลเล็กชัน ตรรกะการท่องผ่าน คือเราอยู่ที่ไหนและจะก้าวไปอย่างไร อยู่ในอ็อบเจ็กต์ iterator ที่แยกต่างหาก ดังนั้นคอลเล็กชันเดียวกันจึงถูกผู้เรียกต่าง ๆ เดินผ่านได้อย่างเป็นอิสระ
+
+## Problem
+
+คอลเล็กชันจำเป็นต้องถูกวนซ้ำ แต่ทุกคอลเล็กชันเก็บข้อมูลของมันต่างกัน ได้แก่ อาเรย์ linked list ต้นไม้ ring buffer หากผู้เรียกเอื้อมเข้าไปข้างในเพื่อเดินผ่านข้อมูล พวกเขาก็เชื่อมติดกับที่จัดเก็บนั้น และการเปลี่ยนโครงสร้างก็ทำให้ทุกลูปพัง ที่แย่กว่านั้นคือผู้เรียกสองรายที่วนซ้ำพร้อมกันจะสะดุดกันเองหากตำแหน่งถูกเก็บไว้บนตัวคอลเล็กชันเอง
+
+ความผันแปรที่ Iterator แยกออกมาคือ *การท่องผ่าน* มันย้ายเคอร์เซอร์ คือตำแหน่งปัจจุบันและกฎสำหรับการก้าวต่อไป เข้าไปในอ็อบเจ็กต์ของมันเอง ผู้เรียกขอ iterator จากคอลเล็กชันแล้วดึงสมาชิกผ่าน interface ที่เป็นแบบเดียวกัน โดยไม่ใส่ใจการจัดวางที่อยู่เบื้องหลัง เพราะแต่ละ iterator เป็นเจ้าของตำแหน่งของมันเอง หลายตัวจึงท่องคอลเล็กชันเดียวกันได้พร้อมกัน
+
+ปัจจุบันภาษาส่วนใหญ่มี iteration protocol ในตัว คุณจึงแทบไม่ต้องประดิษฐ์ interface คลาสสิกด้วยมือ คุณ implement protocol ของภาษาแทนแล้วได้ `for`-loop, comprehension และ lazy pipeline มาฟรี ๆ
+
+## Structure
+
+export const iteratorUml = `classDiagram
+  class Iterable {
+    <<interface>>
+    +iterator() Iterator
+  }
+  class Iterator {
+    <<interface>>
+    +hasNext() bool
+    +next() T
+  }
+  class NumberRing {
+    -items: List~T~
+    +iterator() Iterator
+  }
+  class RingIterator {
+    -index: int
+    +hasNext() bool
+    +next() T
+  }
+  Iterable <|.. NumberRing
+  Iterator <|.. RingIterator
+  NumberRing ..> RingIterator : creates`;
+
+<Mermaid code={iteratorUml} title="คอลเล็กชันสร้าง Iterator ที่ถือเคอร์เซอร์และก้าวต่อไปอย่างเป็นอิสระ" />
+
+- **Iterator** — interface สำหรับการก้าวผ่านสมาชิก โดยทั่วไปคือ "มีอีกตัวไหม?" และ "ขอตัวถัดไป"
+- **Concrete Iterator** — ถือตำแหน่งปัจจุบันและรู้วิธีก้าวต่อไปบนคอลเล็กชันหนึ่งโดยเฉพาะ
+- **Iterable (Aggregate)** — คอลเล็กชัน มันสร้าง iterator เมื่อมีคำขอและซ่อนที่จัดเก็บของมัน
+- **Client** — ขอ iterator และบริโภคสมาชิกผ่าน interface โดยไม่รับรู้การจัดวาง
+
+## Example
+
+คอลเล็กชันแบบกำหนดเองขนาดเล็กที่ส่งสมาชิกออกมาตามลำดับ แต่ละภาษา implement iteration protocol *ดั้งเดิม* ของมัน ได้แก่ `Symbol.iterator` และ generator ใน TypeScript, `__iter__` และ generator ใน Python, generator แบบ closure ใน Go และ trait `Iterator` ใน Rust
+
+<Tabs syncKey="lang">
+  <TabItem label="TypeScript">
+    ```ts
+    class NumberBox implements Iterable<number> {
+      private items: number[] = [];
+      add(n: number): void {
+        this.items.push(n);
+      }
+      // A generator is the idiomatic way to implement Symbol.iterator.
+      *[Symbol.iterator](): Iterator<number> {
+        for (const n of this.items) {
+          yield n;
+        }
+      }
+    }
+
+    const box = new NumberBox();
+    box.add(1);
+    box.add(2);
+    box.add(3);
+    for (const n of box) {
+      console.log(n); // 1, 2, 3
+    }
+    console.log([...box]); // [1, 2, 3] — spread uses the same protocol
+    ```
+  </TabItem>
+  <TabItem label="Python">
+    ```python
+    from collections.abc import Iterator
+
+
+    class NumberBox:
+        def __init__(self) -> None:
+            self._items: list[int] = []
+
+        def add(self, n: int) -> None:
+            self._items.append(n)
+
+        # A generator function makes __iter__ trivial and lazy.
+        def __iter__(self) -> Iterator[int]:
+            for n in self._items:
+                yield n
+
+
+    box = NumberBox()
+    box.add(1)
+    box.add(2)
+    box.add(3)
+    for n in box:
+        print(n)  # 1, 2, 3
+    print(list(box))  # [1, 2, 3]
+    ```
+  </TabItem>
+  <TabItem label="Go">
+    ```go
+    package main
+
+    import "fmt"
+
+    type NumberBox struct{ items []int }
+
+    func (b *NumberBox) Add(n int) { b.items = append(b.items, n) }
+
+    // Iterator returns a closure that yields the next element and a flag.
+    // (Go 1.23+ range-over-func is another idiomatic option.)
+    func (b *NumberBox) Iterator() func() (int, bool) {
+        i := 0
+        return func() (int, bool) {
+            if i >= len(b.items) {
+                return 0, false
+            }
+            v := b.items[i]
+            i++
+            return v, true
+        }
+    }
+
+    func main() {
+        box := &NumberBox{}
+        box.Add(1)
+        box.Add(2)
+        box.Add(3)
+        next := box.Iterator()
+        for v, ok := next(); ok; v, ok = next() {
+            fmt.Println(v) // 1, 2, 3
+        }
+    }
+    ```
+  </TabItem>
+  <TabItem label="Rust">
+    ```rust
+    struct NumberBox {
+        items: Vec<i32>,
+    }
+    impl NumberBox {
+        fn new() -> Self {
+            NumberBox { items: Vec::new() }
+        }
+        fn add(&mut self, n: i32) {
+            self.items.push(n);
+        }
+        // Borrow the items and lean on the standard Iterator trait.
+        fn iter(&self) -> impl Iterator<Item = &i32> {
+            self.items.iter()
+        }
+    }
+
+    fn main() {
+        let mut box_ = NumberBox::new();
+        box_.add(1);
+        box_.add(2);
+        box_.add(3);
+        for n in box_.iter() {
+            println!("{}", n); // 1, 2, 3
+        }
+        let collected: Vec<i32> = box_.iter().copied().collect();
+        println!("{:?}", collected); // [1, 2, 3]
+    }
+    ```
+  </TabItem>
+</Tabs>
+
+## When to use / trade-offs
+
+- **ข้อดี:** ผู้เรียกท่องคอลเล็กชันได้โดยไม่ต้องรู้หรือพึ่งพาที่จัดเก็บภายในของมัน
+- **ข้อดี:** แต่ละ iterator เป็นเจ้าของตำแหน่งของมันเอง การท่องผ่านหลายครั้งของคอลเล็กชันเดียวจึงอยู่ร่วมกันได้
+- **ข้อดี:** มันรวมการวนซ้ำข้ามโครงสร้างที่ต่างกันมหาศาลไว้หลัง interface เดียว และเข้าคู่กันอย่างเป็นธรรมชาติกับการประเมินผลแบบ lazy ตามต้องการ
+- **ข้อเสีย:** สำหรับอาเรย์ธรรมดา ลูปดัชนีตรง ๆ ง่ายกว่าอ็อบเจ็กต์ iterator เฉพาะกิจ
+- **ข้อเสีย:** การเปลี่ยนแปลงคอลเล็กชันขณะวนซ้ำมันเป็นแหล่งบั๊กคลาสสิก และ iterator ส่วนใหญ่ไม่ทนต่อสิ่งนี้
+
+## Related patterns
+
+- ต้นไม้แบบ [Composite](/design-patterns-from-zero-to-hero/th/structural/composite/) เป็นบ้านตามธรรมชาติของ iterator ซึ่งสามารถแผ่โครงสร้างแบบเรียกซ้ำให้กลายเป็นการเดินเชิงเส้นได้
+- [Template Method](/design-patterns-from-zero-to-hero/th/behavioral-essentials/template-method/) มักขับเคลื่อนการท่องผ่าน composite โดย iterator เติมขั้นตอนต่อโหนดเข้าไป
+
+<Callout title="เลือกใช้ protocol ของภาษา">
+interface hasNext/next แบบคลาสสิกนั้นคุ้มค่าที่จะเข้าใจ แต่ในโค้ดประจำวันคุณควร implement iteration protocol ในตัวของภาษา ได้แก่ generator, `__iter__`, range-over-func หรือ trait `Iterator` การทำเช่นนั้นเสียบคอลเล็กชันของคุณเข้ากับทุกลูป comprehension และ lazy combinator ที่ภาษามีให้อยู่แล้ว
+</Callout>
+
+export const quiz = [
+  {
+    q: 'Iterator pattern ให้อะไร?',
+    options: [
+      'instance ที่แชร์ร่วมกันเพียงตัวเดียวของคอลเล็กชัน',
+      'การเข้าถึงสมาชิกตามลำดับโดยไม่เปิดเผยภายในของคอลเล็กชัน',
+      'วิธีคัดลอกคอลเล็กชัน',
+      'โครงร่างอัลกอริทึมที่ตรึงไว้พร้อมขั้นตอนที่ override ได้',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'ทำไม iterator หลายตัวจึงท่องคอลเล็กชันเดียวพร้อมกันได้?',
+    options: [
+      'เพราะคอลเล็กชันเก็บเคอร์เซอร์ที่แชร์ร่วมกันเพียงตัวเดียว',
+      'เพราะอ็อบเจ็กต์ iterator แต่ละตัวถือตำแหน่งของมันเอง',
+      'เพราะการวนซ้ำเป็นแบบเธรดเดียวเสมอ',
+      'เพราะคอลเล็กชันถูกคัดลอกสำหรับแต่ละลูป',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'วิธีที่เป็นสำนวนในการ implement การวนซ้ำในภาษาสมัยใหม่คืออะไร?',
+    options: [
+      'เขียนคลาส hasNext/next ด้วยมือเสมอ',
+      'implement protocol ของภาษา ได้แก่ generator, __iter__ หรือ trait Iterator',
+      'เปิดเผยอาเรย์ที่อยู่เบื้องหลังโดยตรง',
+      'ทำให้คอลเล็กชันเป็น singleton',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'บั๊กที่พบบ่อยเมื่อใช้ iterator คืออะไร?',
+    options: [
+      'การอ่านสมาชิกตามลำดับ',
+      'การเปลี่ยนแปลงคอลเล็กชันขณะวนซ้ำมัน',
+      'การสร้าง iterator สองตัวบนคอลเล็กชันเดียว',
+      'การใช้ for-loop',
+    ],
+    answer: 1,
+  },
+];
+
+<Quiz client:visible id="behavioral-essentials/iterator" questions={quiz} />
+
+<ProgressTracker client:visible id="behavioral-essentials/iterator" />

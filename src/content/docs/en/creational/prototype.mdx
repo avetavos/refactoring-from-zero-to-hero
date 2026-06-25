@@ -1,0 +1,209 @@
+---
+title: Prototype
+description: 'Create new objects by cloning an existing one, choosing shallow or deep copies deliberately.'
+sidebar:
+  order: 6
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+## Intent
+
+Prototype creates new objects by copying an existing, fully configured instance — the prototype — rather than constructing one from scratch.
+
+## Problem
+
+Sometimes building an object from its constructor is expensive or awkward: it might require an expensive computation, a lot of configuration, or knowledge the caller does not have. If you already hold an instance that is almost what you want, copying it and tweaking the copy is simpler than rebuilding it. Prototype makes "give me one like this" a first-class operation: the object knows how to clone itself.
+
+The decision that defines Prototype is **shallow versus deep**. A shallow copy duplicates the top-level object but shares its nested references, so mutating a nested field in the copy also changes the original. A deep copy duplicates the whole graph, so the copy is fully independent. Choosing wrong is a classic source of bugs — a "copy" that secretly shares a list with its source will surprise you the first time either side is mutated. Prototype forces you to make that choice on purpose.
+
+## Structure
+
+export const prototypeUml = `classDiagram
+  class Prototype {
+    <<interface>>
+    +clone() Prototype
+  }
+  class Document {
+    +title: string
+    +tags: List
+    +clone() Document
+  }
+  class Client {
+    +duplicate(p) Prototype
+  }
+  Prototype <|.. Document
+  Client ..> Prototype : clones`;
+
+<Mermaid code={prototypeUml} title="A prototype exposes a clone operation the client calls" />
+
+- **Prototype** — the interface declaring a `clone` operation.
+- **Concrete Prototype** (`Document`) — implements `clone` to produce a copy of itself, deciding shallow vs. deep.
+- **Client** — obtains new objects by cloning a prototype instead of calling a constructor.
+
+## Example
+
+A `Document` with a list of tags. We clone it deeply so editing the copy's tags leaves the original untouched.
+
+<Tabs syncKey="lang">
+  <TabItem label="TypeScript">
+    ```ts
+    class Document {
+      constructor(
+        public title: string,
+        public tags: string[],
+      ) {}
+
+      // Deep clone: structuredClone copies the nested array too.
+      clone(): Document {
+        const copy = structuredClone({ title: this.title, tags: this.tags });
+        return new Document(copy.title, copy.tags);
+      }
+    }
+
+    const original = new Document('Report', ['draft', 'q2']);
+    const copy = original.clone();
+    copy.title = 'Report (revised)';
+    copy.tags.push('final');
+
+    console.log(original.title, original.tags); // Report ['draft', 'q2']
+    console.log(copy.title, copy.tags); // Report (revised) ['draft', 'q2', 'final']
+    ```
+  </TabItem>
+  <TabItem label="Python">
+    ```python
+    import copy
+    from dataclasses import dataclass, field
+
+
+    @dataclass
+    class Document:
+        title: str
+        tags: list[str] = field(default_factory=list)
+
+        def clone(self) -> "Document":
+            # deepcopy duplicates the nested list, so copies are independent.
+            return copy.deepcopy(self)
+
+
+    original = Document("Report", ["draft", "q2"])
+    duplicate = original.clone()
+    duplicate.title = "Report (revised)"
+    duplicate.tags.append("final")
+
+    print(original.title, original.tags)    # Report ['draft', 'q2']
+    print(duplicate.title, duplicate.tags)  # Report (revised) ['draft', 'q2', 'final']
+    ```
+  </TabItem>
+  <TabItem label="Go">
+    ```go
+    package main
+
+    import "fmt"
+
+    type Document struct {
+        Title string
+        Tags  []string
+    }
+
+    // Clone returns a deep copy: the tags slice is duplicated, not shared.
+    func (d Document) Clone() Document {
+        tags := make([]string, len(d.Tags))
+        copy(tags, d.Tags)
+        return Document{Title: d.Title, Tags: tags}
+    }
+
+    func main() {
+        original := Document{Title: "Report", Tags: []string{"draft", "q2"}}
+        duplicate := original.Clone()
+        duplicate.Title = "Report (revised)"
+        duplicate.Tags = append(duplicate.Tags, "final")
+
+        fmt.Println(original.Title, original.Tags)   // Report [draft q2]
+        fmt.Println(duplicate.Title, duplicate.Tags) // Report (revised) [draft q2 final]
+    }
+    ```
+  </TabItem>
+  <TabItem label="Rust">
+    ```rust
+    // Deriving Clone gives a deep copy: the Vec<String> is duplicated.
+    #[derive(Clone)]
+    struct Document {
+        title: String,
+        tags: Vec<String>,
+    }
+
+    fn main() {
+        let original = Document {
+            title: "Report".to_string(),
+            tags: vec!["draft".to_string(), "q2".to_string()],
+        };
+
+        let mut duplicate = original.clone();
+        duplicate.title = "Report (revised)".to_string();
+        duplicate.tags.push("final".to_string());
+
+        println!("{} {:?}", original.title, original.tags);   // Report ["draft", "q2"]
+        println!("{} {:?}", duplicate.title, duplicate.tags); // Report (revised) ["draft", "q2", "final"]
+    }
+    ```
+  </TabItem>
+</Tabs>
+
+## When to use / trade-offs
+
+- **Pro:** cheaper than rebuilding when an object is expensive or complicated to construct.
+- **Pro:** the client copies an existing object without depending on its concrete class or constructor arguments.
+- **Pro:** lets you keep a library of preconfigured prototypes and stamp out variations.
+- **Con:** cloning object graphs with cycles or shared resources (open files, sockets) is tricky.
+- **Con:** the shallow-versus-deep distinction is easy to get wrong, producing copies that secretly share state.
+
+## Related patterns
+
+- [Builder](/design-patterns-from-zero-to-hero/en/creational/builder/) constructs an object step by step, while Prototype starts from a ready-made one.
+- [Abstract Factory](/design-patterns-from-zero-to-hero/en/creational/abstract-factory/) can store and return prototypes instead of constructing each product fresh.
+
+<Callout title="Shallow vs. deep — decide on purpose">
+The whole point of Prototype is controlling what gets duplicated. A shallow copy shares nested references with the original; a deep copy is fully independent. The examples above all clone deeply so editing a copy never touches the source — confirm which one you actually want before shipping.
+</Callout>
+
+export const quiz = [
+  {
+    q: 'How does Prototype create a new object?',
+    options: [
+      'By calling a fresh constructor',
+      'By cloning an existing configured instance',
+      'By looking it up in a Singleton',
+      'By assembling it step by step',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'What is the difference between a shallow and a deep copy?',
+    options: [
+      'Shallow copies are always faster to read',
+      'A shallow copy shares nested references; a deep copy duplicates the whole graph',
+      'A deep copy shares nested references; a shallow copy duplicates everything',
+      'There is no difference for immutable data only',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'Why can a shallow copy cause bugs?',
+    options: [
+      'It uses more memory than a deep copy',
+      'Mutating a nested field in the copy also changes the original',
+      'It cannot be assigned to a variable',
+      'It forces the object to become a Singleton',
+    ],
+    answer: 1,
+  },
+];
+
+<Quiz client:visible id="creational/prototype" questions={quiz} />
+
+<ProgressTracker client:visible id="creational/prototype" />

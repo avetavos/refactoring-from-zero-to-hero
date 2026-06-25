@@ -1,0 +1,318 @@
+---
+title: Visitor
+description: 'Add new operations to a fixed object structure without changing its classes, using double dispatch.'
+sidebar:
+  order: 5
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+## Intent
+
+Visitor lets you define a new operation over a structure of objects without modifying the classes that make up that structure. You package the operation into a visitor and let each element accept it.
+
+## Problem
+
+Suppose you have a hierarchy of shapes — circles, rectangles, and so on — and you keep needing new operations across all of them: compute area, render to SVG, serialize to JSON, estimate paint cost. If each operation lives as a method on every shape class, then adding an operation means editing every class, and the shape classes slowly accumulate unrelated concerns.
+
+Visitor inverts this. The operation moves into its own object — a visitor — with one method per element type. Each element exposes an `accept` method that calls back the matching visitor method, passing itself. This two-step dispatch (the element picks the visitor method, the runtime picks the element type) is *double dispatch*: the executed code depends on both the visitor and the element. Adding a new operation is now just writing a new visitor, with no change to the shapes. The catch is the mirror image — adding a new shape forces a change to every visitor.
+
+## Structure
+
+export const visitorUml = `classDiagram
+  class Shape {
+    <<interface>>
+    +accept(v Visitor) double
+  }
+  class Circle {
+    +radius: double
+    +accept(v Visitor) double
+  }
+  class Rectangle {
+    +width: double
+    +height: double
+    +accept(v Visitor) double
+  }
+  class Visitor {
+    <<interface>>
+    +visitCircle(c Circle) double
+    +visitRectangle(r Rectangle) double
+  }
+  class AreaVisitor {
+    +visitCircle(c Circle) double
+    +visitRectangle(r Rectangle) double
+  }
+  Shape <|.. Circle
+  Shape <|.. Rectangle
+  Visitor <|.. AreaVisitor
+  Circle ..> Visitor : accept
+  Rectangle ..> Visitor : accept`;
+
+<Mermaid code={visitorUml} title="Each element accepts a visitor and dispatches to the method for its own type" />
+
+- **Shape (Element)** — the interface for the structure's members. It declares an `accept` method that takes a visitor.
+- **Circle, Rectangle** — concrete elements. Each `accept` calls back the visitor method specific to its type, passing itself.
+- **Visitor** — the interface declaring one visit method per element type.
+- **AreaVisitor** — a concrete operation. Each visit method implements the operation for one element type.
+
+## Example
+
+A shape hierarchy with an area operation packaged as a visitor. New operations become new visitors; the shapes never change.
+
+<Tabs syncKey="lang">
+  <TabItem label="TypeScript">
+    ```ts
+    interface ShapeVisitor {
+      visitCircle(c: Circle): number;
+      visitRectangle(r: Rectangle): number;
+    }
+
+    interface Shape {
+      accept(v: ShapeVisitor): number;
+    }
+
+    class Circle implements Shape {
+      constructor(readonly radius: number) {}
+      accept(v: ShapeVisitor): number {
+        return v.visitCircle(this);
+      }
+    }
+
+    class Rectangle implements Shape {
+      constructor(readonly width: number, readonly height: number) {}
+      accept(v: ShapeVisitor): number {
+        return v.visitRectangle(this);
+      }
+    }
+
+    class AreaVisitor implements ShapeVisitor {
+      visitCircle(c: Circle): number {
+        return Math.PI * c.radius * c.radius;
+      }
+      visitRectangle(r: Rectangle): number {
+        return r.width * r.height;
+      }
+    }
+
+    const shapes: Shape[] = [new Circle(1), new Rectangle(2, 3)];
+    const area = new AreaVisitor();
+    for (const s of shapes) {
+      console.log(s.accept(area).toFixed(2)); // 3.14, then 6.00
+    }
+    ```
+  </TabItem>
+  <TabItem label="Python">
+    ```python
+    from __future__ import annotations
+    import math
+    from abc import ABC, abstractmethod
+
+
+    class ShapeVisitor(ABC):
+        @abstractmethod
+        def visit_circle(self, c: "Circle") -> float: ...
+
+        @abstractmethod
+        def visit_rectangle(self, r: "Rectangle") -> float: ...
+
+
+    class Shape(ABC):
+        @abstractmethod
+        def accept(self, v: ShapeVisitor) -> float: ...
+
+
+    class Circle(Shape):
+        def __init__(self, radius: float) -> None:
+            self.radius = radius
+
+        def accept(self, v: ShapeVisitor) -> float:
+            return v.visit_circle(self)
+
+
+    class Rectangle(Shape):
+        def __init__(self, width: float, height: float) -> None:
+            self.width = width
+            self.height = height
+
+        def accept(self, v: ShapeVisitor) -> float:
+            return v.visit_rectangle(self)
+
+
+    class AreaVisitor(ShapeVisitor):
+        def visit_circle(self, c: Circle) -> float:
+            return math.pi * c.radius * c.radius
+
+        def visit_rectangle(self, r: Rectangle) -> float:
+            return r.width * r.height
+
+
+    shapes: list[Shape] = [Circle(1), Rectangle(2, 3)]
+    area = AreaVisitor()
+    for s in shapes:
+        print(f"{s.accept(area):.2f}")  # 3.14, then 6.00
+    ```
+  </TabItem>
+  <TabItem label="Go">
+    ```go
+    package main
+
+    import (
+        "fmt"
+        "math"
+    )
+
+    // Visitor declares one method per concrete element type.
+    type Visitor interface {
+        VisitCircle(c Circle) float64
+        VisitRectangle(r Rectangle) float64
+    }
+
+    type Shape interface {
+        Accept(v Visitor) float64
+    }
+
+    type Circle struct{ Radius float64 }
+
+    func (c Circle) Accept(v Visitor) float64 {
+        return v.VisitCircle(c)
+    }
+
+    type Rectangle struct{ Width, Height float64 }
+
+    func (r Rectangle) Accept(v Visitor) float64 {
+        return v.VisitRectangle(r)
+    }
+
+    type AreaVisitor struct{}
+
+    func (AreaVisitor) VisitCircle(c Circle) float64 {
+        return math.Pi * c.Radius * c.Radius
+    }
+
+    func (AreaVisitor) VisitRectangle(r Rectangle) float64 {
+        return r.Width * r.Height
+    }
+
+    func main() {
+        shapes := []Shape{Circle{Radius: 1}, Rectangle{Width: 2, Height: 3}}
+        area := AreaVisitor{}
+        for _, s := range shapes {
+            fmt.Printf("%.2f\n", s.Accept(area)) // 3.14, then 6.00
+        }
+    }
+    ```
+  </TabItem>
+  <TabItem label="Rust">
+    ```rust
+    use std::f64::consts::PI;
+
+    // Visitor has one method per element variant.
+    trait Visitor {
+        fn visit_circle(&self, c: &Circle) -> f64;
+        fn visit_rectangle(&self, r: &Rectangle) -> f64;
+    }
+
+    trait Shape {
+        fn accept(&self, v: &dyn Visitor) -> f64;
+    }
+
+    struct Circle {
+        radius: f64,
+    }
+    impl Shape for Circle {
+        fn accept(&self, v: &dyn Visitor) -> f64 {
+            v.visit_circle(self)
+        }
+    }
+
+    struct Rectangle {
+        width: f64,
+        height: f64,
+    }
+    impl Shape for Rectangle {
+        fn accept(&self, v: &dyn Visitor) -> f64 {
+            v.visit_rectangle(self)
+        }
+    }
+
+    struct AreaVisitor;
+    impl Visitor for AreaVisitor {
+        fn visit_circle(&self, c: &Circle) -> f64 {
+            PI * c.radius * c.radius
+        }
+        fn visit_rectangle(&self, r: &Rectangle) -> f64 {
+            r.width * r.height
+        }
+    }
+
+    fn main() {
+        let shapes: Vec<Box<dyn Shape>> = vec![
+            Box::new(Circle { radius: 1.0 }),
+            Box::new(Rectangle { width: 2.0, height: 3.0 }),
+        ];
+        let area = AreaVisitor;
+        for s in &shapes {
+            println!("{:.2}", s.accept(&area)); // 3.14, then 6.00
+        }
+    }
+    ```
+  </TabItem>
+</Tabs>
+
+## When to use / trade-offs
+
+- **Pro:** add new operations over a structure by writing a new visitor, with no change to the element classes.
+- **Pro:** related behaviour for one operation lives together in one visitor instead of being smeared across every element.
+- **Con:** adding a new element type forces a change to every visitor — the exact opposite trade-off, so use it only when the set of elements is stable.
+- **Con:** visitors often need access to element internals, which can weaken encapsulation.
+- **Con:** the double-dispatch ceremony (accept plus visit methods) is verbose for small hierarchies.
+
+## Related patterns
+
+- [Composite](/design-patterns-from-zero-to-hero/en/structural/) trees are the canonical structure a visitor walks; a visitor traverses the composite and applies an operation at each node.
+- [Iterator](/design-patterns-from-zero-to-hero/en/behavioral-essentials/) can supply the elements to a visitor, separating *how you traverse* from *what you do* at each element.
+
+<Callout title="Visitor versus adding a method">
+Visitor pays off when operations change often but the element types are stable. If instead you keep adding element types, a plain method on each element is simpler — the pattern would force you to edit every visitor each time. Pick the axis you expect to grow.
+</Callout>
+
+export const quiz = [
+  {
+    q: 'What does the Visitor pattern let you add without changing the element classes?',
+    options: [
+      'New element types',
+      'New operations over the existing structure',
+      'New constructors',
+      'New inheritance roots',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'What is double dispatch in the Visitor pattern?',
+    options: [
+      'Calling a method twice for reliability',
+      'The executed code depends on both the visitor type and the element type',
+      'Dispatching work to two threads',
+      'Sending the request to two handlers',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'What is the chief drawback of Visitor?',
+    options: [
+      'Adding a new operation requires editing every element',
+      'Adding a new element type requires editing every visitor',
+      'It cannot return values',
+      'It forbids the use of interfaces',
+    ],
+    answer: 1,
+  },
+];
+
+<Quiz client:visible id="behavioral-advanced/visitor" questions={quiz} />
+
+<ProgressTracker client:visible id="behavioral-advanced/visitor" />

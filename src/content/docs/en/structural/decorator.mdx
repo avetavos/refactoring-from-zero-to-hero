@@ -1,0 +1,311 @@
+---
+title: Decorator
+description: 'Add responsibilities to an object by wrapping it, layering behaviour without subclassing.'
+sidebar:
+  order: 5
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+## Intent
+
+Decorator attaches additional responsibilities to an object dynamically by wrapping it in another object that shares its interface, giving a flexible alternative to subclassing for extending behaviour.
+
+## Problem
+
+You have a data source that can read and write bytes. Now you want optional features: compress the data, encrypt it, maybe both, in some chosen order. Subclassing every combination — `CompressedSource`, `EncryptedSource`, `CompressedEncryptedSource`, `EncryptedCompressedSource` — explodes quickly and bakes the choices in at compile time. You cannot turn a feature on for one object and off for another at runtime.
+
+Decorator solves this by composition. Each feature is a wrapper that implements the same interface as the thing it wraps, holds a reference to an inner object, adds its own behaviour, and then forwards to the inner one. Because a decorator *is* the interface, you can stack them: encryption around compression around the raw source. Each layer does its bit and passes the rest along. You assemble the exact behaviour you want at runtime, per object, with no new subclasses.
+
+## Contrast with inheritance
+
+Inheritance fixes the added behaviour at compile time and applies it to every instance of the subclass; you cannot mix and match per object or change the stack later. Decorator moves that choice to runtime: the same base object can be wrapped with different combinations of decorators, in different orders, and you can add a new decorator without touching the base class or any existing wrapper. The cost is more small objects and the indirection of forwarding calls through each layer.
+
+## Structure
+
+export const decoratorUml = `classDiagram
+  class DataSource {
+    <<interface>>
+    +write(data) string
+    +read() string
+  }
+  class FileSource {
+    +write(data) string
+    +read() string
+  }
+  class SourceDecorator {
+    <<abstract>>
+    #wrappee: DataSource
+    +write(data) string
+    +read() string
+  }
+  class CompressionDecorator
+  class EncryptionDecorator
+  DataSource <|.. FileSource
+  DataSource <|.. SourceDecorator
+  SourceDecorator <|-- CompressionDecorator
+  SourceDecorator <|-- EncryptionDecorator
+  SourceDecorator o--> DataSource : wraps`;
+
+<Mermaid code={decoratorUml} title="Decorators share the component interface and wrap an inner component" />
+
+- **Component** (`DataSource`) — the interface shared by raw objects and decorators alike.
+- **Concrete Component** (`FileSource`) — the base object whose behaviour gets extended.
+- **Decorator** (`SourceDecorator`) — an abstract wrapper that holds a component and forwards to it by default.
+- **Concrete Decorator** (`CompressionDecorator`, `EncryptionDecorator`) — adds behaviour before or after delegating to the wrapped component.
+
+## Example
+
+A data source is wrapped with compression and then encryption. On `write`, each layer transforms the data on the way in; on `read`, the layers reverse it on the way out.
+
+<Tabs syncKey="lang">
+  <TabItem label="TypeScript">
+    ```ts
+    interface DataSource {
+      write(data: string): string;
+      read(stored: string): string;
+    }
+
+    class FileSource implements DataSource {
+      write = (data: string) => data;
+      read = (stored: string) => stored;
+    }
+
+    class CompressionDecorator implements DataSource {
+      constructor(private readonly inner: DataSource) {}
+      write = (data: string) => this.inner.write(`zip(${data})`);
+      read = (stored: string) => this.inner.read(stored).replace(/^zip\((.*)\)$/, '$1');
+    }
+
+    class EncryptionDecorator implements DataSource {
+      constructor(private readonly inner: DataSource) {}
+      write = (data: string) => this.inner.write(`enc(${data})`);
+      read = (stored: string) => this.inner.read(stored).replace(/^enc\((.*)\)$/, '$1');
+    }
+
+    const source = new EncryptionDecorator(new CompressionDecorator(new FileSource()));
+    const stored = source.write('hello');
+    console.log(stored); // zip(enc(hello))
+    console.log(source.read(stored)); // hello
+    ```
+  </TabItem>
+  <TabItem label="Python">
+    ```python
+    from typing import Protocol
+
+
+    class DataSource(Protocol):
+        def write(self, data: str) -> str: ...
+        def read(self, stored: str) -> str: ...
+
+
+    class FileSource:
+        def write(self, data: str) -> str:
+            return data
+
+        def read(self, stored: str) -> str:
+            return stored
+
+
+    class CompressionDecorator:
+        def __init__(self, inner: DataSource) -> None:
+            self._inner = inner
+
+        def write(self, data: str) -> str:
+            return self._inner.write(f"zip({data})")
+
+        def read(self, stored: str) -> str:
+            out = self._inner.read(stored)
+            return out[4:-1] if out.startswith("zip(") else out
+
+
+    class EncryptionDecorator:
+        def __init__(self, inner: DataSource) -> None:
+            self._inner = inner
+
+        def write(self, data: str) -> str:
+            return self._inner.write(f"enc({data})")
+
+        def read(self, stored: str) -> str:
+            out = self._inner.read(stored)
+            return out[4:-1] if out.startswith("enc(") else out
+
+
+    source = EncryptionDecorator(CompressionDecorator(FileSource()))
+    stored = source.write("hello")
+    print(stored)  # zip(enc(hello))
+    print(source.read(stored))  # hello
+    ```
+  </TabItem>
+  <TabItem label="Go">
+    ```go
+    package main
+
+    import (
+        "fmt"
+        "strings"
+    )
+
+    type DataSource interface {
+        Write(data string) string
+        Read(stored string) string
+    }
+
+    type FileSource struct{}
+
+    func (FileSource) Write(data string) string   { return data }
+    func (FileSource) Read(stored string) string  { return stored }
+
+    type CompressionDecorator struct{ inner DataSource }
+
+    func (c CompressionDecorator) Write(data string) string {
+        return c.inner.Write("zip(" + data + ")")
+    }
+    func (c CompressionDecorator) Read(stored string) string {
+        out := c.inner.Read(stored)
+        return strings.TrimSuffix(strings.TrimPrefix(out, "zip("), ")")
+    }
+
+    type EncryptionDecorator struct{ inner DataSource }
+
+    func (e EncryptionDecorator) Write(data string) string {
+        return e.inner.Write("enc(" + data + ")")
+    }
+    func (e EncryptionDecorator) Read(stored string) string {
+        out := e.inner.Read(stored)
+        return strings.TrimSuffix(strings.TrimPrefix(out, "enc("), ")")
+    }
+
+    func main() {
+        var source DataSource = EncryptionDecorator{CompressionDecorator{FileSource{}}}
+        stored := source.Write("hello")
+        fmt.Println(stored)            // zip(enc(hello))
+        fmt.Println(source.Read(stored)) // hello
+    }
+    ```
+  </TabItem>
+  <TabItem label="Rust">
+    ```rust
+    trait DataSource {
+        fn write(&self, data: &str) -> String;
+        fn read(&self, stored: &str) -> String;
+    }
+
+    struct FileSource;
+    impl DataSource for FileSource {
+        fn write(&self, data: &str) -> String {
+            data.to_string()
+        }
+        fn read(&self, stored: &str) -> String {
+            stored.to_string()
+        }
+    }
+
+    struct CompressionDecorator {
+        inner: Box<dyn DataSource>,
+    }
+    impl DataSource for CompressionDecorator {
+        fn write(&self, data: &str) -> String {
+            self.inner.write(&format!("zip({data})"))
+        }
+        fn read(&self, stored: &str) -> String {
+            let out = self.inner.read(stored);
+            out.strip_prefix("zip(").and_then(|s| s.strip_suffix(")"))
+                .map(str::to_string).unwrap_or(out)
+        }
+    }
+
+    struct EncryptionDecorator {
+        inner: Box<dyn DataSource>,
+    }
+    impl DataSource for EncryptionDecorator {
+        fn write(&self, data: &str) -> String {
+            self.inner.write(&format!("enc({data})"))
+        }
+        fn read(&self, stored: &str) -> String {
+            let out = self.inner.read(stored);
+            out.strip_prefix("enc(").and_then(|s| s.strip_suffix(")"))
+                .map(str::to_string).unwrap_or(out)
+        }
+    }
+
+    fn main() {
+        let source = EncryptionDecorator {
+            inner: Box::new(CompressionDecorator { inner: Box::new(FileSource) }),
+        };
+        let stored = source.write("hello");
+        println!("{stored}");                // zip(enc(hello))
+        println!("{}", source.read(&stored)); // hello
+    }
+    ```
+  </TabItem>
+</Tabs>
+
+## When to use / trade-offs
+
+- **Pro:** add or remove responsibilities at runtime, per object, without touching the base class.
+- **Pro:** avoids the subclass explosion of every feature combination.
+- **Pro:** each decorator is a small, single-purpose, independently testable unit.
+- **Con:** a deep stack of tiny wrappers is hard to debug and step through.
+- **Con:** order matters — encryption-then-compression differs from compression-then-encryption — and the wiring is easy to get wrong.
+
+## Related patterns
+
+- [Adapter](/design-patterns-from-zero-to-hero/en/structural/adapter/) wraps to change an interface; Decorator wraps while keeping the same interface and adding behaviour.
+- [Composite](/design-patterns-from-zero-to-hero/en/structural/composite/) shares the recursive-wrapping idea but aggregates many children rather than enhancing one.
+- [Proxy](/design-patterns-from-zero-to-hero/en/structural/proxy/) also wraps an object with the same interface, but to *control access* rather than to add features.
+
+<Callout title="Same interface, different intent">
+Decorator and Proxy look identical on a class diagram: both wrap an object behind its own interface. The difference is purpose. A decorator enriches the result; a proxy decides whether, when, or for whom the underlying call even happens.
+</Callout>
+
+export const quiz = [
+  {
+    q: 'How does a Decorator add behaviour to an object?',
+    options: [
+      'By subclassing it at compile time',
+      'By wrapping it in another object that shares its interface',
+      'By copying it and editing the copy',
+      'By registering a global hook',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'What advantage does Decorator have over inheritance here?',
+    options: [
+      'It runs faster than method calls',
+      'You can combine behaviours per object at runtime without new subclasses',
+      'It guarantees a single instance',
+      'It removes the need for an interface',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'What does a decorator hold a reference to?',
+    options: [
+      'A list of all instances ever created',
+      'The inner component it wraps and forwards calls to',
+      'A factory that builds it',
+      'A shared static singleton',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'What distinguishes Decorator from Proxy despite the similar shape?',
+    options: [
+      'Decorator changes the interface; Proxy does not',
+      'Decorator adds behaviour; Proxy controls access to the underlying object',
+      'Proxy can only wrap subsystems',
+      'They are the same pattern',
+    ],
+    answer: 1,
+  },
+];
+
+<Quiz client:visible id="structural/decorator" questions={quiz} />
+
+<ProgressTracker client:visible id="structural/decorator" />

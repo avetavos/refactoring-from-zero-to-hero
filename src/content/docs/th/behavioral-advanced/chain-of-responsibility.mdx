@@ -1,0 +1,305 @@
+---
+title: Chain of Responsibility
+description: 'ส่ง request ไปตามแถวของ handler ที่เรียงลำดับไว้ จนกระทั่งมีตัวใดตัวหนึ่งจัดการมัน'
+sidebar:
+  order: 2
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+## Intent
+
+Chain of Responsibility ให้คุณส่ง request ผ่านลำดับของ handler แต่ละ handler จะจัดการ request เองหรือส่งต่อไปยังตัวถัดไป ดังนั้นผู้ส่งจึงไม่จำเป็นต้องรู้เลยว่า handler ตัวใดจะเป็นผู้ลงมือทำงานในที่สุด
+
+## Problem
+
+ลองนึกถึงการตรวจสอบ request ที่เข้ามาก่อนที่แอปพลิเคชันของคุณจะลงมือทำงานกับมัน คุณอาจตรวจว่าฟิลด์ที่จำเป็นมีครบ, payload ไม่ใหญ่เกินไป, ผู้เรียกได้รับการยืนยันตัวตน, และมีสิทธิ์เพียงพอ การยัดทั้งหมดนั้นไว้ในฟังก์ชันยักษ์เพียงตัวเดียวจะกลายเป็นเงื่อนไขซ้อนกันที่พันกันยุ่ง และการสลับลำดับหรือลบการตรวจสอบสักข้อหมายถึงการผ่าตัดบล็อกเดียวนั้น
+
+Chain of Responsibility เปลี่ยนการตรวจสอบแต่ละข้อให้กลายเป็น handler เล็ก ๆ ของตัวเองที่มีความรับผิดชอบเดียว handler ถูกเชื่อมต่อกันตามลำดับ request เข้าสู่หัวแถวของ chain และเดินทางไปตามนั้นจนกว่ามี handler ปฏิเสธมัน หรือมันหลุดออกจากปลายแถวหลังผ่านการตรวจสอบทุกข้อแล้ว การเพิ่ม, ลบ, หรือสลับลำดับการตรวจสอบจึงกลายเป็นเรื่องของการเชื่อม handler ใหม่ ไม่ใช่การเขียนตรรกะใหม่ และโค้ดที่ส่ง request เข้ามาก็ยังคงไม่รับรู้เลยว่ามี handler อยู่กี่ตัว
+
+## Structure
+
+export const corUml = `classDiagram
+  class Handler {
+    <<interface>>
+    +setNext(h Handler) Handler
+    +handle(request) Result
+  }
+  class BaseHandler {
+    -next Handler
+    +setNext(h Handler) Handler
+    +handle(request) Result
+  }
+  class ConcreteHandlerA {
+    +handle(request) Result
+  }
+  class ConcreteHandlerB {
+    +handle(request) Result
+  }
+  Handler <|.. BaseHandler
+  BaseHandler <|-- ConcreteHandlerA
+  BaseHandler <|-- ConcreteHandlerB
+  BaseHandler --> Handler : next`;
+
+<Mermaid code={corUml} title="แต่ละ handler ถือ reference ไปยังตัวถัดไปและอาจส่งต่อ request" />
+
+- **Handler** — อินเทอร์เฟซที่ทุก link ใช้ร่วมกัน ประกอบด้วยวิธีกำหนด handler ตัวถัดไปและเมท็อดที่ประมวลผล request
+- **BaseHandler** — base ที่ใช้ร่วมกันแบบไม่บังคับ ทำหน้าที่เก็บ link ตัวถัดไปและส่งต่อโดยปริยาย เพื่อให้ concrete handler override เฉพาะส่วนที่ตนสนใจเท่านั้น
+- **ConcreteHandler** — การตรวจสอบหรือขั้นตอนเฉพาะ ทำหน้าที่จัดการ request ให้เสร็จเองหรือมอบหมายไปยัง handler ตัวถัดไปในแถว
+- **Client** — สร้าง chain และส่ง request ไปยังหัวแถว ไม่ใช่ไปยัง handler ตัวใดตัวหนึ่งโดยเฉพาะ
+
+## Example
+
+chain การตรวจสอบเล็ก ๆ สำหรับ request สมัครสมาชิก แต่ละ handler ตรวจสอบ request แล้วรายงานปัญหาหรือส่งมันต่อไปตามแถว ผลลัพธ์ที่ว่างเปล่าหมายความว่าทุก handler อนุมัติมันแล้ว
+
+<Tabs syncKey="lang">
+  <TabItem label="TypeScript">
+    ```ts
+    interface SignUp {
+      email: string;
+      password: string;
+    }
+
+    abstract class Validator {
+      private next: Validator | null = null;
+
+      setNext(next: Validator): Validator {
+        this.next = next;
+        return next;
+      }
+
+      validate(req: SignUp): string | null {
+        const error = this.check(req);
+        if (error !== null) return error;
+        return this.next ? this.next.validate(req) : null;
+      }
+
+      protected abstract check(req: SignUp): string | null;
+    }
+
+    class EmailValidator extends Validator {
+      protected check(req: SignUp): string | null {
+        return req.email.includes('@') ? null : 'email is invalid';
+      }
+    }
+
+    class PasswordValidator extends Validator {
+      protected check(req: SignUp): string | null {
+        return req.password.length >= 8 ? null : 'password too short';
+      }
+    }
+
+    const chain = new EmailValidator();
+    chain.setNext(new PasswordValidator());
+
+    console.log(chain.validate({ email: 'a@b.com', password: 'secret12' })); // null
+    console.log(chain.validate({ email: 'nope', password: 'secret12' })); // email is invalid
+    ```
+  </TabItem>
+  <TabItem label="Python">
+    ```python
+    from __future__ import annotations
+    from abc import ABC, abstractmethod
+    from dataclasses import dataclass
+
+
+    @dataclass
+    class SignUp:
+        email: str
+        password: str
+
+
+    class Validator(ABC):
+        def __init__(self) -> None:
+            self._next: Validator | None = None
+
+        def set_next(self, nxt: "Validator") -> "Validator":
+            self._next = nxt
+            return nxt
+
+        def validate(self, req: SignUp) -> str | None:
+            error = self.check(req)
+            if error is not None:
+                return error
+            return self._next.validate(req) if self._next else None
+
+        @abstractmethod
+        def check(self, req: SignUp) -> str | None: ...
+
+
+    class EmailValidator(Validator):
+        def check(self, req: SignUp) -> str | None:
+            return None if "@" in req.email else "email is invalid"
+
+
+    class PasswordValidator(Validator):
+        def check(self, req: SignUp) -> str | None:
+            return None if len(req.password) >= 8 else "password too short"
+
+
+    chain = EmailValidator()
+    chain.set_next(PasswordValidator())
+
+    print(chain.validate(SignUp("a@b.com", "secret12")))  # None
+    print(chain.validate(SignUp("nope", "secret12")))      # email is invalid
+    ```
+  </TabItem>
+  <TabItem label="Go">
+    ```go
+    package main
+
+    import (
+        "fmt"
+        "strings"
+    )
+
+    type SignUp struct {
+        Email    string
+        Password string
+    }
+
+    // Validator is one link in the chain.
+    type Validator interface {
+        Validate(req SignUp) string
+    }
+
+    type emailValidator struct{ next Validator }
+
+    func (v emailValidator) Validate(req SignUp) string {
+        if !strings.Contains(req.Email, "@") {
+            return "email is invalid"
+        }
+        if v.next != nil {
+            return v.next.Validate(req)
+        }
+        return ""
+    }
+
+    type passwordValidator struct{ next Validator }
+
+    func (v passwordValidator) Validate(req SignUp) string {
+        if len(req.Password) < 8 {
+            return "password too short"
+        }
+        if v.next != nil {
+            return v.next.Validate(req)
+        }
+        return ""
+    }
+
+    func main() {
+        chain := emailValidator{next: passwordValidator{}}
+
+        fmt.Printf("%q\n", chain.Validate(SignUp{"a@b.com", "secret12"})) // ""
+        fmt.Printf("%q\n", chain.Validate(SignUp{"nope", "secret12"}))    // "email is invalid"
+    }
+    ```
+  </TabItem>
+  <TabItem label="Rust">
+    ```rust
+    struct SignUp {
+        email: String,
+        password: String,
+    }
+
+    // Each handler may approve (None) or stop the chain (Some(error)).
+    trait Validator {
+        fn check(&self, req: &SignUp) -> Option<String>;
+    }
+
+    struct EmailValidator;
+    impl Validator for EmailValidator {
+        fn check(&self, req: &SignUp) -> Option<String> {
+            if req.email.contains('@') {
+                None
+            } else {
+                Some("email is invalid".to_string())
+            }
+        }
+    }
+
+    struct PasswordValidator;
+    impl Validator for PasswordValidator {
+        fn check(&self, req: &SignUp) -> Option<String> {
+            if req.password.len() >= 8 {
+                None
+            } else {
+                Some("password too short".to_string())
+            }
+        }
+    }
+
+    fn run(chain: &[Box<dyn Validator>], req: &SignUp) -> Option<String> {
+        chain.iter().find_map(|v| v.check(req))
+    }
+
+    fn main() {
+        let chain: Vec<Box<dyn Validator>> =
+            vec![Box::new(EmailValidator), Box::new(PasswordValidator)];
+
+        let ok = SignUp { email: "a@b.com".into(), password: "secret12".into() };
+        let bad = SignUp { email: "nope".into(), password: "secret12".into() };
+
+        println!("{:?}", run(&chain, &ok));  // None
+        println!("{:?}", run(&chain, &bad)); // Some("email is invalid")
+    }
+    ```
+  </TabItem>
+</Tabs>
+
+## When to use / trade-offs
+
+- **ข้อดี:** แยกผู้ส่ง request ออกจาก handler ตัวที่ลงเอยด้วยการประมวลผลมัน
+- **ข้อดี:** แต่ละ handler มีงานเดียว และคุณสลับลำดับหรือขยายไปป์ไลน์ได้ด้วยการเชื่อมใหม่ ไม่ใช่การเขียนใหม่
+- **ข้อเสีย:** request อาจหลุดออกจากปลายแถวโดยไม่ถูกจัดการ คุณต้องตัดสินใจว่ายอมให้เกิดเหตุการณ์นั้นได้หรือไม่
+- **ข้อเสีย:** การดีบักยากขึ้นเพราะพฤติกรรมกระจายอยู่ทั่ว handler เล็ก ๆ จำนวนมากและขึ้นอยู่กับลำดับของพวกมัน
+
+## Related patterns
+
+- [Command](/design-patterns-from-zero-to-hero/th/behavioral-essentials/) มักเดินทางในฐานะออบเจ็กต์ request ที่ chain ประมวลผล
+- [Composite](/design-patterns-from-zero-to-hero/th/structural/) และ Chain of Responsibility ต่างก็สร้างโครงสร้างแบบเชื่อมโยงกัน แต่ composite เป็นต้นไม้ที่คุณดำเนินการกับมัน ขณะที่ chain เป็นแถวที่ request เดินผ่านไป
+
+<Callout title="การส่งต่อคือหัวใจทั้งหมด">
+ลักษณะเด่นคือ handler สามารถเลือกที่จะ *ไม่* ลงมือและส่ง request ต่อไปได้ หาก handler ของคุณลงมือทำเสมอ คุณก็ไม่มี chain — คุณมีไปป์ไลน์ของการแปลงค่า ซึ่งเรียบง่ายและชัดเจนกว่าหากจะโมเดลมันตรง ๆ
+</Callout>
+
+export const quiz = [
+  {
+    q: 'handler แต่ละตัวใน Chain of Responsibility ตัดสินใจเรื่องอะไร?',
+    options: [
+      'จะรันบนเธรดใด',
+      'จะจัดการ request เองหรือส่งต่อไปยัง handler ตัวถัดไป',
+      'จะสร้าง handler ตัวถัดไปอย่างไร',
+      'รูปแบบการ serialize ของ request',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'ทำไมผู้ส่งจึงแยกขาดจากผู้รับใน pattern นี้?',
+    options: [
+      'ผู้ส่งส่งเข้าหัวแถวของ chain และไม่จำเป็นต้องรู้ว่า handler ตัวใดตอบสนอง',
+      'ผู้ส่งทำงานในโปรเซสแยกต่างหาก',
+      'handler ไร้สถานะเสมอ',
+      'request ถูกเข้ารหัสแบบ end to end',
+    ],
+    answer: 0,
+  },
+  {
+    q: 'อะไรคือความเสี่ยงของการใช้ chain?',
+    options: [
+      'request ถูกจัดการสองครั้งเสมอ',
+      'request อาจไปถึงปลายแถวของ chain โดยไม่ถูกจัดการ',
+      'handler สลับลำดับไม่ได้',
+      'มี handler ได้เพียงตัวเดียวเท่านั้น',
+    ],
+    answer: 1,
+  },
+];
+
+<Quiz client:visible id="behavioral-advanced/chain-of-responsibility" questions={quiz} />
+
+<ProgressTracker client:visible id="behavioral-advanced/chain-of-responsibility" />

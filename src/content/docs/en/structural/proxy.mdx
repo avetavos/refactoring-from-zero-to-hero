@@ -1,0 +1,273 @@
+---
+title: Proxy
+description: 'Put a stand-in in front of an object to control access to it.'
+sidebar:
+  order: 8
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+## Intent
+
+Proxy provides a surrogate or placeholder for another object that shares its interface and controls access to it, so the proxy can decide whether, when, and how the real object is reached.
+
+## Problem
+
+Sometimes you want to use an object, but accessing it directly is expensive, sensitive, or remote. A high-resolution image should not load from disk until something actually displays it. A privileged operation should run only for an authorised caller. A remote service should be reachable through a local stand-in. In each case the real object is fine; what you need is a layer of control around getting to it.
+
+Proxy is that layer. It implements the same interface as the real subject, so clients cannot tell the difference, and holds a reference to (or knows how to obtain) the real object. On each call the proxy can do work first — lazily create the subject, check permissions, cache a result, log the access — and then forward to the real object, or refuse. Because the proxy is interchangeable with the subject, you slip this control in without changing any client code.
+
+## Structure
+
+export const proxyUml = `classDiagram
+  class Image {
+    <<interface>>
+    +display() string
+  }
+  class RealImage {
+    -file: string
+    +display() string
+  }
+  class LazyImageProxy {
+    -file: string
+    -real: RealImage
+    +display() string
+  }
+  class Client
+  Image <|.. RealImage
+  Image <|.. LazyImageProxy
+  LazyImageProxy --> RealImage : creates and forwards on demand
+  Client --> Image : uses`;
+
+<Mermaid code={proxyUml} title="A proxy shares the subject's interface and controls access to the real object" />
+
+- **Subject** (`Image`) — the interface shared by the real object and its proxy, so they are interchangeable.
+- **Real Subject** (`RealImage`) — the actual object that does the work and is expensive or sensitive to reach.
+- **Proxy** (`LazyImageProxy`) — implements the subject interface, controls access, and forwards to the real subject when appropriate.
+- **Client** — talks to the subject interface and is unaware whether it holds a proxy or the real object.
+
+## Example
+
+A virtual proxy that delays loading a heavy image until the first `display` call, then caches the loaded object for reuse.
+
+<Tabs syncKey="lang">
+  <TabItem label="TypeScript">
+    ```ts
+    interface Image {
+      display(): string;
+    }
+
+    class RealImage implements Image {
+      constructor(private readonly file: string) {
+        // Pretend this reads a large file from disk.
+        console.log(`loading ${file}`);
+      }
+      display = () => `showing ${this.file}`;
+    }
+
+    class LazyImageProxy implements Image {
+      private real: RealImage | null = null;
+      constructor(private readonly file: string) {}
+      display(): string {
+        if (this.real === null) {
+          this.real = new RealImage(this.file); // load only on first use
+        }
+        return this.real.display();
+      }
+    }
+
+    const image: Image = new LazyImageProxy('photo.png'); // nothing loaded yet
+    console.log(image.display()); // loading photo.png \n showing photo.png
+    console.log(image.display()); // showing photo.png (cached, no reload)
+    ```
+  </TabItem>
+  <TabItem label="Python">
+    ```python
+    from typing import Optional, Protocol
+
+
+    class Image(Protocol):
+        def display(self) -> str: ...
+
+
+    class RealImage:
+        def __init__(self, file: str) -> None:
+            print(f"loading {file}")  # pretend to read a large file
+            self._file = file
+
+        def display(self) -> str:
+            return f"showing {self._file}"
+
+
+    class LazyImageProxy:
+        def __init__(self, file: str) -> None:
+            self._file = file
+            self._real: Optional[RealImage] = None
+
+        def display(self) -> str:
+            if self._real is None:
+                self._real = RealImage(self._file)  # load only on first use
+            return self._real.display()
+
+
+    image: Image = LazyImageProxy("photo.png")  # nothing loaded yet
+    print(image.display())  # loading photo.png \n showing photo.png
+    print(image.display())  # showing photo.png (cached, no reload)
+    ```
+  </TabItem>
+  <TabItem label="Go">
+    ```go
+    package main
+
+    import "fmt"
+
+    type Image interface {
+        Display() string
+    }
+
+    type RealImage struct{ file string }
+
+    func NewRealImage(file string) *RealImage {
+        fmt.Printf("loading %s\n", file) // pretend to read a large file
+        return &RealImage{file: file}
+    }
+
+    func (r *RealImage) Display() string { return "showing " + r.file }
+
+    type LazyImageProxy struct {
+        file string
+        real *RealImage
+    }
+
+    func (p *LazyImageProxy) Display() string {
+        if p.real == nil {
+            p.real = NewRealImage(p.file) // load only on first use
+        }
+        return p.real.Display()
+    }
+
+    func main() {
+        var image Image = &LazyImageProxy{file: "photo.png"} // nothing loaded yet
+        fmt.Println(image.Display()) // loading photo.png + showing photo.png
+        fmt.Println(image.Display()) // showing photo.png (cached)
+    }
+    ```
+  </TabItem>
+  <TabItem label="Rust">
+    ```rust
+    trait Image {
+        fn display(&mut self) -> String;
+    }
+
+    struct RealImage {
+        file: String,
+    }
+
+    impl RealImage {
+        fn new(file: &str) -> Self {
+            println!("loading {file}"); // pretend to read a large file
+            RealImage { file: file.to_string() }
+        }
+    }
+
+    impl Image for RealImage {
+        fn display(&mut self) -> String {
+            format!("showing {}", self.file)
+        }
+    }
+
+    struct LazyImageProxy {
+        file: String,
+        real: Option<RealImage>,
+    }
+
+    impl Image for LazyImageProxy {
+        fn display(&mut self) -> String {
+            if self.real.is_none() {
+                self.real = Some(RealImage::new(&self.file)); // load on first use
+            }
+            self.real.as_mut().unwrap().display()
+        }
+    }
+
+    fn main() {
+        let mut image = LazyImageProxy { file: "photo.png".to_string(), real: None };
+        println!("{}", image.display()); // loading photo.png + showing photo.png
+        println!("{}", image.display()); // showing photo.png (cached)
+    }
+    ```
+  </TabItem>
+</Tabs>
+
+## Contrast with Decorator and Facade
+
+All three wrap something, but their purposes diverge. A **Decorator** shares the subject's interface and *adds behaviour*, enriching the result of each call; you stack decorators to compose features. A **Proxy** also shares the subject's interface but *controls access* — it decides whether the real call happens at all (lazy loading, permission checks, caching) rather than enhancing what comes back, and it typically manages the lifecycle of the one real subject. A **Facade** does neither: it invents a *new, simpler* interface over a whole subsystem of many classes, so it does not share the subject's interface and is not interchangeable with any single underlying object.
+
+## When to use / trade-offs
+
+- **Pro:** controls access transparently — lazy loading, access control, caching, or remoting — without changing clients.
+- **Pro:** defers or avoids expensive work until it is actually needed (virtual proxy).
+- **Pro:** centralises cross-cutting concerns like authorisation or logging in one place.
+- **Con:** adds a layer of indirection that can obscure where work or latency really happens.
+- **Con:** a lazy or remote proxy introduces timing surprises — the first call behaves very differently from later ones.
+
+## Related patterns
+
+- [Decorator](/design-patterns-from-zero-to-hero/en/structural/decorator/) shares the wrapping shape but adds behaviour rather than controlling access.
+- [Facade](/design-patterns-from-zero-to-hero/en/structural/facade/) simplifies a subsystem behind a new interface, whereas a proxy keeps the same interface as one subject.
+- [Adapter](/design-patterns-from-zero-to-hero/en/structural/adapter/) changes an interface to match a client; a proxy deliberately keeps the interface identical.
+
+<Callout title="Same interface, gatekeeper intent">
+A proxy is a gatekeeper, not an enhancer. If your wrapper is making each result richer, it is a Decorator; if it is deciding whether, when, or for whom the real call runs, it is a Proxy. Keeping that distinction clear stops these look-alike patterns from blurring together.
+</Callout>
+
+export const quiz = [
+  {
+    q: 'What is the main purpose of a Proxy?',
+    options: [
+      'To add new behaviour to each result',
+      'To control access to another object while sharing its interface',
+      'To simplify a whole subsystem behind one interface',
+      'To convert one interface into another',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'What does a virtual proxy (like the lazy image) optimise?',
+    options: [
+      'Network bandwidth only',
+      'It defers expensive creation until the object is actually needed',
+      'The number of subclasses',
+      'Thread scheduling',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'How does a Proxy differ from a Decorator?',
+    options: [
+      'Proxy controls access; Decorator adds behaviour to the result',
+      'Proxy changes the interface; Decorator keeps it',
+      'Decorator controls access; Proxy adds behaviour',
+      'They are identical in purpose',
+    ],
+    answer: 0,
+  },
+  {
+    q: 'Why is a Proxy interchangeable with the real subject?',
+    options: [
+      'Because it inherits all the subject fields',
+      'Because it implements the same subject interface',
+      'Because it is always a singleton',
+      'Because it clones the subject',
+    ],
+    answer: 1,
+  },
+];
+
+<Quiz client:visible id="structural/proxy" questions={quiz} />
+
+<ProgressTracker client:visible id="structural/proxy" />

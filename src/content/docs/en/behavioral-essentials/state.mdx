@@ -1,0 +1,399 @@
+---
+title: State
+description: 'Let an object change its behaviour when its internal state changes, so it appears to switch class at runtime instead of branching on a flag.'
+sidebar:
+  order: 5
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+## Intent
+
+State lets an object alter its behaviour when its internal state changes. Each state becomes its own object, and the context delegates to whichever state it currently holds. From the outside the context appears to change class at runtime.
+
+## Problem
+
+Consider an order that moves through *draft*, *paid*, *shipped*, and *delivered*. Each action — pay, ship, deliver, cancel — is allowed in some states and forbidden in others. The naive implementation is a status string and a thicket of conditionals in every method: "if status is draft do this, else if paid do that, else throw." The rules for each status are smeared across every method, and adding a status means revisiting all of them.
+
+The variation here is *behaviour per state*, and the transitions between states. State gathers all the behaviour for one status into a single object. The context holds a reference to the current state and forwards calls to it; each state knows what it allows and which state to move to next. Adding a status is adding a class, and the transition rules live next to the behaviour they govern.
+
+## Structure
+
+export const stateUml = `classDiagram
+  class Order {
+    -state: OrderState
+    +pay()
+    +ship()
+    +status() string
+  }
+  class OrderState {
+    <<interface>>
+    +pay(order)
+    +ship(order)
+    +name() string
+  }
+  class DraftState {
+    +pay(order)
+    +ship(order)
+  }
+  class PaidState {
+    +pay(order)
+    +ship(order)
+  }
+  Order o--> OrderState
+  OrderState <|.. DraftState
+  OrderState <|.. PaidState`;
+
+<Mermaid code={stateUml} title="An Order delegates to its current OrderState, which decides what is allowed and which state comes next" />
+
+- **State** — the interface declaring the actions that vary by state.
+- **Concrete State** — one state object; it implements the allowed actions and triggers transitions to other states.
+- **Context** — holds a reference to the current state and delegates every state-dependent call to it. It exposes a way for states to switch it to a new state.
+- **Client** — drives the context by calling its actions; it does not manipulate states directly.
+
+## Example
+
+An order state machine where each state decides what `pay` and `ship` do and which state comes next. Contrast with Strategy: there the client chooses the algorithm, whereas here the states choose their own successor.
+
+<Tabs syncKey="lang">
+  <TabItem label="TypeScript">
+    ```ts
+    interface OrderState {
+      name(): string;
+      pay(order: Order): void;
+      ship(order: Order): void;
+    }
+
+    class Order {
+      private state: OrderState = new DraftState();
+      setState(s: OrderState): void {
+        this.state = s;
+      }
+      status(): string {
+        return this.state.name();
+      }
+      pay(): void {
+        this.state.pay(this);
+      }
+      ship(): void {
+        this.state.ship(this);
+      }
+    }
+
+    class DraftState implements OrderState {
+      name(): string {
+        return 'draft';
+      }
+      pay(order: Order): void {
+        order.setState(new PaidState());
+      }
+      ship(_order: Order): void {
+        throw new Error('cannot ship an unpaid order');
+      }
+    }
+
+    class PaidState implements OrderState {
+      name(): string {
+        return 'paid';
+      }
+      pay(_order: Order): void {
+        throw new Error('already paid');
+      }
+      ship(order: Order): void {
+        order.setState(new ShippedState());
+      }
+    }
+
+    class ShippedState implements OrderState {
+      name(): string {
+        return 'shipped';
+      }
+      pay(_order: Order): void {
+        throw new Error('already paid');
+      }
+      ship(_order: Order): void {
+        throw new Error('already shipped');
+      }
+    }
+
+    const order = new Order();
+    order.pay();
+    order.ship();
+    console.log(order.status()); // "shipped"
+    ```
+  </TabItem>
+  <TabItem label="Python">
+    ```python
+    from __future__ import annotations
+    from typing import Protocol
+
+
+    class OrderState(Protocol):
+        def name(self) -> str: ...
+        def pay(self, order: Order) -> None: ...
+        def ship(self, order: Order) -> None: ...
+
+
+    class Order:
+        def __init__(self) -> None:
+            self._state: OrderState = DraftState()
+
+        def set_state(self, state: OrderState) -> None:
+            self._state = state
+
+        def status(self) -> str:
+            return self._state.name()
+
+        def pay(self) -> None:
+            self._state.pay(self)
+
+        def ship(self) -> None:
+            self._state.ship(self)
+
+
+    class DraftState:
+        def name(self) -> str:
+            return "draft"
+
+        def pay(self, order: Order) -> None:
+            order.set_state(PaidState())
+
+        def ship(self, order: Order) -> None:
+            raise ValueError("cannot ship an unpaid order")
+
+
+    class PaidState:
+        def name(self) -> str:
+            return "paid"
+
+        def pay(self, order: Order) -> None:
+            raise ValueError("already paid")
+
+        def ship(self, order: Order) -> None:
+            order.set_state(ShippedState())
+
+
+    class ShippedState:
+        def name(self) -> str:
+            return "shipped"
+
+        def pay(self, order: Order) -> None:
+            raise ValueError("already paid")
+
+        def ship(self, order: Order) -> None:
+            raise ValueError("already shipped")
+
+
+    order = Order()
+    order.pay()
+    order.ship()
+    print(order.status())  # "shipped"
+    ```
+  </TabItem>
+  <TabItem label="Go">
+    ```go
+    package main
+
+    import (
+        "errors"
+        "fmt"
+    )
+
+    type Order struct{ state OrderState }
+
+    // OrderState decides what is allowed and which state comes next.
+    type OrderState interface {
+        Name() string
+        Pay(o *Order) error
+        Ship(o *Order) error
+    }
+
+    func (o *Order) setState(s OrderState) { o.state = s }
+    func (o *Order) Status() string        { return o.state.Name() }
+    func (o *Order) Pay() error             { return o.state.Pay(o) }
+    func (o *Order) Ship() error            { return o.state.Ship(o) }
+
+    type DraftState struct{}
+
+    func (DraftState) Name() string { return "draft" }
+    func (DraftState) Pay(o *Order) error {
+        o.setState(PaidState{})
+        return nil
+    }
+    func (DraftState) Ship(*Order) error { return errors.New("cannot ship an unpaid order") }
+
+    type PaidState struct{}
+
+    func (PaidState) Name() string        { return "paid" }
+    func (PaidState) Pay(*Order) error    { return errors.New("already paid") }
+    func (PaidState) Ship(o *Order) error {
+        o.setState(ShippedState{})
+        return nil
+    }
+
+    type ShippedState struct{}
+
+    func (ShippedState) Name() string     { return "shipped" }
+    func (ShippedState) Pay(*Order) error  { return errors.New("already paid") }
+    func (ShippedState) Ship(*Order) error { return errors.New("already shipped") }
+
+    func main() {
+        order := &Order{state: DraftState{}}
+        _ = order.Pay()
+        _ = order.Ship()
+        fmt.Println(order.Status()) // "shipped"
+    }
+    ```
+  </TabItem>
+  <TabItem label="Rust">
+    ```rust
+    enum Transition {
+        Stay,
+        To(Box<dyn OrderState>),
+        Error(&'static str),
+    }
+
+    trait OrderState {
+        fn name(&self) -> &'static str;
+        fn pay(&self) -> Transition;
+        fn ship(&self) -> Transition;
+    }
+
+    struct Draft;
+    impl OrderState for Draft {
+        fn name(&self) -> &'static str {
+            "draft"
+        }
+        fn pay(&self) -> Transition {
+            Transition::To(Box::new(Paid))
+        }
+        fn ship(&self) -> Transition {
+            Transition::Error("cannot ship an unpaid order")
+        }
+    }
+
+    struct Paid;
+    impl OrderState for Paid {
+        fn name(&self) -> &'static str {
+            "paid"
+        }
+        fn pay(&self) -> Transition {
+            Transition::Error("already paid")
+        }
+        fn ship(&self) -> Transition {
+            Transition::To(Box::new(Shipped))
+        }
+    }
+
+    struct Shipped;
+    impl OrderState for Shipped {
+        fn name(&self) -> &'static str {
+            "shipped"
+        }
+        fn pay(&self) -> Transition {
+            Transition::Error("already paid")
+        }
+        fn ship(&self) -> Transition {
+            Transition::Error("already shipped")
+        }
+    }
+
+    struct Order {
+        state: Box<dyn OrderState>,
+    }
+    impl Order {
+        fn apply(&mut self, t: Transition) {
+            if let Transition::To(next) = t {
+                self.state = next;
+            }
+        }
+        fn pay(&mut self) {
+            let t = self.state.pay();
+            self.apply(t);
+        }
+        fn ship(&mut self) {
+            let t = self.state.ship();
+            self.apply(t);
+        }
+        fn status(&self) -> &'static str {
+            self.state.name()
+        }
+    }
+
+    fn main() {
+        let mut order = Order { state: Box::new(Draft) };
+        order.pay();
+        order.ship();
+        println!("{}", order.status()); // "shipped"
+    }
+    ```
+  </TabItem>
+</Tabs>
+
+## When to use / trade-offs
+
+- **Pro:** replaces tangled per-status conditionals with one cohesive object per state.
+- **Pro:** transitions are explicit and live beside the behaviour they trigger, which makes the state machine easy to read.
+- **Pro:** adding a state means adding a class, leaving existing states untouched.
+- **Con:** more classes than a single status flag, which is overkill for two or three trivial states.
+- **Con:** transition logic is distributed across the states, so the full map of the machine is not in one place.
+
+## Related patterns
+
+- [Strategy](/design-patterns-from-zero-to-hero/en/behavioral-essentials/strategy/) shares the same class diagram, but the intent diverges: a strategy is selected by the client to vary an algorithm, whereas a state object selects its own successor as the object's condition changes. Strategy objects are usually unaware of each other; state objects know the states they transition to.
+- [Singleton](/design-patterns-from-zero-to-hero/en/creational/singleton/) is sometimes used for stateless state objects so they can be shared rather than re-created on every transition.
+
+<Callout title="State versus Strategy">
+If you ever wonder which one you are looking at, ask who decides the next behaviour. If the *client* picks it to change how a task is done, it is Strategy. If the object swaps its own behaviour as a reaction to its changing condition — and the objects know about each other's transitions — it is State.
+</Callout>
+
+export const quiz = [
+  {
+    q: 'What does the State pattern let an object do?',
+    options: [
+      'Hold exactly one instance for the whole program',
+      'Change its behaviour as its internal state changes, as if switching class',
+      'Clone itself cheaply',
+      'Traverse a collection without exposing its layout',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'Where do the transition rules live in the State pattern?',
+    options: [
+      'In a single global conditional',
+      'Inside the state objects, beside the behaviour they govern',
+      'In the client only',
+      'They are not represented at all',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'How does State differ from Strategy in intent?',
+    options: [
+      'They have unrelated class structures',
+      'State objects select their own successor as conditions change; strategies are chosen by the client',
+      'Strategy cannot change behaviour at runtime',
+      'State requires a singleton context',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'What replaces the tangled per-status conditionals?',
+    options: [
+      'A single enormous switch statement',
+      'One cohesive object per state that knows what it allows',
+      'A shared mutable global flag',
+      'A factory that builds the order',
+    ],
+    answer: 1,
+  },
+];
+
+<Quiz client:visible id="behavioral-essentials/state" questions={quiz} />
+
+<ProgressTracker client:visible id="behavioral-essentials/state" />

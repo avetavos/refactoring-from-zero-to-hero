@@ -1,0 +1,382 @@
+---
+title: Abstract Factory
+description: 'สร้างทั้งตระกูลของออบเจ็กต์ที่เกี่ยวข้องกันผ่าน interface เดียว เพื่อให้พวกมันเข้ากันได้เสมอ'
+sidebar:
+  order: 4
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+## เจตนา
+
+Abstract Factory ให้ interface เดียวสำหรับสร้างตระกูลของ product ที่เกี่ยวข้องกันโดยไม่ต้องเอ่ยชื่อ concrete class ของพวกมัน รับประกันว่า product ที่คุณได้มาจะอยู่ในตระกูลเดียวกันเสมอ
+
+## ปัญหา
+
+ลองพิจารณา UI kit ข้ามแพลตฟอร์ม หน้าต่างหนึ่งต้องการปุ่มและ checkbox และในทุกแพลตฟอร์ม widget เหล่านั้นต้องมีหน้าตาและพฤติกรรมที่สอดคล้องกัน ปุ่มแบบ macOS ที่จับคู่กับ checkbox แบบ Windows ย่อมผิดเพี้ยน อันตรายคือการปนตระกูลกัน โค้ดที่สร้างแต่ละ widget แยกกันอาจประกอบชุดที่ไม่สอดคล้องกันได้ง่าย ๆ
+
+Abstract Factory แก้ปัญหานี้ด้วยการยกทั้งตระกูลขึ้นมาเป็น interface เดียว `GuiFactory` ประกาศ `createButton` และ `createCheckbox` แต่ละ concrete factory (`MacFactory`, `WindowsFactory`) คืน widget จากแพลตฟอร์มเดียวเท่านั้น แอปพลิเคชันรับ factory มาครั้งเดียว แล้วจึงขอชิ้นส่วนต่าง ๆ จากมัน เพราะทุกชิ้นมาจาก factory เดียวกัน จึงรับประกันได้ว่าพวกมันเข้ากันได้ และการสลับแพลตฟอร์มก็หมายถึงการสลับออบเจ็กต์เพียงตัวเดียว
+
+**เปรียบเทียบกับ Factory Method** Factory Method ว่าด้วย product *หนึ่ง* ตัวที่เลือกผ่านการ subclass และ override method เดียว ความแปรผันอาศัยการสืบทอด ส่วน Abstract Factory ว่าด้วย *ตระกูลของ product* ที่เลือกผ่านการประกอบเข้าใน factory object โดยทั่วไปคุณถือ factory instance และเรียก creation method หลายตัวบนมัน พูดอีกอย่างคือ Factory Method ตอบคำถาม "ตัวไหน?" ผ่าน subclass ในขณะที่ Abstract Factory ตอบคำถาม "ชุดไหน?" ผ่านออบเจ็กต์ที่สลับได้ และ method ต่าง ๆ ของ Abstract Factory ก็มักเป็น factory method เสียเอง
+
+## โครงสร้าง
+
+export const abstractFactoryUml = `classDiagram
+  class GuiFactory {
+    <<interface>>
+    +createButton() Button
+    +createCheckbox() Checkbox
+  }
+  class MacFactory {
+    +createButton() Button
+    +createCheckbox() Checkbox
+  }
+  class WindowsFactory {
+    +createButton() Button
+    +createCheckbox() Checkbox
+  }
+  class Button {
+    <<interface>>
+    +render() string
+  }
+  class Checkbox {
+    <<interface>>
+    +render() string
+  }
+  class MacButton
+  class WindowsButton
+  class MacCheckbox
+  class WindowsCheckbox
+  GuiFactory <|.. MacFactory
+  GuiFactory <|.. WindowsFactory
+  Button <|.. MacButton
+  Button <|.. WindowsButton
+  Checkbox <|.. MacCheckbox
+  Checkbox <|.. WindowsCheckbox
+  MacFactory ..> MacButton
+  MacFactory ..> MacCheckbox
+  WindowsFactory ..> WindowsButton
+  WindowsFactory ..> WindowsCheckbox`;
+
+<Mermaid code={abstractFactoryUml} title="แต่ละ concrete factory สร้างหนึ่งตระกูลของ widget ที่สอดคล้องกัน" />
+
+- **Abstract Factory** (`GuiFactory`) — ประกาศ creation method หนึ่งตัวต่อ product หนึ่งตัวในตระกูล
+- **Concrete Factories** (`MacFactory`, `WindowsFactory`) — แต่ละตัวผลิตตระกูลที่ครบถ้วนและสอดคล้องกันภายใน
+- **Abstract Products** (`Button`, `Checkbox`) — interface ที่ client พึ่งพา
+- **Concrete Products** (`MacButton`, `WindowsCheckbox`, …) — implementation เฉพาะแพลตฟอร์ม
+- **Client** — รับ factory มาและสร้าง UI จากชิ้นส่วนที่มันคืนกลับมา โดยไม่เคยเอ่ยชื่อ concrete class
+
+## ตัวอย่าง
+
+`GuiFactory` ที่ให้ปุ่มและ checkbox ที่เข้าคู่กันต่อหนึ่งแพลตฟอร์ม
+
+<Tabs syncKey="lang">
+  <TabItem label="TypeScript">
+    ```ts
+    interface Button {
+      render(): string;
+    }
+    interface Checkbox {
+      render(): string;
+    }
+
+    class MacButton implements Button {
+      render() {
+        return '[ macOS button ]';
+      }
+    }
+    class MacCheckbox implements Checkbox {
+      render() {
+        return '[ macOS checkbox ]';
+      }
+    }
+    class WindowsButton implements Button {
+      render() {
+        return '[ Windows button ]';
+      }
+    }
+    class WindowsCheckbox implements Checkbox {
+      render() {
+        return '[ Windows checkbox ]';
+      }
+    }
+
+    interface GuiFactory {
+      createButton(): Button;
+      createCheckbox(): Checkbox;
+    }
+
+    class MacFactory implements GuiFactory {
+      createButton(): Button {
+        return new MacButton();
+      }
+      createCheckbox(): Checkbox {
+        return new MacCheckbox();
+      }
+    }
+    class WindowsFactory implements GuiFactory {
+      createButton(): Button {
+        return new WindowsButton();
+      }
+      createCheckbox(): Checkbox {
+        return new WindowsCheckbox();
+      }
+    }
+
+    function buildForm(factory: GuiFactory): string {
+      return `${factory.createButton().render()} ${factory.createCheckbox().render()}`;
+    }
+
+    console.log(buildForm(new MacFactory()));
+    console.log(buildForm(new WindowsFactory()));
+    ```
+  </TabItem>
+  <TabItem label="Python">
+    ```python
+    from abc import ABC, abstractmethod
+
+
+    class Button(ABC):
+        @abstractmethod
+        def render(self) -> str: ...
+
+
+    class Checkbox(ABC):
+        @abstractmethod
+        def render(self) -> str: ...
+
+
+    class MacButton(Button):
+        def render(self) -> str:
+            return "[ macOS button ]"
+
+
+    class MacCheckbox(Checkbox):
+        def render(self) -> str:
+            return "[ macOS checkbox ]"
+
+
+    class WindowsButton(Button):
+        def render(self) -> str:
+            return "[ Windows button ]"
+
+
+    class WindowsCheckbox(Checkbox):
+        def render(self) -> str:
+            return "[ Windows checkbox ]"
+
+
+    class GuiFactory(ABC):
+        @abstractmethod
+        def create_button(self) -> Button: ...
+
+        @abstractmethod
+        def create_checkbox(self) -> Checkbox: ...
+
+
+    class MacFactory(GuiFactory):
+        def create_button(self) -> Button:
+            return MacButton()
+
+        def create_checkbox(self) -> Checkbox:
+            return MacCheckbox()
+
+
+    class WindowsFactory(GuiFactory):
+        def create_button(self) -> Button:
+            return WindowsButton()
+
+        def create_checkbox(self) -> Checkbox:
+            return WindowsCheckbox()
+
+
+    def build_form(factory: GuiFactory) -> str:
+        return f"{factory.create_button().render()} {factory.create_checkbox().render()}"
+
+
+    print(build_form(MacFactory()))
+    print(build_form(WindowsFactory()))
+    ```
+  </TabItem>
+  <TabItem label="Go">
+    ```go
+    package main
+
+    import "fmt"
+
+    type Button interface{ Render() string }
+    type Checkbox interface{ Render() string }
+
+    type MacButton struct{}
+
+    func (MacButton) Render() string { return "[ macOS button ]" }
+
+    type MacCheckbox struct{}
+
+    func (MacCheckbox) Render() string { return "[ macOS checkbox ]" }
+
+    type WindowsButton struct{}
+
+    func (WindowsButton) Render() string { return "[ Windows button ]" }
+
+    type WindowsCheckbox struct{}
+
+    func (WindowsCheckbox) Render() string { return "[ Windows checkbox ]" }
+
+    type GuiFactory interface {
+        CreateButton() Button
+        CreateCheckbox() Checkbox
+    }
+
+    type MacFactory struct{}
+
+    func (MacFactory) CreateButton() Button     { return MacButton{} }
+    func (MacFactory) CreateCheckbox() Checkbox { return MacCheckbox{} }
+
+    type WindowsFactory struct{}
+
+    func (WindowsFactory) CreateButton() Button     { return WindowsButton{} }
+    func (WindowsFactory) CreateCheckbox() Checkbox { return WindowsCheckbox{} }
+
+    func buildForm(f GuiFactory) string {
+        return f.CreateButton().Render() + " " + f.CreateCheckbox().Render()
+    }
+
+    func main() {
+        fmt.Println(buildForm(MacFactory{}))
+        fmt.Println(buildForm(WindowsFactory{}))
+    }
+    ```
+  </TabItem>
+  <TabItem label="Rust">
+    ```rust
+    trait Button {
+        fn render(&self) -> String;
+    }
+    trait Checkbox {
+        fn render(&self) -> String;
+    }
+
+    struct MacButton;
+    impl Button for MacButton {
+        fn render(&self) -> String {
+            "[ macOS button ]".to_string()
+        }
+    }
+    struct MacCheckbox;
+    impl Checkbox for MacCheckbox {
+        fn render(&self) -> String {
+            "[ macOS checkbox ]".to_string()
+        }
+    }
+    struct WindowsButton;
+    impl Button for WindowsButton {
+        fn render(&self) -> String {
+            "[ Windows button ]".to_string()
+        }
+    }
+    struct WindowsCheckbox;
+    impl Checkbox for WindowsCheckbox {
+        fn render(&self) -> String {
+            "[ Windows checkbox ]".to_string()
+        }
+    }
+
+    trait GuiFactory {
+        fn create_button(&self) -> Box<dyn Button>;
+        fn create_checkbox(&self) -> Box<dyn Checkbox>;
+    }
+
+    struct MacFactory;
+    impl GuiFactory for MacFactory {
+        fn create_button(&self) -> Box<dyn Button> {
+            Box::new(MacButton)
+        }
+        fn create_checkbox(&self) -> Box<dyn Checkbox> {
+            Box::new(MacCheckbox)
+        }
+    }
+
+    struct WindowsFactory;
+    impl GuiFactory for WindowsFactory {
+        fn create_button(&self) -> Box<dyn Button> {
+            Box::new(WindowsButton)
+        }
+        fn create_checkbox(&self) -> Box<dyn Checkbox> {
+            Box::new(WindowsCheckbox)
+        }
+    }
+
+    fn build_form(factory: &dyn GuiFactory) -> String {
+        format!(
+            "{} {}",
+            factory.create_button().render(),
+            factory.create_checkbox().render()
+        )
+    }
+
+    fn main() {
+        println!("{}", build_form(&MacFactory));
+        println!("{}", build_form(&WindowsFactory));
+    }
+    ```
+  </TabItem>
+</Tabs>
+
+## เมื่อไรควรใช้ / ข้อแลกเปลี่ยน
+
+- **ข้อดี:** product จาก factory เดียวรับประกันว่าอยู่ในตระกูลเดียวกัน ไม่มีการจับคู่ที่ผิดเพี้ยน
+- **ข้อดี:** การสลับทั้งตระกูลเป็นการเปลี่ยนแปลงเพียงบรรทัดเดียว: ส่ง factory ตัวอื่นเข้าไป
+- **ข้อดี:** client พึ่งพาเฉพาะ abstract product interface เท่านั้น ไม่เคยพึ่งพา concrete class
+- **ข้อเสีย:** การเพิ่ม *product ใหม่* เข้าตระกูลหมายถึงการต้องเปลี่ยน factory interface และทุก concrete factory
+- **ข้อเสีย:** สำหรับ product เดียวหรือตระกูลเดียว มันหนักกว่า Factory Method หรือ constructor ธรรมดา
+
+## Pattern ที่เกี่ยวข้อง
+
+- [Factory Method](/design-patterns-from-zero-to-hero/th/creational/factory-method/) เป็นญาติที่เรียบง่ายกว่าซึ่งจัดการ product เดียว และมักถูกใช้ implement แต่ละ method ของ Abstract Factory
+- [Singleton](/design-patterns-from-zero-to-hero/th/creational/singleton/) มักถือ factory ที่เลือกไว้เพื่อให้ instance เดียวถูกแชร์ทั่วทั้งแอป
+
+<Callout title="ตระกูล ไม่ใช่สมาชิก">
+หยิบ Abstract Factory มาใช้เมื่อ product มาเป็น *ชุด* ที่ต้องสอดคล้องกัน ถ้าคุณแปรผันเพียง product เดียวเสมอ Factory Method เบากว่าและชัดเจนกว่า
+</Callout>
+
+export const quiz = [
+  {
+    q: 'Abstract Factory รับประกันอะไรเป็นหลัก?',
+    options: [
+      'มี instance ของแต่ละ product เพียงตัวเดียว',
+      'product ที่ได้จาก factory เดียวอยู่ในตระกูลเดียวกัน',
+      'ออบเจ็กต์ถูกสร้างทีละขั้นตอน',
+      'ออบเจ็กต์ที่มีอยู่ถูก clone',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'Abstract Factory ต่างจาก Factory Method อย่างไร?',
+    options: [
+      'มันสร้างตระกูลของ product ผ่าน factory object ที่ประกอบเข้ามา ไม่ใช่ product เดียวผ่านการ subclass',
+      'มันไม่สามารถใช้ interface ได้',
+      'มันใช้ได้กับโค้ด UI เท่านั้น',
+      'มันคืน Singleton เสมอ',
+    ],
+    answer: 0,
+  },
+  {
+    q: 'ต้นทุนหลักของการเพิ่ม product ชนิดใหม่เอี่ยมเข้าตระกูลคืออะไร?',
+    options: [
+      'ไม่มีเลย มันเป็นอัตโนมัติ',
+      'คุณต้องเปลี่ยน factory interface และทุก concrete factory',
+      'คุณต้องลบ client ทั้งหมด',
+      'คุณต้องแปลงมันเป็น Singleton',
+    ],
+    answer: 1,
+  },
+];
+
+<Quiz client:visible id="creational/abstract-factory" questions={quiz} />
+
+<ProgressTracker client:visible id="creational/abstract-factory" />

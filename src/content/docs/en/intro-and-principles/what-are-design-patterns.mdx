@@ -1,0 +1,98 @@
+---
+title: History, Benefits, and Pattern Structure
+description: 'Where design patterns came from, what they buy you, where they go wrong, and the standard structure used to describe each one.'
+sidebar:
+  order: 2
+---
+
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+## Where patterns came from
+
+The idea of writing down recurring solutions did not start with software. It came from an architect, Christopher Alexander, who catalogued reusable arrangements for buildings and towns. In the mid-1990s four authors — collectively nicknamed the Gang of Four — borrowed that approach for object-oriented software and published a catalogue of twenty-three patterns. Their lasting contribution was less the specific patterns than the *format*: a shared way to name a problem, describe a proven structure, and weigh its consequences. Once developers had common names, design conversations got dramatically shorter.
+
+It is worth remembering that patterns were *discovered*, not invented. The authors surveyed systems that already worked and noticed the same shapes recurring. That origin explains both their strength and their limits: a pattern captures hard-won experience, but only for the kinds of problems people had actually been solving.
+
+## Benefits
+
+- **Shared vocabulary.** A team that knows the catalogue can describe a non-trivial design in a sentence and trust everyone pictures the same thing.
+- **Proven structure.** Each pattern has been stress-tested across many systems, so you inherit a solution whose pitfalls are already documented.
+- **Faster reasoning.** Recognising "this is an Observer problem" lets you skip rediscovering the arrangement and jump to adapting it.
+
+## Criticisms
+
+Patterns are not free, and treating them as goals rather than tools causes real harm.
+
+- **Over-engineering.** The most common failure is reaching for a pattern before the problem justifies it — wrapping a one-line need in three interfaces and a factory. Indirection you do not need is just cost.
+- **Workarounds for missing features.** Some classic patterns exist mainly to paper over a language gap. First-class functions, for instance, make several "behavioral" patterns shrink to a single callback.
+- **Cargo-culting.** Applying a pattern because it is prestigious, rather than because the forces match, produces ceremony without benefit.
+
+## The structure of a pattern
+
+Every pattern in this course — and in the original catalogue — is described with the same handful of fields. Reading them in order tells you whether a pattern fits before you write any code.
+
+export const structureDiagram = `flowchart LR
+  I[Intent] --> Pr[Problem]
+  Pr --> St[Structure]
+  St --> Co[Consequences]
+  Co --> D{Does it fit?}`;
+
+<Mermaid code={structureDiagram} title="The fields that describe every pattern, read top to bottom" />
+
+- **Intent** — one sentence stating what the pattern accomplishes.
+- **Problem** — the recurring situation and the competing forces (flexibility, coupling, performance) that make it hard.
+- **Structure** — the participating roles and how they relate, usually shown as a UML class diagram.
+- **Consequences** — what you gain and what you pay: the trade-offs that decide whether the pattern is worth it here.
+
+## When to reach for one
+
+Reach for a pattern when you feel a specific, recurring pain — duplicated creation logic, rigid `if`/`switch` ladders on a type, a class that knows too much about another. The pain comes first; the pattern is the response. If you cannot name the force a pattern relieves, you do not need it yet. The mark of an experienced designer is not how many patterns they apply but how often they correctly decide *not* to.
+
+<Callout title="Let the problem ask for the pattern">
+A pattern earns its keep only when the forces it balances are actually present. Start with the simplest thing that works, and introduce a pattern when duplication, rigidity, or coupling makes that simple code hurt — never before.
+</Callout>
+
+export const quiz = [
+  {
+    q: 'What was the Gang of Four\'s most lasting contribution?',
+    options: [
+      'Inventing object-oriented programming',
+      'A shared format for naming, structuring, and weighing reusable solutions',
+      'A compiler that enforces design patterns',
+      'Proving that patterns make all code faster',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'Which is the most commonly cited criticism of design patterns?',
+    options: [
+      'They only work in functional languages',
+      'They are over-applied, adding indirection a problem does not justify',
+      'They are impossible to test',
+      'They were never used in real systems',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'Which field of a pattern description states its trade-offs?',
+    options: ['Intent', 'Problem', 'Structure', 'Consequences'],
+    answer: 3,
+  },
+  {
+    q: 'When should you reach for a design pattern?',
+    options: [
+      'At the very start of every project, to look professional',
+      'When a specific recurring pain — duplication, rigidity, coupling — makes simpler code hurt',
+      'Whenever a class has more than one method',
+      'Only when the compiler reports an error',
+    ],
+    answer: 1,
+  },
+];
+
+<Quiz client:visible id="intro-and-principles/what-are-design-patterns" questions={quiz} />
+
+<ProgressTracker client:visible id="intro-and-principles/what-are-design-patterns" />

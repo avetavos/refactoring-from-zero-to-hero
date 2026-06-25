@@ -1,0 +1,78 @@
+---
+title: Creational Patterns
+description: 'Creational design patterns แยกสิ่งที่คุณสร้างออกจากวิธีที่คุณสร้างมันได้อย่างไร'
+sidebar:
+  order: 1
+---
+
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+
+## เจตนา
+
+Creational patterns มอบหน้าที่ในการ *สร้าง* ออบเจ็กต์ให้กับกลไกเฉพาะที่เปลี่ยนแทนกันได้ เพื่อให้โค้ดส่วนที่เหลือพึ่งพา abstraction แทนที่จะพึ่งพา constructor ที่เป็นรูปธรรมโดยตรง
+
+## ปัญหา
+
+วิธีที่ง่ายที่สุดในการสร้างออบเจ็กต์คือเรียก constructor ของมันโดยตรง วิธีนี้ใช้ได้จนกระทั่งโค้ดของคุณต้องเลือกระหว่างชนิดที่เป็นรูปธรรมหลายชนิด ต้องแชร์ instance เดียวกัน ต้องประกอบออบเจ็กต์ทีละขั้นตอนเล็ก ๆ หลายขั้น หรือต้องคัดลอกออบเจ็กต์ที่มีอยู่แล้วอย่างประหยัด ทุก ๆ `new Thing()` ที่กระจายอยู่ทั่วโค้ดเบสคือการตัดสินใจที่ผูกตายตัวไว้ เปลี่ยนคลาสเมื่อไรก็เท่ากับเปลี่ยนผู้เรียกทุกที่ Creational patterns รวบรวมการตัดสินใจเหล่านั้นไว้ในที่เดียว เพื่อให้ตรรกะการสร้างวิวัฒน์ได้โดยไม่กระเพื่อมไปถึงทุกที่ที่ใช้ผลลัพธ์
+
+แต่ละ pattern ในโมดูลนี้โจมตีปัญหานั้นคนละแง่มุม พวกมันไม่ใช่คู่แข่งกัน นักออกแบบที่ช่ำชองจะหยิบตัวที่ตรงกับข้อจำกัดตรงหน้ามาใช้ และมักผสมหลายตัวเข้าด้วยกันในระบบเดียว
+
+## โครงสร้าง
+
+โมดูลนี้ครอบคลุม creational patterns คลาสสิกทั้งห้าตัวและความสัมพันธ์ระหว่างกัน
+
+export const overviewUml = `classDiagram
+  class CreationalPattern {
+    <<concept>>
+    +produce() Product
+  }
+  class Singleton {
+    +instance() Singleton
+  }
+  class FactoryMethod {
+    +create() Product
+  }
+  class AbstractFactory {
+    +createA() ProductA
+    +createB() ProductB
+  }
+  class Builder {
+    +step()
+    +build() Product
+  }
+  class Prototype {
+    +clone() Prototype
+  }
+  CreationalPattern <|.. Singleton
+  CreationalPattern <|.. FactoryMethod
+  CreationalPattern <|.. AbstractFactory
+  CreationalPattern <|.. Builder
+  CreationalPattern <|.. Prototype`;
+
+<Mermaid code={overviewUml} title="creational patterns ทั้งห้าและบทบาทร่วมกันของพวกมัน" />
+
+ภาพรวม pattern ทั้งห้า:
+
+- **Singleton** — รับประกันว่าคลาสมี instance ที่แชร์กันเพียงหนึ่งเดียว และให้ทุกคนมีจุดเข้าถึงเพียงจุดเดียว
+- **Factory Method** — ปล่อยให้คลาสฐานเลื่อนการเลือกว่าจะสร้าง concrete product ตัวไหนไปให้ subclass ตัดสินใจ
+- **Abstract Factory** — ผลิตทั้งตระกูลของ product ที่เกี่ยวข้องกันผ่าน interface เดียว เพื่อให้สมาชิกในตระกูลสอดคล้องกัน
+- **Builder** — แยกการประกอบทีละขั้นตอนของออบเจ็กต์ที่ซับซ้อนออกจากรูปแบบสุดท้ายของมัน
+- **Prototype** — สร้างออบเจ็กต์ใหม่ด้วยการ clone instance ที่มีอยู่แล้วแทนที่จะสร้างขึ้นมาใหม่ตั้งแต่ต้น
+
+## เมื่อไรควรใช้ / ข้อแลกเปลี่ยน
+
+- **ข้อดี:** ตรรกะการสร้างอยู่ในที่เดียว การสลับ implementation จึงแทบไม่ต้องแตะโค้ดผู้เรียก
+- **ข้อดี:** โค้ดผู้เรียกพึ่งพา interface ทำให้การทดสอบและการแทนที่ทำได้ง่ายขึ้น
+- **ข้อเสีย:** ทุก pattern เพิ่มชั้นทางอ้อม สำหรับโปรแกรมเล็ก ๆ constructor ธรรมดาชัดเจนกว่า
+- **ข้อเสีย:** หากใช้ผิดที่ pattern เหล่านี้สร้างพิธีรีตองโดยไม่ได้ประโยชน์ จงหยิบมาใช้เมื่อปัญหาเรื่องการสร้างมีอยู่จริงเท่านั้น
+
+## Pattern ที่เกี่ยวข้อง
+
+- [Singleton](/design-patterns-from-zero-to-hero/th/creational/singleton/)
+- [Factory Method](/design-patterns-from-zero-to-hero/th/creational/factory-method/)
+- [Builder](/design-patterns-from-zero-to-hero/th/creational/builder/)
+
+<Callout title="วิธีอ่านโมดูลนี้">
+ทุกบทเรียนมีรูปแบบเดียวกัน: เจตนา ปัญหาที่มันแก้ ไดอะแกรมโครงสร้าง UML ตัวอย่างหนึ่งชุดที่แสดงด้วย TypeScript, Python, Go และ Rust ข้อแลกเปลี่ยน และแบบทดสอบสั้น ๆ ทำไปตามลำดับ เพราะ pattern ที่อยู่ทีหลังต่อยอดศัพท์ที่แนะนำไว้ก่อนหน้า
+</Callout>

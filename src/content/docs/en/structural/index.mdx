@@ -1,0 +1,87 @@
+---
+title: Structural Patterns
+description: 'How structural design patterns compose objects and classes into larger structures while keeping them flexible.'
+sidebar:
+  order: 1
+---
+
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+
+## Intent
+
+Structural patterns describe how to assemble classes and objects into larger structures while keeping those structures flexible, so you can recombine parts without rewriting them.
+
+## Problem
+
+Once you have the right objects, the next question is how they fit together. Two interfaces that should cooperate do not match. A behaviour needs to grow without an explosion of subclasses. A subsystem of a dozen classes overwhelms its callers. A tree of nested parts needs to be treated the same whether a node is a leaf or a branch. These are all *composition* problems: the individual objects are fine, but the way they connect is awkward, rigid, or wasteful.
+
+Structural patterns are recipes for those connections. Some operate at the class level through inheritance, but most work by wiring objects together at runtime — wrapping, forwarding, or sharing — which keeps the arrangement loose and changeable. The goal is the same throughout: build a bigger thing out of smaller things without welding them permanently together.
+
+## Structure
+
+This module covers the seven classic structural patterns from the Gang of Four.
+
+export const overviewUml = `classDiagram
+  class StructuralPattern {
+    <<concept>>
+    +compose() Structure
+  }
+  class Adapter {
+    +request()
+  }
+  class Bridge {
+    +operation()
+  }
+  class Composite {
+    +add(child)
+    +operation()
+  }
+  class Decorator {
+    +operation()
+  }
+  class Facade {
+    +simpleCall()
+  }
+  class Flyweight {
+    +draw(extrinsic)
+  }
+  class Proxy {
+    +request()
+  }
+  StructuralPattern <|.. Adapter
+  StructuralPattern <|.. Bridge
+  StructuralPattern <|.. Composite
+  StructuralPattern <|.. Decorator
+  StructuralPattern <|.. Facade
+  StructuralPattern <|.. Flyweight
+  StructuralPattern <|.. Proxy`;
+
+<Mermaid code={overviewUml} title="The seven structural patterns and their shared role" />
+
+The seven patterns at a glance:
+
+- **Adapter** — wraps an object so its interface matches the one a client expects, letting incompatible types work together.
+- **Bridge** — splits an abstraction from its implementation so the two hierarchies can vary independently.
+- **Composite** — arranges objects into part-whole trees and lets clients treat leaves and branches uniformly.
+- **Decorator** — adds responsibilities to an object by wrapping it, layering behaviour without subclassing.
+- **Facade** — offers one simplified interface over a complicated subsystem of many classes.
+- **Flyweight** — shares common state across many fine-grained objects to cut memory use.
+- **Proxy** — puts a stand-in in front of an object to control access to it, for example lazy loading or permission checks.
+
+## When to use / trade-offs
+
+- **Pro:** composition over inheritance keeps structures flexible and recombinable at runtime.
+- **Pro:** each pattern isolates one structural concern, so clients stay simple and decoupled.
+- **Con:** every wrapper or indirection layer adds a hop and a class to understand.
+- **Con:** overused, these patterns bury simple calls under layers of forwarding; reach for them only when the structural problem is real.
+
+## Related patterns
+
+- [Adapter](/design-patterns-from-zero-to-hero/en/structural/adapter/)
+- [Decorator](/design-patterns-from-zero-to-hero/en/structural/decorator/)
+- [Proxy](/design-patterns-from-zero-to-hero/en/structural/proxy/)
+
+<Callout title="How to read this module">
+Each lesson follows the same shape: the intent, the problem it solves, a UML structure diagram, one worked example shown in TypeScript, Python, Go, and Rust, the trade-offs, and a short quiz. Several of these patterns look alike on a diagram but differ in *purpose* — watch for the contrasts called out in the Decorator and Proxy lessons.
+</Callout>

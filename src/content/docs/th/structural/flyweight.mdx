@@ -1,0 +1,295 @@
+---
+title: Flyweight
+description: 'แบ่งปัน state ร่วมกันระหว่าง object ละเอียดจำนวนมากเพื่อลดการใช้หน่วยความจำ'
+sidebar:
+  order: 7
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+## เจตนา
+
+Flyweight ลดการใช้หน่วยความจำให้น้อยที่สุดด้วยการแบ่งปัน state ให้มากที่สุดเท่าที่จะเป็นไปได้ระหว่าง object ที่คล้ายกันจำนวนมาก โดยแยก state ที่สามารถแบ่งปันได้ออกจาก state ที่ต้องคงความเฉพาะตัวในแต่ละการใช้งาน
+
+## ปัญหา
+
+ลองนึกถึงระบบอนุภาคหรือเกมที่ render ต้นไม้นับพันต้น ต้นไม้แต่ละต้นมีตำแหน่ง แต่มันก็มี mesh, texture และสี ซึ่งเป็นข้อมูลหนักที่เหมือนกันในทุกต้นไม้ชนิดเดียวกัน การเก็บข้อมูลทั้งหมดนั้นไว้ในทุก ๆ ต้นจากต้นไม้แสนต้นสิ้นเปลืองหน่วยความจำมหาศาล ทั้งที่จริง ๆ แล้วมีเพียงตำแหน่งเท่านั้นที่แตกต่างกัน
+
+Flyweight แยกข้อมูลของแต่ละ object ออกเป็นสองส่วน *intrinsic* state คือ mesh, texture, สี ถูกแบ่งปัน เปลี่ยนแปลงไม่ได้ และเก็บไว้ครั้งเดียวต่อหนึ่งชนิดใน object ที่ใช้ร่วมกันตัวเดียว ส่วน *extrinsic* state คือตำแหน่งของแต่ละ instance ถูกเก็บไว้นอก flyweight และส่งเข้ามาเมื่อจำเป็น เช่น ตอน draw factory แจกจ่าย flyweight โดยคืน object ที่ใช้ร่วมกันตัวเดิมสำหรับ intrinsic key เดียวกันแทนที่จะสร้างตัวใหม่ ต้นไม้แสนต้นจึงอ้างอิงไปยัง `TreeType` flyweight ที่ใช้ร่วมกันเพียงไม่กี่ตัวบวกกับตำแหน่งน้ำหนักเบาของตัวเอง
+
+## โครงสร้าง
+
+export const flyweightUml = `classDiagram
+  class TreeType {
+    +mesh: string
+    +texture: string
+    +draw(x, y) string
+  }
+  class TreeTypeFactory {
+    -pool: Map
+    +get(mesh, texture) TreeType
+  }
+  class Tree {
+    -x: int
+    -y: int
+    -type: TreeType
+    +draw() string
+  }
+  TreeTypeFactory --> TreeType : caches and returns shared
+  Tree --> TreeType : references shared intrinsic state`;
+
+<Mermaid code={flyweightUml} title="ต้นไม้จำนวนมากแบ่งปัน TreeType flyweight ไม่กี่ตัว ส่วนตำแหน่งยังคงเป็น extrinsic" />
+
+- **Flyweight** (`TreeType`) — ถือ intrinsic state ที่แบ่งปันได้และเปลี่ยนแปลงไม่ได้ และรับ extrinsic state เป็น parameter
+- **Flyweight Factory** (`TreeTypeFactory`) — cache flyweight ไว้และคืนตัวที่มีอยู่แล้วสำหรับ intrinsic key ที่กำหนด โดยสร้างมันขึ้นเฉพาะเมื่อ miss เท่านั้น
+- **Context** (`Tree`) — เก็บ extrinsic state และ reference ไปยัง flyweight ที่ใช้ร่วมกัน
+- **Client** — ทำงานผ่าน context และ factory โดยไม่เคยทำซ้ำ intrinsic state
+
+## ตัวอย่าง
+
+ต้นไม้หลายพันต้นแบ่งปันพูลเล็ก ๆ ของ `TreeType` flyweight ต้นไม้แต่ละต้นเก็บเพียงตำแหน่งของมันและ reference ไปยัง type ที่ใช้ร่วมกัน
+
+<Tabs syncKey="lang">
+  <TabItem label="TypeScript">
+    ```ts
+    class TreeType {
+      constructor(readonly mesh: string, readonly texture: string) {}
+      draw(x: number, y: number): string {
+        return `${this.mesh}/${this.texture} at (${x},${y})`;
+      }
+    }
+
+    class TreeTypeFactory {
+      private pool = new Map<string, TreeType>();
+      get(mesh: string, texture: string): TreeType {
+        const key = `${mesh}|${texture}`;
+        let type = this.pool.get(key);
+        if (type === undefined) {
+          type = new TreeType(mesh, texture);
+          this.pool.set(key, type);
+        }
+        return type;
+      }
+      get size(): number {
+        return this.pool.size;
+      }
+    }
+
+    const factory = new TreeTypeFactory();
+    const trees = Array.from({ length: 1000 }, (_, i) => ({
+      x: i,
+      y: i,
+      type: factory.get('oak', 'bark.png'), // all share one flyweight
+    }));
+
+    console.log(trees[0].type.draw(trees[0].x, trees[0].y)); // oak/bark.png at (0,0)
+    console.log(factory.size); // 1 — one shared TreeType for 1000 trees
+    ```
+  </TabItem>
+  <TabItem label="Python">
+    ```python
+    class TreeType:
+        def __init__(self, mesh: str, texture: str) -> None:
+            self.mesh = mesh
+            self.texture = texture
+
+        def draw(self, x: int, y: int) -> str:
+            return f"{self.mesh}/{self.texture} at ({x},{y})"
+
+
+    class TreeTypeFactory:
+        def __init__(self) -> None:
+            self._pool: dict[tuple[str, str], TreeType] = {}
+
+        def get(self, mesh: str, texture: str) -> TreeType:
+            key = (mesh, texture)
+            if key not in self._pool:
+                self._pool[key] = TreeType(mesh, texture)
+            return self._pool[key]
+
+        @property
+        def size(self) -> int:
+            return len(self._pool)
+
+
+    factory = TreeTypeFactory()
+    trees = [
+        {"x": i, "y": i, "type": factory.get("oak", "bark.png")}
+        for i in range(1000)
+    ]
+
+    first = trees[0]
+    print(first["type"].draw(first["x"], first["y"]))  # oak/bark.png at (0,0)
+    print(factory.size)  # 1 — one shared TreeType for 1000 trees
+    ```
+  </TabItem>
+  <TabItem label="Go">
+    ```go
+    package main
+
+    import "fmt"
+
+    type TreeType struct {
+        Mesh    string
+        Texture string
+    }
+
+    func (t *TreeType) Draw(x, y int) string {
+        return fmt.Sprintf("%s/%s at (%d,%d)", t.Mesh, t.Texture, x, y)
+    }
+
+    type TreeTypeFactory struct {
+        pool map[string]*TreeType
+    }
+
+    func NewTreeTypeFactory() *TreeTypeFactory {
+        return &TreeTypeFactory{pool: make(map[string]*TreeType)}
+    }
+
+    func (f *TreeTypeFactory) Get(mesh, texture string) *TreeType {
+        key := mesh + "|" + texture
+        if t, ok := f.pool[key]; ok {
+            return t
+        }
+        t := &TreeType{Mesh: mesh, Texture: texture}
+        f.pool[key] = t
+        return t
+    }
+
+    type Tree struct {
+        X, Y int
+        Type *TreeType
+    }
+
+    func main() {
+        factory := NewTreeTypeFactory()
+        trees := make([]Tree, 1000)
+        for i := range trees {
+            trees[i] = Tree{X: i, Y: i, Type: factory.Get("oak", "bark.png")}
+        }
+        fmt.Println(trees[0].Type.Draw(trees[0].X, trees[0].Y)) // oak/bark.png at (0,0)
+        fmt.Println(len(factory.pool))                          // 1
+    }
+    ```
+  </TabItem>
+  <TabItem label="Rust">
+    ```rust
+    use std::collections::HashMap;
+    use std::rc::Rc;
+
+    struct TreeType {
+        mesh: String,
+        texture: String,
+    }
+
+    impl TreeType {
+        fn draw(&self, x: i32, y: i32) -> String {
+            format!("{}/{} at ({x},{y})", self.mesh, self.texture)
+        }
+    }
+
+    #[derive(Default)]
+    struct TreeTypeFactory {
+        pool: HashMap<String, Rc<TreeType>>,
+    }
+
+    impl TreeTypeFactory {
+        fn get(&mut self, mesh: &str, texture: &str) -> Rc<TreeType> {
+            let key = format!("{mesh}|{texture}");
+            self.pool
+                .entry(key)
+                .or_insert_with(|| Rc::new(TreeType {
+                    mesh: mesh.to_string(),
+                    texture: texture.to_string(),
+                }))
+                .clone()
+        }
+    }
+
+    struct Tree {
+        x: i32,
+        y: i32,
+        type_: Rc<TreeType>, // shared intrinsic state
+    }
+
+    fn main() {
+        let mut factory = TreeTypeFactory::default();
+        let trees: Vec<Tree> = (0..1000)
+            .map(|i| Tree { x: i, y: i, type_: factory.get("oak", "bark.png") })
+            .collect();
+
+        println!("{}", trees[0].type_.draw(trees[0].x, trees[0].y)); // oak/bark.png at (0,0)
+        println!("{}", factory.pool.len()); // 1 — one shared TreeType
+    }
+    ```
+  </TabItem>
+</Tabs>
+
+## เมื่อไรควรใช้ / ข้อแลกเปลี่ยน
+
+- **ข้อดี:** ลดหน่วยความจำลงอย่างมากเมื่อโปรแกรมถือ object จำนวนมหาศาลที่มี state ซ้ำกันเยอะ
+- **ข้อดี:** การ caching ของ factory ยังสามารถเร่งการสร้างให้เร็วขึ้นด้วยการนำ object ที่มีอยู่กลับมาใช้ใหม่
+- **ข้อดี:** การรวม intrinsic state ไว้ใน object ที่ใช้ร่วมกันและเปลี่ยนแปลงไม่ได้ตัวเดียวสามารถปรับปรุง cache locality ได้
+- **ข้อเสีย:** การแยก state ออกเป็น intrinsic และ extrinsic ทำให้โค้ดและ signature ของการเรียกซับซ้อนขึ้น
+- **ข้อเสีย:** flyweight ต้องเปลี่ยนแปลงไม่ได้เมื่อถูกแบ่งปัน การ mutate state ที่แบ่งปันจะทำให้ทุก context ที่อ้างอิงมันเสียหาย
+- **ข้อเสีย:** มันคุ้มค่าก็ต่อเมื่ออยู่ในสเกลใหญ่เท่านั้น สำหรับ object เพียงไม่กี่ตัว การบันทึกข้อมูลกินต้นทุนมากกว่าที่ประหยัดได้
+
+## Pattern ที่เกี่ยวข้อง
+
+- [Singleton](/design-patterns-from-zero-to-hero/th/creational/singleton/) แบ่งปัน instance เพียงตัวเดียวเป๊ะ ส่วน Flyweight แบ่งปันพูลเล็ก ๆ ของ instance ที่เปลี่ยนแปลงไม่ได้ซึ่งมี key เป็น intrinsic state
+- [Factory Method](/design-patterns-from-zero-to-hero/th/creational/factory-method/) และ flyweight factory ต่างก็รวมการสร้างไว้ที่ศูนย์กลาง แต่งานที่นิยามตัว flyweight factory คือการคืน object ที่มีอยู่แล้วแทนที่จะสร้างตัวใหม่เสมอ
+
+<Callout title="intrinsic ต้องเปลี่ยนแปลงไม่ได้">
+ทั้งกลไกนี้ตั้งอยู่บน intrinsic state ที่แบ่งปันซึ่งไม่เคยเปลี่ยนแปลง ถ้า context หนึ่งสามารถ mutate flyweight ได้ ทุก context อื่นที่แบ่งปันมันจะเห็นการเปลี่ยนแปลงนั้น จงทำให้ flyweight เปลี่ยนแปลงไม่ได้และส่งข้อมูลของแต่ละ instance ทั้งหมดเข้ามาในรูปของ extrinsic parameter
+</Callout>
+
+export const quiz = [
+  {
+    q: 'Flyweight แบ่งปันอะไรระหว่าง object จำนวนมาก?',
+    options: [
+      'extrinsic state ของแต่ละ instance',
+      'intrinsic state ที่เปลี่ยนแปลงไม่ได้ซึ่งเป็นของร่วมกันในหลาย object',
+      'constructor ของพวกมัน',
+      'ที่อยู่ในหน่วยความจำของพวกมัน',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'extrinsic state ถูกเก็บไว้ที่ไหน?',
+    options: [
+      'ภายใน flyweight ที่ใช้ร่วมกัน',
+      'นอก flyweight ส่งเข้ามาเมื่อจำเป็น',
+      'ใน global singleton',
+      'มันถูกทิ้งไปทั้งหมด',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'หน้าที่ของ flyweight factory คืออะไร?',
+    options: [
+      'สร้าง object ตัวใหม่เอี่ยมในทุก request',
+      'คืน flyweight ที่ใช้ร่วมกันซึ่งมีอยู่แล้วสำหรับ key ที่กำหนด โดยสร้างตัวใหม่เฉพาะเมื่อ miss',
+      'รับประกัน instance เดียวของทั้งโปรแกรม',
+      'แปลง interface หนึ่งเป็นอีก interface หนึ่ง',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'ทำไม intrinsic state ที่แบ่งปันจึงต้องเปลี่ยนแปลงไม่ได้?',
+    options: [
+      'เพราะ object ที่เปลี่ยนแปลงไม่ได้นั้นเร็วกว่าเสมอ',
+      'เพราะการ mutate มันจะทำให้ทุก context ที่แบ่งปันมันเสียหาย',
+      'เพราะ factory ไม่สามารถเก็บ object ที่เปลี่ยนแปลงได้',
+      'เพราะภาษาห้ามไว้',
+    ],
+    answer: 1,
+  },
+];
+
+<Quiz client:visible id="structural/flyweight" questions={quiz} />
+
+<ProgressTracker client:visible id="structural/flyweight" />

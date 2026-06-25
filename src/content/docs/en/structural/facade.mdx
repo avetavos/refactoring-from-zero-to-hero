@@ -1,0 +1,266 @@
+---
+title: Facade
+description: 'Offer one simplified interface over a complicated subsystem of many classes.'
+sidebar:
+  order: 6
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+## Intent
+
+Facade provides a single, unified interface to a set of interfaces in a subsystem, giving clients one easy entry point instead of forcing them to orchestrate many collaborating classes themselves.
+
+## Problem
+
+A capable subsystem often has a lot of moving parts. To convert a video file you might need a decoder, an audio mixer, a codec selector, a bitrate calculator, and a writer — each with its own setup, ordering rules, and quirks. A client that just wants "turn this file into MP4" should not have to learn all five classes, instantiate them in the right order, and wire their outputs together. That knowledge leaks the subsystem's internals into every caller and makes the subsystem painful to change.
+
+Facade is a single class that knows the dance. It exposes a small, task-oriented method — `convert(file, format)` — and internally creates and coordinates the subsystem objects in the right sequence. Clients depend only on the facade. The subsystem classes stay fully usable for advanced callers who need them directly, but the common case becomes one call. Refactor the subsystem and you fix one facade, not a hundred call sites.
+
+## Structure
+
+export const facadeUml = `classDiagram
+  class Client
+  class VideoConverter {
+    +convert(file, format) string
+  }
+  class Decoder {
+    +decode(file) string
+  }
+  class AudioMixer {
+    +mix(stream) string
+  }
+  class Encoder {
+    +encode(stream, format) string
+  }
+  Client --> VideoConverter : uses
+  VideoConverter --> Decoder
+  VideoConverter --> AudioMixer
+  VideoConverter --> Encoder`;
+
+<Mermaid code={facadeUml} title="A facade fronts several subsystem classes behind one method" />
+
+- **Facade** (`VideoConverter`) — the single class clients talk to; it knows how to coordinate the subsystem.
+- **Subsystem classes** (`Decoder`, `AudioMixer`, `Encoder`) — the real workers; they know nothing of the facade and can still be used directly.
+- **Client** — calls the facade and stays insulated from the subsystem's structure.
+
+## Example
+
+A `VideoConverter` facade turns a one-line request into the right sequence of decode, mix, and encode calls.
+
+<Tabs syncKey="lang">
+  <TabItem label="TypeScript">
+    ```ts
+    class Decoder {
+      decode = (file: string) => `raw(${file})`;
+    }
+    class AudioMixer {
+      mix = (stream: string) => `mixed(${stream})`;
+    }
+    class Encoder {
+      encode = (stream: string, format: string) => `${stream}.${format}`;
+    }
+
+    // Facade: one method hides the subsystem choreography.
+    class VideoConverter {
+      private decoder = new Decoder();
+      private mixer = new AudioMixer();
+      private encoder = new Encoder();
+
+      convert(file: string, format: string): string {
+        const raw = this.decoder.decode(file);
+        const mixed = this.mixer.mix(raw);
+        return this.encoder.encode(mixed, format);
+      }
+    }
+
+    const converter = new VideoConverter();
+    console.log(converter.convert('clip.avi', 'mp4')); // mixed(raw(clip.avi)).mp4
+    ```
+  </TabItem>
+  <TabItem label="Python">
+    ```python
+    class Decoder:
+        def decode(self, file: str) -> str:
+            return f"raw({file})"
+
+
+    class AudioMixer:
+        def mix(self, stream: str) -> str:
+            return f"mixed({stream})"
+
+
+    class Encoder:
+        def encode(self, stream: str, fmt: str) -> str:
+            return f"{stream}.{fmt}"
+
+
+    class VideoConverter:
+        def __init__(self) -> None:
+            self._decoder = Decoder()
+            self._mixer = AudioMixer()
+            self._encoder = Encoder()
+
+        def convert(self, file: str, fmt: str) -> str:
+            raw = self._decoder.decode(file)
+            mixed = self._mixer.mix(raw)
+            return self._encoder.encode(mixed, fmt)
+
+
+    converter = VideoConverter()
+    print(converter.convert("clip.avi", "mp4"))  # mixed(raw(clip.avi)).mp4
+    ```
+  </TabItem>
+  <TabItem label="Go">
+    ```go
+    package main
+
+    import "fmt"
+
+    type decoder struct{}
+
+    func (decoder) decode(file string) string { return "raw(" + file + ")" }
+
+    type audioMixer struct{}
+
+    func (audioMixer) mix(stream string) string { return "mixed(" + stream + ")" }
+
+    type encoder struct{}
+
+    func (encoder) encode(stream, format string) string { return stream + "." + format }
+
+    // VideoConverter is the facade over the unexported subsystem.
+    type VideoConverter struct {
+        d decoder
+        m audioMixer
+        e encoder
+    }
+
+    func (vc VideoConverter) Convert(file, format string) string {
+        raw := vc.d.decode(file)
+        mixed := vc.m.mix(raw)
+        return vc.e.encode(mixed, format)
+    }
+
+    func main() {
+        vc := VideoConverter{}
+        fmt.Println(vc.Convert("clip.avi", "mp4")) // mixed(raw(clip.avi)).mp4
+    }
+    ```
+  </TabItem>
+  <TabItem label="Rust">
+    ```rust
+    struct Decoder;
+    impl Decoder {
+        fn decode(&self, file: &str) -> String {
+            format!("raw({file})")
+        }
+    }
+
+    struct AudioMixer;
+    impl AudioMixer {
+        fn mix(&self, stream: &str) -> String {
+            format!("mixed({stream})")
+        }
+    }
+
+    struct Encoder;
+    impl Encoder {
+        fn encode(&self, stream: &str, format: &str) -> String {
+            format!("{stream}.{format}")
+        }
+    }
+
+    // Facade: hides the subsystem behind one method.
+    struct VideoConverter {
+        decoder: Decoder,
+        mixer: AudioMixer,
+        encoder: Encoder,
+    }
+
+    impl VideoConverter {
+        fn new() -> Self {
+            VideoConverter { decoder: Decoder, mixer: AudioMixer, encoder: Encoder }
+        }
+        fn convert(&self, file: &str, format: &str) -> String {
+            let raw = self.decoder.decode(file);
+            let mixed = self.mixer.mix(&raw);
+            self.encoder.encode(&mixed, format)
+        }
+    }
+
+    fn main() {
+        let converter = VideoConverter::new();
+        println!("{}", converter.convert("clip.avi", "mp4")); // mixed(raw(clip.avi)).mp4
+    }
+    ```
+  </TabItem>
+</Tabs>
+
+## When to use / trade-offs
+
+- **Pro:** shrinks a multi-class subsystem to one easy entry point for the common case.
+- **Pro:** decouples clients from subsystem internals, so the subsystem can be refactored freely.
+- **Pro:** advanced callers can still reach the subsystem directly; the facade is optional, not a wall.
+- **Con:** a facade can drift into a god object that knows too much if you keep piling features onto it.
+- **Con:** it may hide useful flexibility, tempting clients to accept the easy path when they need the detailed one.
+
+## Related patterns
+
+- [Adapter](/design-patterns-from-zero-to-hero/en/structural/adapter/) changes one object's interface to match an expected one; Facade invents a brand-new simpler interface over many objects.
+- [Abstract Factory](/design-patterns-from-zero-to-hero/en/creational/abstract-factory/) can sit behind a facade to create the subsystem objects the facade coordinates.
+
+<Callout title="A facade is a convenience, not a cage">
+Good facades simplify the common path without sealing off the subsystem. Keep the underlying classes accessible so power users are not blocked, and resist letting the facade absorb every responsibility — when it grows unwieldy, split it into several focused facades.
+</Callout>
+
+export const quiz = [
+  {
+    q: 'What does a Facade provide?',
+    options: [
+      'A guarantee of one shared instance',
+      'A single simplified interface over a complex subsystem of many classes',
+      'A way to add behaviour by wrapping an object',
+      'A clone of an existing object',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'Do the subsystem classes know about the facade?',
+    options: [
+      'Yes, they must inherit from it',
+      'No, they work independently and can be used directly',
+      'Yes, they hold a reference back to it',
+      'Only the first one created does',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'How does Facade differ from Adapter?',
+    options: [
+      'Facade invents a new simple interface over many objects; Adapter matches one object to an expected interface',
+      'Facade changes behaviour; Adapter never does',
+      'Facade requires inheritance; Adapter forbids it',
+      'They are the same pattern',
+    ],
+    answer: 0,
+  },
+  {
+    q: 'What is a risk of overusing a Facade?',
+    options: [
+      'It forces every object to be a singleton',
+      'It can become a god object that knows too much',
+      'It makes the subsystem impossible to call directly',
+      'It always slows down the program',
+    ],
+    answer: 1,
+  },
+];
+
+<Quiz client:visible id="structural/facade" questions={quiz} />
+
+<ProgressTracker client:visible id="structural/facade" />

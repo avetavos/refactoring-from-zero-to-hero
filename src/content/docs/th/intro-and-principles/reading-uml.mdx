@@ -1,0 +1,121 @@
+---
+title: การอ่านไดอะแกรม UML
+description: 'วิธีอ่าน class diagram ที่ใช้ตลอดทั้งคอร์สนี้ — กล่อง interface และลูกศรที่เชื่อมโยงพวกมันเข้าด้วยกัน'
+sidebar:
+  order: 5
+---
+
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+## ทำไมต้องมีไดอะแกรมด้วย
+
+ทุก pattern ในคอร์สนี้มี UML class diagram อยู่ในส่วน **Structure** ของมัน UML — Unified Modeling Language — เป็นโน้ตเทชันมาตรฐานสำหรับร่างรูปทรงเชิงสถิตของโค้ดเชิงวัตถุ: มี type อะไรอยู่บ้าง มันถืออะไรไว้ และมันเชื่อมโยงกันอย่างไร ไดอะแกรมบอกในแวบเดียวสิ่งที่ย่อหน้าหนึ่งต้องใช้หลายประโยคในการอธิบาย บทเรียนนี้ครอบคลุมเฉพาะส่วนย่อยของ UML ที่คุณต้องใช้จริง ๆ ในการอ่านไดอะแกรมที่นี่ และจับคู่แต่ละชิ้นเข้ากับ syntax ของ Mermaid ที่ render มันออกมา
+
+## class และ interface
+
+class คือกล่องหนึ่ง ที่อาจแบ่งออกเป็นสามแถว: ชื่อ field ของมัน และ operation ของมัน เครื่องหมาย `+` นำหน้าบ่งบอก member ที่เป็นสาธารณะ ส่วน `-` บ่งบอกตัวที่เป็นส่วนตัว *interface* — สัญญาที่ไม่มี implementation — ถูกวาดเป็นกล่องที่มี stereotype `<<interface>>` อยู่เหนือชื่อของมัน
+
+export const classDiagram = `classDiagram
+  class Account {
+    -balance: number
+    +deposit(amount)
+    +withdraw(amount)
+  }
+  class Repository {
+    <<interface>>
+    +save(account)
+    +findById(id)
+  }`;
+
+<Mermaid code={classDiagram} title="class ที่มี member ส่วนตัวและสาธารณะ และ interface หนึ่ง" />
+
+## inheritance และ implementation
+
+ลูกศรสองแบบอธิบายความสัมพันธ์แบบ "เป็นชนิดหนึ่งของ" และมันดูคล้ายกัน ดังนั้นการแยกแยะจึงสำคัญ **สามเหลี่ยมกลวงบนเส้นทึบ** หมายถึง *inheritance* — class หนึ่ง extend อีก class หนึ่ง **สามเหลี่ยมกลวงบนเส้นประ** หมายถึง *implementation* — class หนึ่งทำตามสัญญาของ interface ใน Mermaid `<|--` คือ inheritance (สามเหลี่ยมชี้ไปที่ parent) และ `..|>` คือ implementation (เส้นประชี้ไปที่ interface)
+
+export const inheritanceDiagram = `classDiagram
+  class Shape {
+    <<interface>>
+    +area() number
+  }
+  class Polygon
+  class Circle
+  Shape <|-- Polygon : Polygon extends Shape
+  Circle ..|> Shape : Circle implements Shape`;
+
+<Mermaid code={inheritanceDiagram} title="สามเหลี่ยมเส้นทึบ = inheritance สามเหลี่ยมเส้นประ = implementation" />
+
+## association, aggregation และ composition
+
+ลูกศรที่เหลืออธิบายความสัมพันธ์แบบ "has-a" เรียงตามว่า object ทั้งสองถูกผูกเข้าด้วยกันแน่นแค่ไหน:
+
+- **Association** — เส้นธรรมดา (Mermaid `-->`) object หนึ่งเพียงใช้หรืออ้างถึงอีกตัว โดยไม่บ่งบอกถึงความเป็นเจ้าของ `Order` อ้างถึง `Customer`
+- **Aggregation** — สี่เหลี่ยมข้าวหลามตัดกลวง (Mermaid `o--`) ที่ปลายฝั่งเจ้าของ ความสัมพันธ์แบบทั้งหมด-ส่วนย่อยที่ส่วนย่อยสามารถอยู่ได้นานกว่าทั้งหมด: `Team` aggregate `Player` หลายตัว แต่ผู้เล่นดำรงอยู่อย่างเป็นอิสระจากทีม
+- **Composition** — สี่เหลี่ยมข้าวหลามตัดทึบ (Mermaid `*--`) ที่ปลายฝั่งเจ้าของ ความสัมพันธ์แบบทั้งหมด-ส่วนย่อยที่แข็งแกร่งกว่า ที่อายุของส่วนย่อยถูกผูกเข้ากับทั้งหมด: `House` ประกอบขึ้นจาก `Room` หลายตัวที่ถูกทำลายไปพร้อมกับบ้าน
+
+export const relationsDiagram = `classDiagram
+  class Order
+  class Customer
+  class Team
+  class Player
+  class House
+  class Room
+  Order --> Customer : association (uses)
+  Team o-- Player : aggregation (shared part)
+  House *-- Room : composition (owned part)`;
+
+<Mermaid code={relationsDiagram} title="association, aggregation และ composition จากหลวมที่สุดไปแน่นที่สุด" />
+
+## ตารางอ้างอิงฉบับย่อ
+
+จงจำการจับคู่นี้ไว้ในใจ แล้วทุกไดอะแกรมในคอร์สก็จะอ่านออก:
+
+- `<|--` — inheritance (extend class หนึ่ง)
+- `..|>` — implementation (ทำตามสัญญาของ interface)
+- `-->` — association (ใช้หรืออ้างถึง)
+- `o--` — aggregation (เป็นเจ้าของส่วนย่อยที่อยู่ได้อย่างเป็นอิสระ)
+- `*--` — composition (เป็นเจ้าของส่วนย่อยที่ควบคุมอายุของมัน)
+
+<Callout title="อ่านลูกศรก่อน">
+เมื่อไดอะแกรม structure ดูยุ่งเหยิง จงอ่านหัวลูกศรก่อนอ่านกล่อง ชนิดของลูกศรบอกคุณถึงความสัมพันธ์ — is-a, has-a หรือ owns — และนั่นมักเป็นสิ่งสำคัญที่สุดเพียงสิ่งเดียวที่ไดอะแกรมของ pattern พยายามจะสื่อสาร
+</Callout>
+
+export const quiz = [
+  {
+    q: 'interface ถูกทำเครื่องหมายอย่างไรใน class diagram เหล่านี้?',
+    options: [
+      'ด้วยสี่เหลี่ยมข้าวหลามตัดทึบ',
+      'ด้วย stereotype <<interface>> อยู่เหนือชื่อของมัน',
+      'ด้วยขอบเส้นประ',
+      'ด้วยเครื่องหมายลบนำหน้า',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'สามเหลี่ยมกลวงบนเส้นทึบ (Mermaid <|--) แทนอะไร?',
+    options: ['Composition', 'Association', 'Inheritance', 'Aggregation'],
+    answer: 2,
+  },
+  {
+    q: 'ความสัมพันธ์ใดที่ผูกอายุของส่วนย่อยเข้ากับทั้งหมด?',
+    options: [
+      'Association',
+      'Aggregation',
+      'Composition',
+      'Implementation',
+    ],
+    answer: 2,
+  },
+  {
+    q: 'ใน Mermaid ลูกศรใดบ่งบอก association ธรรมดาที่ object หนึ่งเพียงใช้อีกตัว?',
+    options: ['-->', '*--', 'o--', '..|>'],
+    answer: 0,
+  },
+];
+
+<Quiz client:visible id="intro-and-principles/reading-uml" questions={quiz} />
+
+<ProgressTracker client:visible id="intro-and-principles/reading-uml" />

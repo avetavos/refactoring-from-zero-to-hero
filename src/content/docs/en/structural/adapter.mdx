@@ -1,0 +1,261 @@
+---
+title: Adapter
+description: 'Wrap an object so its interface matches the one your client already expects.'
+sidebar:
+  order: 2
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+## Intent
+
+Adapter converts the interface of an existing object into the interface a client expects, letting classes cooperate that otherwise could not because their method shapes do not line up.
+
+## Problem
+
+Your code is written against a clean interface you control. Then you need to plug in a third-party library, a legacy module, or some external API that does the right job but exposes the wrong shape: different method names, different argument order, data in a format you do not want. You cannot change the foreign code, and rewriting your whole codebase to match it would be absurd.
+
+Adapter is the thin translation layer in between. It implements the interface your client expects and, behind that face, forwards each call to the foreign object, converting names, arguments, and return values as needed. The client keeps talking to the interface it already knows; the adapter absorbs the mismatch. You can swap one foreign service for another by writing a new adapter, leaving everything upstream untouched.
+
+## Structure
+
+export const adapterUml = `classDiagram
+  class Target {
+    <<interface>>
+    +fetch(city) Weather
+  }
+  class Client
+  class Adapter {
+    -service: LegacyWeatherAPI
+    +fetch(city) Weather
+  }
+  class LegacyWeatherAPI {
+    +getTempByZip(zip) number
+  }
+  Target <|.. Adapter
+  Adapter --> LegacyWeatherAPI : delegates to
+  Client --> Target : uses`;
+
+<Mermaid code={adapterUml} title="An adapter implements the target interface and delegates to the foreign service" />
+
+- **Target** — the interface your client code is written against and wants to call.
+- **Adaptee** (`LegacyWeatherAPI`) — the existing object with a useful capability but an incompatible interface.
+- **Adapter** — implements the target interface and translates each call into one or more calls on the adaptee.
+- **Client** — depends only on the target interface, oblivious to the adaptee behind it.
+
+## Example
+
+Your app expects a `WeatherProvider` that takes a city name and returns degrees Celsius. The third-party service only takes a postal code and returns Fahrenheit. The adapter bridges the gap.
+
+<Tabs syncKey="lang">
+  <TabItem label="TypeScript">
+    ```ts
+    // Target interface our app is written against.
+    interface WeatherProvider {
+      currentCelsius(city: string): number;
+    }
+
+    // The foreign service we cannot change.
+    class LegacyWeatherApi {
+      tempFahrenheitByZip(zip: string): number {
+        return 68; // pretend network call
+      }
+    }
+
+    const cityToZip: Record<string, string> = { London: 'EC1A', Tokyo: '100' };
+
+    class LegacyWeatherAdapter implements WeatherProvider {
+      constructor(private readonly service: LegacyWeatherApi) {}
+
+      currentCelsius(city: string): number {
+        const zip = cityToZip[city] ?? '00000';
+        const f = this.service.tempFahrenheitByZip(zip);
+        return Math.round(((f - 32) * 5) / 9);
+      }
+    }
+
+    const provider: WeatherProvider = new LegacyWeatherAdapter(new LegacyWeatherApi());
+    console.log(provider.currentCelsius('London')); // 20
+    ```
+  </TabItem>
+  <TabItem label="Python">
+    ```python
+    from typing import Protocol
+
+
+    class WeatherProvider(Protocol):
+        def current_celsius(self, city: str) -> int: ...
+
+
+    class LegacyWeatherApi:
+        def temp_fahrenheit_by_zip(self, zip_code: str) -> int:
+            return 68  # pretend network call
+
+
+    CITY_TO_ZIP = {"London": "EC1A", "Tokyo": "100"}
+
+
+    class LegacyWeatherAdapter:
+        def __init__(self, service: LegacyWeatherApi) -> None:
+            self._service = service
+
+        def current_celsius(self, city: str) -> int:
+            zip_code = CITY_TO_ZIP.get(city, "00000")
+            f = self._service.temp_fahrenheit_by_zip(zip_code)
+            return round((f - 32) * 5 / 9)
+
+
+    provider: WeatherProvider = LegacyWeatherAdapter(LegacyWeatherApi())
+    print(provider.current_celsius("London"))  # 20
+    ```
+  </TabItem>
+  <TabItem label="Go">
+    ```go
+    package main
+
+    import "fmt"
+
+    // Target interface our app is written against.
+    type WeatherProvider interface {
+        CurrentCelsius(city string) int
+    }
+
+    // The foreign service we cannot change.
+    type LegacyWeatherAPI struct{}
+
+    func (LegacyWeatherAPI) TempFahrenheitByZip(zip string) int {
+        return 68 // pretend network call
+    }
+
+    var cityToZip = map[string]string{"London": "EC1A", "Tokyo": "100"}
+
+    type LegacyWeatherAdapter struct {
+        service LegacyWeatherAPI
+    }
+
+    func (a LegacyWeatherAdapter) CurrentCelsius(city string) int {
+        zip, ok := cityToZip[city]
+        if !ok {
+            zip = "00000"
+        }
+        f := a.service.TempFahrenheitByZip(zip)
+        return (f - 32) * 5 / 9
+    }
+
+    func main() {
+        var provider WeatherProvider = LegacyWeatherAdapter{}
+        fmt.Println(provider.CurrentCelsius("London")) // 20
+    }
+    ```
+  </TabItem>
+  <TabItem label="Rust">
+    ```rust
+    use std::collections::HashMap;
+
+    // Target interface our app is written against.
+    trait WeatherProvider {
+        fn current_celsius(&self, city: &str) -> i32;
+    }
+
+    // The foreign service we cannot change.
+    struct LegacyWeatherApi;
+
+    impl LegacyWeatherApi {
+        fn temp_fahrenheit_by_zip(&self, _zip: &str) -> i32 {
+            68 // pretend network call
+        }
+    }
+
+    struct LegacyWeatherAdapter {
+        service: LegacyWeatherApi,
+        city_to_zip: HashMap<&'static str, &'static str>,
+    }
+
+    impl WeatherProvider for LegacyWeatherAdapter {
+        fn current_celsius(&self, city: &str) -> i32 {
+            let zip = self.city_to_zip.get(city).copied().unwrap_or("00000");
+            let f = self.service.temp_fahrenheit_by_zip(zip);
+            (f - 32) * 5 / 9
+        }
+    }
+
+    fn main() {
+        let adapter = LegacyWeatherAdapter {
+            service: LegacyWeatherApi,
+            city_to_zip: HashMap::from([("London", "EC1A"), ("Tokyo", "100")]),
+        };
+        let provider: &dyn WeatherProvider = &adapter;
+        println!("{}", provider.current_celsius("London")); // 20
+    }
+    ```
+  </TabItem>
+</Tabs>
+
+## When to use / trade-offs
+
+- **Pro:** lets you reuse existing or third-party code whose interface you cannot change.
+- **Pro:** isolates the conversion in one place, so a service swap means writing one new adapter.
+- **Pro:** keeps clients depending only on the clean target interface, improving testability.
+- **Con:** adds a layer of indirection and an extra class for every adaptee you wrap.
+- **Con:** complex conversions hide real work inside the adapter, which can mask performance or semantic mismatches.
+
+## Related patterns
+
+- [Bridge](/design-patterns-from-zero-to-hero/en/structural/bridge/) looks similar but is designed up front to let abstraction and implementation vary, whereas Adapter retrofits two existing interfaces after the fact.
+- [Decorator](/design-patterns-from-zero-to-hero/en/structural/decorator/) also wraps an object, but it keeps the same interface and adds behaviour, while Adapter changes the interface.
+- [Facade](/design-patterns-from-zero-to-hero/en/structural/facade/) wraps a whole subsystem behind a new simple interface, where Adapter typically wraps a single object to match an existing one.
+
+<Callout title="Adapter changes shape, not behaviour">
+An adapter's job is translation, not new functionality. If you find yourself adding logic the client could not get from the adaptee directly, you have probably drifted into Decorator or a service object. Keep the adapter thin: rename, reorder, reformat, forward.
+</Callout>
+
+export const quiz = [
+  {
+    q: 'What does an Adapter primarily change about an object?',
+    options: [
+      'Its internal behaviour',
+      'Its interface, so a client with different expectations can use it',
+      'The number of instances that can exist',
+      'Where the object is stored in memory',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'In the Adapter pattern, what is the "adaptee"?',
+    options: [
+      'The client calling the code',
+      'The clean interface the client expects',
+      'The existing object with a useful but incompatible interface',
+      'A shared pool of cached objects',
+    ],
+    answer: 2,
+  },
+  {
+    q: 'How does Adapter differ from Decorator?',
+    options: [
+      'Adapter changes the interface; Decorator keeps it and adds behaviour',
+      'Adapter adds behaviour; Decorator changes the interface',
+      'They are identical patterns',
+      'Adapter can only wrap subsystems, never single objects',
+    ],
+    answer: 0,
+  },
+  {
+    q: 'Why is the Adapter pattern useful with third-party code?',
+    options: [
+      'It makes the third-party code run faster',
+      'It lets you reuse code whose interface you cannot modify',
+      'It removes the third-party dependency entirely',
+      'It guarantees a single instance of the library',
+    ],
+    answer: 1,
+  },
+];
+
+<Quiz client:visible id="structural/adapter" questions={quiz} />
+
+<ProgressTracker client:visible id="structural/adapter" />

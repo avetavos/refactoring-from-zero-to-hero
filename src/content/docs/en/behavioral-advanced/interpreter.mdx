@@ -1,0 +1,268 @@
+---
+title: Interpreter
+description: 'Represent a small grammar as a tree of objects and evaluate expressions written in it.'
+sidebar:
+  order: 6
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+## Intent
+
+Interpreter gives you a way to represent the grammar of a small language as a class hierarchy and to evaluate sentences in that language by walking a tree built from those classes.
+
+## Problem
+
+Sometimes a problem is naturally expressed in a little language: a search filter, a pricing rule, a feature-flag condition, a formula. You could hard-code each variation, but the variations keep coming. What you really want is to let users write expressions like `true AND (false OR true)` and have the program evaluate them.
+
+Interpreter models each rule of the grammar as a class. Literals and variables become *terminal* expressions; operators like AND and OR become *non-terminal* expressions that hold sub-expressions. An expression in the language becomes a tree of these objects — an abstract syntax tree — and evaluating it means asking the root to interpret itself, which recurses into its children. The grammar lives in the type system, so extending the language is a matter of adding an expression class. The pattern shines for small, stable grammars and becomes unwieldy if the language grows large, where a real parser and a different evaluation strategy fit better.
+
+## Structure
+
+export const interpreterUml = `classDiagram
+  class Expr {
+    <<interface>>
+    +interpret() bool
+  }
+  class Literal {
+    -value: bool
+    +interpret() bool
+  }
+  class And {
+    -left: Expr
+    -right: Expr
+    +interpret() bool
+  }
+  class Or {
+    -left: Expr
+    -right: Expr
+    +interpret() bool
+  }
+  Expr <|.. Literal
+  Expr <|.. And
+  Expr <|.. Or
+  And o-- Expr : left and right
+  Or o-- Expr : left and right`;
+
+<Mermaid code={interpreterUml} title="Operators are non-terminal expressions that hold sub-expressions; literals are terminals" />
+
+- **Expr** — the common interface. Every node knows how to `interpret` itself and return a result.
+- **Literal** — a terminal expression: a constant value with no children.
+- **And, Or** — non-terminal expressions. Each holds sub-expressions and combines their results.
+- **Client** — assembles the expression tree (by hand or via a parser) and calls `interpret` on the root.
+
+## Example
+
+A tiny boolean expression evaluator. We build the tree for `true AND (false OR true)` directly and interpret it; the result is `true`.
+
+<Tabs syncKey="lang">
+  <TabItem label="TypeScript">
+    ```ts
+    interface Expr {
+      interpret(): boolean;
+    }
+
+    class Literal implements Expr {
+      constructor(private value: boolean) {}
+      interpret(): boolean {
+        return this.value;
+      }
+    }
+
+    class And implements Expr {
+      constructor(private left: Expr, private right: Expr) {}
+      interpret(): boolean {
+        return this.left.interpret() && this.right.interpret();
+      }
+    }
+
+    class Or implements Expr {
+      constructor(private left: Expr, private right: Expr) {}
+      interpret(): boolean {
+        return this.left.interpret() || this.right.interpret();
+      }
+    }
+
+    // true AND (false OR true)
+    const expr = new And(new Literal(true), new Or(new Literal(false), new Literal(true)));
+    console.log(expr.interpret()); // true
+    ```
+  </TabItem>
+  <TabItem label="Python">
+    ```python
+    from __future__ import annotations
+    from abc import ABC, abstractmethod
+
+
+    class Expr(ABC):
+        @abstractmethod
+        def interpret(self) -> bool: ...
+
+
+    class Literal(Expr):
+        def __init__(self, value: bool) -> None:
+            self._value = value
+
+        def interpret(self) -> bool:
+            return self._value
+
+
+    class And(Expr):
+        def __init__(self, left: Expr, right: Expr) -> None:
+            self._left = left
+            self._right = right
+
+        def interpret(self) -> bool:
+            return self._left.interpret() and self._right.interpret()
+
+
+    class Or(Expr):
+        def __init__(self, left: Expr, right: Expr) -> None:
+            self._left = left
+            self._right = right
+
+        def interpret(self) -> bool:
+            return self._left.interpret() or self._right.interpret()
+
+
+    # true AND (false OR true)
+    expr = And(Literal(True), Or(Literal(False), Literal(True)))
+    print(expr.interpret())  # True
+    ```
+  </TabItem>
+  <TabItem label="Go">
+    ```go
+    package main
+
+    import "fmt"
+
+    // Expr is any node in the boolean expression tree.
+    type Expr interface {
+        Interpret() bool
+    }
+
+    type Literal struct{ value bool }
+
+    func (l Literal) Interpret() bool {
+        return l.value
+    }
+
+    type And struct{ left, right Expr }
+
+    func (a And) Interpret() bool {
+        return a.left.Interpret() && a.right.Interpret()
+    }
+
+    type Or struct{ left, right Expr }
+
+    func (o Or) Interpret() bool {
+        return o.left.Interpret() || o.right.Interpret()
+    }
+
+    func main() {
+        // true AND (false OR true)
+        expr := And{
+            left:  Literal{value: true},
+            right: Or{left: Literal{value: false}, right: Literal{value: true}},
+        }
+        fmt.Println(expr.Interpret()) // true
+    }
+    ```
+  </TabItem>
+  <TabItem label="Rust">
+    ```rust
+    // Every node in the grammar knows how to interpret itself.
+    trait Expr {
+        fn interpret(&self) -> bool;
+    }
+
+    struct Literal(bool);
+    impl Expr for Literal {
+        fn interpret(&self) -> bool {
+            self.0
+        }
+    }
+
+    struct And(Box<dyn Expr>, Box<dyn Expr>);
+    impl Expr for And {
+        fn interpret(&self) -> bool {
+            self.0.interpret() && self.1.interpret()
+        }
+    }
+
+    struct Or(Box<dyn Expr>, Box<dyn Expr>);
+    impl Expr for Or {
+        fn interpret(&self) -> bool {
+            self.0.interpret() || self.1.interpret()
+        }
+    }
+
+    fn main() {
+        // true AND (false OR true)
+        let expr = And(
+            Box::new(Literal(true)),
+            Box::new(Or(Box::new(Literal(false)), Box::new(Literal(true)))),
+        );
+        println!("{}", expr.interpret()); // true
+    }
+    ```
+  </TabItem>
+</Tabs>
+
+## When to use / trade-offs
+
+- **Pro:** a small, stable grammar maps cleanly onto a class per rule, and each class is easy to read and test in isolation.
+- **Pro:** extending the language often means adding one expression class, not editing a monolithic evaluator.
+- **Con:** every grammar rule becomes a class, so a large grammar produces an explosion of small classes that is hard to maintain.
+- **Con:** building the tree by hand is tedious; you usually still need a parser to turn text into expression objects.
+- **Con:** tree-walking interpretation is slow for hot paths compared with compiled or bytecode approaches.
+
+## Related patterns
+
+- [Composite](/design-patterns-from-zero-to-hero/en/structural/) describes the tree shape that an interpreter's expressions form; non-terminal expressions are composites of sub-expressions.
+- [Visitor](/design-patterns-from-zero-to-hero/en/behavioral-advanced/visitor/) often complements Interpreter: rather than putting `interpret` on every node, you can move evaluation, printing, or optimization into separate visitors over the syntax tree.
+
+<Callout title="Know when to stop">
+Interpreter is for *small* languages. Once the grammar grows real precedence rules, error recovery, and performance needs, hand-rolling a class per rule turns into a liability. At that point reach for a parser generator and a dedicated evaluator, and keep this pattern for the genuinely tiny cases.
+</Callout>
+
+export const quiz = [
+  {
+    q: 'What does the Interpreter pattern represent as a class hierarchy?',
+    options: [
+      'A database schema',
+      'The grammar of a small language',
+      'A thread pool',
+      'A user-interface layout',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'How does a non-terminal expression such as AND produce its result?',
+    options: [
+      'By reading a global variable',
+      'By interpreting its sub-expressions and combining their results',
+      'By cloning itself',
+      'By querying a mediator',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'When does the Interpreter pattern become a poor fit?',
+    options: [
+      'When the grammar is tiny and stable',
+      'When the grammar grows large and performance-sensitive',
+      'When expressions return booleans',
+      'When the tree is built by a client',
+    ],
+    answer: 1,
+  },
+];
+
+<Quiz client:visible id="behavioral-advanced/interpreter" questions={quiz} />
+
+<ProgressTracker client:visible id="behavioral-advanced/interpreter" />

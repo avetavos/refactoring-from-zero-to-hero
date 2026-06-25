@@ -1,0 +1,246 @@
+---
+title: Iterator
+description: 'Provide sequential access to the elements of a collection without exposing how the collection stores them.'
+sidebar:
+  order: 7
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+## Intent
+
+Iterator provides a way to access the elements of a collection one at a time, in order, without revealing the collection's internal representation. The traversal logic — where we are, and how to advance — lives in a separate iterator object, so the same collection can be walked by different callers independently.
+
+## Problem
+
+A collection needs to be looped over, but every collection stores its data differently: an array, a linked list, a tree, a ring buffer. If callers reach inside to walk the data, they become coupled to that storage, and changing the structure breaks every loop. Worse, two callers iterating at once would trip over each other if the position were kept on the collection itself.
+
+The variation Iterator isolates is *traversal*. It moves the cursor — the current position and the rule for advancing — into its own object. Callers ask the collection for an iterator and then pull elements through a uniform interface, oblivious to the underlying layout. Because each iterator owns its position, several can traverse the same collection at the same time.
+
+Most languages now offer native iteration protocols, so you rarely hand-roll the classic interface; you implement the language's protocol instead and get `for`-loops, comprehensions, and lazy pipelines for free.
+
+## Structure
+
+export const iteratorUml = `classDiagram
+  class Iterable {
+    <<interface>>
+    +iterator() Iterator
+  }
+  class Iterator {
+    <<interface>>
+    +hasNext() bool
+    +next() T
+  }
+  class NumberRing {
+    -items: List~T~
+    +iterator() Iterator
+  }
+  class RingIterator {
+    -index: int
+    +hasNext() bool
+    +next() T
+  }
+  Iterable <|.. NumberRing
+  Iterator <|.. RingIterator
+  NumberRing ..> RingIterator : creates`;
+
+<Mermaid code={iteratorUml} title="A collection creates an Iterator that holds the cursor and advances independently" />
+
+- **Iterator** — the interface for stepping through elements: typically "is there another?" and "give me the next."
+- **Concrete Iterator** — holds the current position and knows how to advance over one specific collection.
+- **Iterable (Aggregate)** — the collection; it creates iterators on request and hides its storage.
+- **Client** — asks for an iterator and consumes elements through the interface, unaware of the layout.
+
+## Example
+
+A small custom collection that yields its elements in order. Each language implements its *native* iteration protocol — `Symbol.iterator` and generators in TypeScript, `__iter__` and generators in Python, a closure-based generator in Go, and the `Iterator` trait in Rust.
+
+<Tabs syncKey="lang">
+  <TabItem label="TypeScript">
+    ```ts
+    class NumberBox implements Iterable<number> {
+      private items: number[] = [];
+      add(n: number): void {
+        this.items.push(n);
+      }
+      // A generator is the idiomatic way to implement Symbol.iterator.
+      *[Symbol.iterator](): Iterator<number> {
+        for (const n of this.items) {
+          yield n;
+        }
+      }
+    }
+
+    const box = new NumberBox();
+    box.add(1);
+    box.add(2);
+    box.add(3);
+    for (const n of box) {
+      console.log(n); // 1, 2, 3
+    }
+    console.log([...box]); // [1, 2, 3] — spread uses the same protocol
+    ```
+  </TabItem>
+  <TabItem label="Python">
+    ```python
+    from collections.abc import Iterator
+
+
+    class NumberBox:
+        def __init__(self) -> None:
+            self._items: list[int] = []
+
+        def add(self, n: int) -> None:
+            self._items.append(n)
+
+        # A generator function makes __iter__ trivial and lazy.
+        def __iter__(self) -> Iterator[int]:
+            for n in self._items:
+                yield n
+
+
+    box = NumberBox()
+    box.add(1)
+    box.add(2)
+    box.add(3)
+    for n in box:
+        print(n)  # 1, 2, 3
+    print(list(box))  # [1, 2, 3]
+    ```
+  </TabItem>
+  <TabItem label="Go">
+    ```go
+    package main
+
+    import "fmt"
+
+    type NumberBox struct{ items []int }
+
+    func (b *NumberBox) Add(n int) { b.items = append(b.items, n) }
+
+    // Iterator returns a closure that yields the next element and a flag.
+    // (Go 1.23+ range-over-func is another idiomatic option.)
+    func (b *NumberBox) Iterator() func() (int, bool) {
+        i := 0
+        return func() (int, bool) {
+            if i >= len(b.items) {
+                return 0, false
+            }
+            v := b.items[i]
+            i++
+            return v, true
+        }
+    }
+
+    func main() {
+        box := &NumberBox{}
+        box.Add(1)
+        box.Add(2)
+        box.Add(3)
+        next := box.Iterator()
+        for v, ok := next(); ok; v, ok = next() {
+            fmt.Println(v) // 1, 2, 3
+        }
+    }
+    ```
+  </TabItem>
+  <TabItem label="Rust">
+    ```rust
+    struct NumberBox {
+        items: Vec<i32>,
+    }
+    impl NumberBox {
+        fn new() -> Self {
+            NumberBox { items: Vec::new() }
+        }
+        fn add(&mut self, n: i32) {
+            self.items.push(n);
+        }
+        // Borrow the items and lean on the standard Iterator trait.
+        fn iter(&self) -> impl Iterator<Item = &i32> {
+            self.items.iter()
+        }
+    }
+
+    fn main() {
+        let mut box_ = NumberBox::new();
+        box_.add(1);
+        box_.add(2);
+        box_.add(3);
+        for n in box_.iter() {
+            println!("{}", n); // 1, 2, 3
+        }
+        let collected: Vec<i32> = box_.iter().copied().collect();
+        println!("{:?}", collected); // [1, 2, 3]
+    }
+    ```
+  </TabItem>
+</Tabs>
+
+## When to use / trade-offs
+
+- **Pro:** callers traverse a collection without knowing or depending on its internal storage.
+- **Pro:** each iterator owns its position, so multiple traversals of one collection coexist.
+- **Pro:** it unifies looping across wildly different structures behind one interface, and pairs naturally with lazy, on-demand evaluation.
+- **Con:** for a plain array a direct index loop is simpler than a dedicated iterator object.
+- **Con:** mutating a collection while iterating it is a classic source of bugs, and most iterators do not tolerate it.
+
+## Related patterns
+
+- [Composite](/design-patterns-from-zero-to-hero/en/structural/composite/) trees are a natural home for iterators, which can flatten a recursive structure into a linear walk.
+- [Template Method](/design-patterns-from-zero-to-hero/en/behavioral-essentials/template-method/) often drives traversal of a composite, with the iterator filling in the per-node step.
+
+<Callout title="Prefer the language protocol">
+The classic hasNext/next interface is worth understanding, but in day-to-day code you should implement your language's built-in iteration protocol — generators, `__iter__`, range-over-func, or the `Iterator` trait. Doing so plugs your collection into every loop, comprehension, and lazy combinator the language already provides.
+</Callout>
+
+export const quiz = [
+  {
+    q: 'What does the Iterator pattern provide?',
+    options: [
+      'A single shared instance of a collection',
+      'Sequential access to elements without exposing the collection internals',
+      'A way to clone a collection',
+      'A fixed algorithm skeleton with overridable steps',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'Why can several iterators traverse one collection at once?',
+    options: [
+      'Because the collection stores a single shared cursor',
+      'Because each iterator object holds its own position',
+      'Because iteration is always single-threaded',
+      'Because the collection is copied for each loop',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'Which is the idiomatic way to implement iteration in modern languages?',
+    options: [
+      'Always hand-write a hasNext/next class',
+      'Implement the language protocol — generators, __iter__, or the Iterator trait',
+      'Expose the underlying array directly',
+      'Make the collection a singleton',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'What is a common bug when using iterators?',
+    options: [
+      'Reading elements in order',
+      'Mutating the collection while iterating over it',
+      'Creating two iterators on one collection',
+      'Using a for-loop',
+    ],
+    answer: 1,
+  },
+];
+
+<Quiz client:visible id="behavioral-essentials/iterator" questions={quiz} />
+
+<ProgressTracker client:visible id="behavioral-essentials/iterator" />

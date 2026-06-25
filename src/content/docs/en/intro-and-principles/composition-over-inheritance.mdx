@@ -1,0 +1,251 @@
+---
+title: Composition Over Inheritance
+description: 'Why assembling behaviour from small parts is usually more flexible than building deep inheritance hierarchies.'
+sidebar:
+  order: 4
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+## Two ways to reuse behaviour
+
+When one object needs the abilities of another, you have two broad choices. *Inheritance* says "a `FlyingDuck` **is a** `Duck`" and pulls in the parent's behaviour automatically. *Composition* says "a `Duck` **has a** flying behaviour" and holds a reference to a separate object that supplies it. Both reuse code, but they age very differently as requirements shift.
+
+## Where deep inheritance hurts
+
+Inheritance binds a subclass to its parent at compile time. That is rigid in three ways. First, a subclass inherits *everything*, including behaviour it does not want — so a `RubberDuck` that cannot fly still inherits `fly()`. Second, behaviour is fixed for the object's lifetime; you cannot change how a duck flies at runtime. Third, deep hierarchies couple unrelated features: when you need every combination of fly-or-not and quack-or-not, a tree of subclasses explodes combinatorially, and a change near the root ripples to every leaf.
+
+## How composition helps
+
+Composition replaces the tree with a small set of interchangeable parts. A `Duck` holds a `FlyBehavior` and a `QuackBehavior`; each is an interface with a few concrete implementations. New combinations cost nothing — you just plug different parts together — and because the parts are held as fields, you can even swap them at runtime. The example below refactors a `Duck` that hard-codes flying via inheritance into one that delegates to an injected `FlyBehavior`.
+
+<Tabs syncKey="lang">
+  <TabItem label="TypeScript">
+    ```ts
+    // Composition: the duck delegates flying to an injected behaviour.
+    interface FlyBehavior {
+      fly(): string;
+    }
+
+    class FlyWithWings implements FlyBehavior {
+      fly(): string {
+        return 'flying with wings';
+      }
+    }
+
+    class NoFly implements FlyBehavior {
+      fly(): string {
+        return 'cannot fly';
+      }
+    }
+
+    class Duck {
+      constructor(private behavior: FlyBehavior) {}
+
+      performFly(): string {
+        return this.behavior.fly();
+      }
+
+      setFly(behavior: FlyBehavior): void {
+        this.behavior = behavior; // swap behaviour at runtime
+      }
+    }
+
+    const rubber = new Duck(new NoFly());
+    console.log(rubber.performFly()); // cannot fly
+    rubber.setFly(new FlyWithWings());
+    console.log(rubber.performFly()); // flying with wings
+    ```
+  </TabItem>
+  <TabItem label="Python">
+    ```python
+    from typing import Protocol
+
+
+    # Composition: the duck delegates flying to an injected behaviour.
+    class FlyBehavior(Protocol):
+        def fly(self) -> str: ...
+
+
+    class FlyWithWings:
+        def fly(self) -> str:
+            return "flying with wings"
+
+
+    class NoFly:
+        def fly(self) -> str:
+            return "cannot fly"
+
+
+    class Duck:
+        def __init__(self, behavior: FlyBehavior) -> None:
+            self._behavior = behavior
+
+        def perform_fly(self) -> str:
+            return self._behavior.fly()
+
+        def set_fly(self, behavior: FlyBehavior) -> None:
+            self._behavior = behavior  # swap behaviour at runtime
+
+
+    rubber = Duck(NoFly())
+    print(rubber.perform_fly())  # cannot fly
+    rubber.set_fly(FlyWithWings())
+    print(rubber.perform_fly())  # flying with wings
+    ```
+  </TabItem>
+  <TabItem label="Go">
+    ```go
+    package main
+
+    import "fmt"
+
+    // Composition: the duck delegates flying to an injected behaviour.
+    type FlyBehavior interface {
+        Fly() string
+    }
+
+    type FlyWithWings struct{}
+
+    func (FlyWithWings) Fly() string { return "flying with wings" }
+
+    type NoFly struct{}
+
+    func (NoFly) Fly() string { return "cannot fly" }
+
+    type Duck struct {
+        behavior FlyBehavior
+    }
+
+    func (d Duck) PerformFly() string { return d.behavior.Fly() }
+
+    func (d *Duck) SetFly(b FlyBehavior) { d.behavior = b } // swap at runtime
+
+    func main() {
+        rubber := Duck{behavior: NoFly{}}
+        fmt.Println(rubber.PerformFly()) // cannot fly
+        rubber.SetFly(FlyWithWings{})
+        fmt.Println(rubber.PerformFly()) // flying with wings
+    }
+    ```
+  </TabItem>
+  <TabItem label="Rust">
+    ```rust
+    // Composition: the duck delegates flying to an injected behaviour.
+    trait FlyBehavior {
+        fn fly(&self) -> &'static str;
+    }
+
+    struct FlyWithWings;
+    impl FlyBehavior for FlyWithWings {
+        fn fly(&self) -> &'static str {
+            "flying with wings"
+        }
+    }
+
+    struct NoFly;
+    impl FlyBehavior for NoFly {
+        fn fly(&self) -> &'static str {
+            "cannot fly"
+        }
+    }
+
+    struct Duck {
+        behavior: Box<dyn FlyBehavior>,
+    }
+
+    impl Duck {
+        fn perform_fly(&self) -> &'static str {
+            self.behavior.fly()
+        }
+
+        fn set_fly(&mut self, behavior: Box<dyn FlyBehavior>) {
+            self.behavior = behavior; // swap behaviour at runtime
+        }
+    }
+
+    fn main() {
+        let mut rubber = Duck { behavior: Box::new(NoFly) };
+        println!("{}", rubber.perform_fly()); // cannot fly
+        rubber.set_fly(Box::new(FlyWithWings));
+        println!("{}", rubber.perform_fly()); // flying with wings
+    }
+    ```
+  </TabItem>
+</Tabs>
+
+## Tree versus parts
+
+On the left, a rigid hierarchy needs a new subclass for every combination of abilities. On the right, the duck holds a behaviour it can swap.
+
+export const compDiagram = `classDiagram
+  class Duck
+  class FlyingDuck
+  class NonFlyingDuck
+  Duck <|-- FlyingDuck
+  Duck <|-- NonFlyingDuck
+  class FlexibleDuck
+  class FlyBehavior {
+    <<interface>>
+    +fly()
+  }
+  FlexibleDuck --> FlyBehavior : has-a, swappable`;
+
+<Mermaid code={compDiagram} title="Inheritance fixes behaviour in a tree; composition holds a swappable part" />
+
+This "favour composition over inheritance" guideline is the backbone of many patterns: Strategy, Decorator, and State all replace a subclass with a held, interchangeable object. It does not ban inheritance — a genuine *is-a* relationship with a stable base is still the right tool. The lesson is to reach for composition first and let inheritance prove it is needed.
+
+<Callout title="Has-a beats is-a when behaviour varies">
+If the variation you are modelling is about *what an object does* rather than *what it fundamentally is*, prefer holding a behaviour object over subclassing. You gain runtime flexibility, avoid combinatorial subclass explosions, and keep each part small enough to test on its own.
+</Callout>
+
+export const quiz = [
+  {
+    q: 'What is the core difference between inheritance and composition?',
+    options: [
+      'Inheritance is faster; composition is slower',
+      'Inheritance expresses "is-a" and binds at compile time; composition expresses "has-a" and can swap parts at runtime',
+      'Composition only works in dynamically typed languages',
+      'There is no practical difference',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'Why do deep inheritance hierarchies become rigid?',
+    options: [
+      'Subclasses inherit everything and behaviour is fixed for the object\'s lifetime',
+      'They use too much memory',
+      'Compilers forbid more than two levels',
+      'They cannot define new methods',
+    ],
+    answer: 0,
+  },
+  {
+    q: 'In the refactored example, how does the duck change how it flies?',
+    options: [
+      'By recompiling the program',
+      'By swapping the injected FlyBehavior object at runtime',
+      'By inheriting from a new parent class',
+      'It cannot change once created',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'Which patterns are built on favouring composition over inheritance?',
+    options: [
+      'Strategy, Decorator, and State',
+      'Singleton only',
+      'None — patterns avoid composition',
+      'Only creational patterns',
+    ],
+    answer: 0,
+  },
+];
+
+<Quiz client:visible id="intro-and-principles/composition-over-inheritance" questions={quiz} />
+
+<ProgressTracker client:visible id="intro-and-principles/composition-over-inheritance" />

@@ -1,0 +1,75 @@
+---
+title: Behavioral Patterns II
+description: 'Five more behavioral patterns that route requests, centralize communication, capture state, and walk structures or grammars.'
+sidebar:
+  order: 1
+---
+
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+
+## Intent
+
+Behavioral patterns govern how objects interact and how responsibility is shared between them. This module continues directly from *Behavioral Patterns I*, taking the same goal — loosen the coupling between collaborating objects — and applying it to five harder problems: routing a request through a line of candidates, funnelling many-to-many chatter through one hub, snapshotting and restoring state, attaching new operations to a fixed structure, and turning a small language into running code.
+
+## Problem
+
+The five patterns in the first module handled the everyday axes of variation: the algorithm, the recipient of a notification, the request as a value, the mode of an object, and the way a collection is traversed. The patterns here address situations that feel less like a single class and more like a small subsystem.
+
+Who should handle this request, when more than one object could? How do you stop a dozen widgets from each knowing about every other widget? How do you offer undo without exposing an object's private fields? How do you add yet another operation to a sprawling object tree without editing every class in it? And how do you evaluate a user-supplied expression without writing a one-off parser each time? Each pattern below isolates one of these concerns so the rest of the system stays simple.
+
+## Structure
+
+These five patterns build on the foundation laid in *Behavioral Patterns I*. If you have not read it, start with the [Behavioral Patterns I module](/design-patterns-from-zero-to-hero/en/behavioral-essentials/) first.
+
+export const overviewUml = `classDiagram
+  class BehavioralPattern {
+    <<concept>>
+    +coordinate()
+  }
+  class ChainOfResponsibility {
+    +handle()
+  }
+  class Mediator {
+    +notify()
+  }
+  class Memento {
+    +getState()
+  }
+  class Visitor {
+    +visit()
+  }
+  class Interpreter {
+    +interpret()
+  }
+  BehavioralPattern <|.. ChainOfResponsibility
+  BehavioralPattern <|.. Mediator
+  BehavioralPattern <|.. Memento
+  BehavioralPattern <|.. Visitor
+  BehavioralPattern <|.. Interpreter`;
+
+<Mermaid code={overviewUml} title="The five patterns covered in Behavioral Patterns II" />
+
+The five patterns at a glance:
+
+- **Chain of Responsibility** — passes a request along an ordered line of handlers, letting each decide to handle it or forward it, so sender and receiver stay decoupled.
+- **Mediator** — replaces tangled many-to-many references with one coordinator that all colleagues talk to, centralizing complex communication.
+- **Memento** — captures an object's internal state into an opaque token and restores it later, enabling undo without breaking encapsulation.
+- **Visitor** — moves an operation out of a structure's classes and into a separate visitor, letting you add behaviour without editing the structure.
+- **Interpreter** — represents a small grammar as a tree of objects and evaluates it, turning expressions into results.
+
+## When to use / trade-offs
+
+- **Pro:** each pattern isolates one interaction concern, so the surrounding code stays decoupled and easier to change.
+- **Pro:** several of them — Memento, Chain of Responsibility, Visitor — pair naturally with patterns from the first module such as Command and Composite.
+- **Con:** these are heavier abstractions than the essentials; an unused handler chain or a one-method visitor adds ceremony without payoff.
+- **Con:** reach for them only when the interaction problem is genuinely present, not in anticipation of one.
+
+## Related patterns
+
+- [Behavioral Patterns I](/design-patterns-from-zero-to-hero/en/behavioral-essentials/) introduces Strategy, Observer, Command, State, Template Method, and Iterator.
+- [Composite](/design-patterns-from-zero-to-hero/en/structural/) trees are the classic input to a Visitor.
+
+<Callout title="How to read this module">
+Each lesson keeps the same shape: intent, the problem, a UML structure diagram, one worked example in TypeScript, Python, Go, and Rust, the trade-offs, related patterns, and a short quiz. Read them in order — Memento references Command, and Visitor assumes you are comfortable with object trees.
+</Callout>

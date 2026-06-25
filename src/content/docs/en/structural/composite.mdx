@@ -1,0 +1,266 @@
+---
+title: Composite
+description: 'Arrange objects into part-whole trees and treat leaves and branches uniformly.'
+sidebar:
+  order: 4
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+## Intent
+
+Composite lets you build tree structures of part-whole hierarchies and treat individual objects and compositions of objects through the same interface, so clients do not need to know whether they hold a leaf or a whole branch.
+
+## Problem
+
+Think of a file system: files have a size, and folders contain files and other folders, with their size being the sum of everything inside. If you model files and folders as unrelated types, every piece of client code that walks the tree has to ask "is this a file or a folder?" and branch accordingly. That conditional spreads everywhere and breaks the moment you add a third kind of node.
+
+Composite removes the question. A common interface — say, a node with a `size()` method — is implemented by both leaves and containers. A leaf returns its own value. A container delegates to its children and combines their results, recursing as deep as the tree goes. The client calls `size()` on the root and gets the total, never caring about the shape underneath. Adding a node type means implementing the same interface, not editing every traversal.
+
+## Structure
+
+export const compositeUml = `classDiagram
+  class Node {
+    <<interface>>
+    +size() int
+    +name() string
+  }
+  class File {
+    -bytes: int
+    +size() int
+  }
+  class Folder {
+    -children: Node[]
+    +add(child)
+    +size() int
+  }
+  Node <|.. File
+  Node <|.. Folder
+  Folder o--> Node : contains children`;
+
+<Mermaid code={compositeUml} title="Leaves and containers share one interface; containers hold children" />
+
+- **Component** (`Node`) — the common interface for everything in the tree, declaring the operations clients call.
+- **Leaf** (`File`) — a node with no children; it implements the operation directly.
+- **Composite** (`Folder`) — a node that holds child components and implements the operation by delegating to and combining its children.
+- **Client** — works against the component interface and treats leaves and composites the same.
+
+## Example
+
+A file-system tree where both files and folders expose `size()`. A folder's size is the sum of its children, computed recursively.
+
+<Tabs syncKey="lang">
+  <TabItem label="TypeScript">
+    ```ts
+    interface Node {
+      size(): number;
+    }
+
+    class File implements Node {
+      constructor(private readonly bytes: number) {}
+      size = () => this.bytes;
+    }
+
+    class Folder implements Node {
+      private children: Node[] = [];
+      add(child: Node): this {
+        this.children.push(child);
+        return this;
+      }
+      size = () => this.children.reduce((sum, c) => sum + c.size(), 0);
+    }
+
+    const root = new Folder()
+      .add(new File(100))
+      .add(new Folder().add(new File(20)).add(new File(30)));
+
+    console.log(root.size()); // 150
+    ```
+  </TabItem>
+  <TabItem label="Python">
+    ```python
+    from abc import ABC, abstractmethod
+
+
+    class Node(ABC):
+        @abstractmethod
+        def size(self) -> int: ...
+
+
+    class File(Node):
+        def __init__(self, bytes_: int) -> None:
+            self._bytes = bytes_
+
+        def size(self) -> int:
+            return self._bytes
+
+
+    class Folder(Node):
+        def __init__(self) -> None:
+            self._children: list[Node] = []
+
+        def add(self, child: Node) -> "Folder":
+            self._children.append(child)
+            return self
+
+        def size(self) -> int:
+            return sum(child.size() for child in self._children)
+
+
+    root = Folder()
+    root.add(File(100)).add(Folder().add(File(20)).add(File(30)))
+    print(root.size())  # 150
+    ```
+  </TabItem>
+  <TabItem label="Go">
+    ```go
+    package main
+
+    import "fmt"
+
+    type Node interface {
+        Size() int
+    }
+
+    type File struct{ Bytes int }
+
+    func (f File) Size() int { return f.Bytes }
+
+    type Folder struct{ children []Node }
+
+    func (fo *Folder) Add(child Node) *Folder {
+        fo.children = append(fo.children, child)
+        return fo
+    }
+
+    func (fo *Folder) Size() int {
+        total := 0
+        for _, c := range fo.children {
+            total += c.Size()
+        }
+        return total
+    }
+
+    func main() {
+        inner := (&Folder{}).Add(File{20}).Add(File{30})
+        root := (&Folder{}).Add(File{100}).Add(inner)
+        fmt.Println(root.Size()) // 150
+    }
+    ```
+  </TabItem>
+  <TabItem label="Rust">
+    ```rust
+    trait Node {
+        fn size(&self) -> u64;
+    }
+
+    struct File {
+        bytes: u64,
+    }
+
+    impl Node for File {
+        fn size(&self) -> u64 {
+            self.bytes
+        }
+    }
+
+    struct Folder {
+        children: Vec<Box<dyn Node>>,
+    }
+
+    impl Folder {
+        fn new() -> Self {
+            Folder { children: Vec::new() }
+        }
+        fn add(mut self, child: Box<dyn Node>) -> Self {
+            self.children.push(child);
+            self
+        }
+    }
+
+    impl Node for Folder {
+        fn size(&self) -> u64 {
+            self.children.iter().map(|c| c.size()).sum()
+        }
+    }
+
+    fn main() {
+        let inner = Folder::new()
+            .add(Box::new(File { bytes: 20 }))
+            .add(Box::new(File { bytes: 30 }));
+        let root = Folder::new()
+            .add(Box::new(File { bytes: 100 }))
+            .add(Box::new(inner));
+        println!("{}", root.size()); // 150
+    }
+    ```
+  </TabItem>
+</Tabs>
+
+## When to use / trade-offs
+
+- **Pro:** clients treat single objects and whole subtrees uniformly, eliminating type-checking conditionals.
+- **Pro:** adding new component types is open-ended — just implement the shared interface.
+- **Pro:** recursive operations like totals, rendering, or searches fall out naturally from the structure.
+- **Con:** a too-general component interface can force leaves to implement child operations that make no sense for them.
+- **Con:** the uniformity can hide cost: a single innocent call may recurse over a huge tree.
+
+## Related patterns
+
+- [Decorator](/design-patterns-from-zero-to-hero/en/structural/decorator/) also relies on recursive composition, but it adds behaviour to a single wrapped object rather than aggregating many children.
+- [Builder](/design-patterns-from-zero-to-hero/en/creational/builder/) is handy for assembling a complex composite tree step by step.
+
+<Callout title="Where to put child operations">
+A classic design tension: do you put `add` and `remove` on the shared component interface (uniform, but leaves must reject them) or only on the composite (type-safe, but clients must distinguish)? The example puts them only on `Folder` for safety. Choose based on whether your clients need true uniformity or stronger typing.
+</Callout>
+
+export const quiz = [
+  {
+    q: 'What structure does the Composite pattern build?',
+    options: [
+      'A single shared instance',
+      'A part-whole tree treated through one common interface',
+      'A queue of pending requests',
+      'A flat lookup table',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'How does a composite (container) implement the shared operation?',
+    options: [
+      'By returning a constant value',
+      'By delegating to its children and combining their results',
+      'By throwing an exception',
+      'By cloning itself',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'What benefit does treating leaves and composites uniformly give clients?',
+    options: [
+      'It guarantees thread safety',
+      'It removes the need to check whether a node is a leaf or a branch',
+      'It reduces memory by sharing state',
+      'It enforces a single instance',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'What is a downside of a very general component interface?',
+    options: [
+      'It prevents recursion entirely',
+      'Leaves may be forced to implement child operations that make no sense for them',
+      'It makes the tree impossible to traverse',
+      'It requires inheritance from a singleton',
+    ],
+    answer: 1,
+  },
+];
+
+<Quiz client:visible id="structural/composite" questions={quiz} />
+
+<ProgressTracker client:visible id="structural/composite" />

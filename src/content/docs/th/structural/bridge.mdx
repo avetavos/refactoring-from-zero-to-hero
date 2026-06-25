@@ -1,0 +1,302 @@
+---
+title: Bridge
+description: 'แยก abstraction ออกจาก implementation เพื่อให้ทั้งสองเปลี่ยนแปลงได้อย่างอิสระต่อกัน'
+sidebar:
+  order: 3
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+## เจตนา
+
+Bridge แยก abstraction ออกจาก implementation โดยให้แต่ละส่วนอยู่ในลำดับชั้น class ของตัวเอง เพื่อให้ทั้งสองเปลี่ยนแปลงและเติบโตได้อย่างอิสระต่อกันแทนที่จะทวีคูณรวมกัน
+
+## ปัญหา
+
+สมมติว่าคุณมีรูปทรง คือ วงกลม สี่เหลี่ยม และคุณต้องการวาดแต่ละอันด้วย rendering backend ที่ต่างกัน เช่น vector renderer และ raster renderer เส้นทางที่ง่ายที่สุดคือการ inheritance ได้แก่ `VectorCircle`, `RasterCircle`, `VectorSquare`, `RasterSquare` เพิ่มรูปทรงตัวที่สามหรือ backend ตัวที่สามแล้วจำนวน class จะระเบิดเป็นผลคูณของสองมิติ ที่แย่กว่านั้นคือตอนนี้ทุกรูปทรงต้องรู้จัก backend ทุกตัว
+
+Bridge แยกผลคูณนั้นออกจากกัน ลำดับชั้นหนึ่งจำลอง *abstraction* (รูปทรงและการดำเนินการระดับสูงของมัน) อีกลำดับชั้นหนึ่งจำลอง *implementation* (พื้นฐานของการ render) abstraction ถือ reference ไปยัง object ของ implementation และ delegate งานระดับล่างให้กับมัน ตอนนี้รูปทรงและ renderer เปลี่ยนแปลงบนแกนที่อิสระต่อกัน คือ สามรูปทรงบวกสอง renderer หมายถึงห้า class ไม่ใช่หก และการเพิ่มฝั่งใดฝั่งหนึ่งก็ไม่ไปแตะอีกฝั่ง
+
+## โครงสร้าง
+
+export const bridgeUml = `classDiagram
+  class Shape {
+    <<abstract>>
+    #renderer: Renderer
+    +draw()
+  }
+  class Circle {
+    +draw()
+  }
+  class Square {
+    +draw()
+  }
+  class Renderer {
+    <<interface>>
+    +drawCircle(r)
+    +drawRectangle(w, h)
+  }
+  class VectorRenderer
+  class RasterRenderer
+  Shape <|-- Circle
+  Shape <|-- Square
+  Shape o--> Renderer : delegates to
+  Renderer <|.. VectorRenderer
+  Renderer <|.. RasterRenderer`;
+
+<Mermaid code={bridgeUml} title="ลำดับชั้นของรูปทรงเชื่อม (bridge) ไปยังลำดับชั้นของ renderer ที่แยกออกมา" />
+
+- **Abstraction** (`Shape`) — interface ระดับสูงที่ client ใช้ มันถือ reference ไปยัง implementor และ delegate การดำเนินการพื้นฐานให้กับมัน
+- **Refined Abstraction** (`Circle`, `Square`) — รูปแบบที่เป็นรูปธรรมของ abstraction ซึ่งอาจเพิ่มการดำเนินการของตัวเอง
+- **Implementor** (`Renderer`) — interface สำหรับการดำเนินการระดับล่างที่ abstraction พึ่งพา
+- **Concrete Implementor** (`VectorRenderer`, `RasterRenderer`) — implementation จริงที่ abstraction สามารถจับคู่ด้วยได้ตอน runtime
+
+## ตัวอย่าง
+
+รูปทรง delegate การวาดของมันไปยัง renderer ที่เสียบเปลี่ยนได้ รูปทรงใด ๆ ทำงานได้กับ renderer ใด ๆ โดยเลือกตอนที่รูปทรงถูกสร้างขึ้น
+
+<Tabs syncKey="lang">
+  <TabItem label="TypeScript">
+    ```ts
+    // Implementor: the low-level drawing operations.
+    interface Renderer {
+      drawCircle(radius: number): string;
+      drawRectangle(width: number, height: number): string;
+    }
+
+    class VectorRenderer implements Renderer {
+      drawCircle = (r: number) => `vector circle r=${r}`;
+      drawRectangle = (w: number, h: number) => `vector rect ${w}x${h}`;
+    }
+
+    class RasterRenderer implements Renderer {
+      drawCircle = (r: number) => `raster pixels for circle r=${r}`;
+      drawRectangle = (w: number, h: number) => `raster pixels for rect ${w}x${h}`;
+    }
+
+    // Abstraction: holds a renderer and delegates to it.
+    abstract class Shape {
+      constructor(protected readonly renderer: Renderer) {}
+      abstract draw(): string;
+    }
+
+    class Circle extends Shape {
+      constructor(renderer: Renderer, private readonly radius: number) {
+        super(renderer);
+      }
+      draw = () => this.renderer.drawCircle(this.radius);
+    }
+
+    console.log(new Circle(new VectorRenderer(), 5).draw()); // vector circle r=5
+    console.log(new Circle(new RasterRenderer(), 5).draw()); // raster pixels for circle r=5
+    ```
+  </TabItem>
+  <TabItem label="Python">
+    ```python
+    from abc import ABC, abstractmethod
+    from typing import Protocol
+
+
+    class Renderer(Protocol):
+        def draw_circle(self, radius: float) -> str: ...
+        def draw_rectangle(self, width: float, height: float) -> str: ...
+
+
+    class VectorRenderer:
+        def draw_circle(self, radius: float) -> str:
+            return f"vector circle r={radius}"
+
+        def draw_rectangle(self, width: float, height: float) -> str:
+            return f"vector rect {width}x{height}"
+
+
+    class RasterRenderer:
+        def draw_circle(self, radius: float) -> str:
+            return f"raster pixels for circle r={radius}"
+
+        def draw_rectangle(self, width: float, height: float) -> str:
+            return f"raster pixels for rect {width}x{height}"
+
+
+    class Shape(ABC):
+        def __init__(self, renderer: Renderer) -> None:
+            self._renderer = renderer
+
+        @abstractmethod
+        def draw(self) -> str: ...
+
+
+    class Circle(Shape):
+        def __init__(self, renderer: Renderer, radius: float) -> None:
+            super().__init__(renderer)
+            self._radius = radius
+
+        def draw(self) -> str:
+            return self._renderer.draw_circle(self._radius)
+
+
+    print(Circle(VectorRenderer(), 5).draw())  # vector circle r=5
+    print(Circle(RasterRenderer(), 5).draw())  # raster pixels for circle r=5
+    ```
+  </TabItem>
+  <TabItem label="Go">
+    ```go
+    package main
+
+    import "fmt"
+
+    // Implementor: the low-level drawing operations.
+    type Renderer interface {
+        DrawCircle(radius float64) string
+        DrawRectangle(width, height float64) string
+    }
+
+    type VectorRenderer struct{}
+
+    func (VectorRenderer) DrawCircle(r float64) string {
+        return fmt.Sprintf("vector circle r=%g", r)
+    }
+    func (VectorRenderer) DrawRectangle(w, h float64) string {
+        return fmt.Sprintf("vector rect %gx%g", w, h)
+    }
+
+    type RasterRenderer struct{}
+
+    func (RasterRenderer) DrawCircle(r float64) string {
+        return fmt.Sprintf("raster pixels for circle r=%g", r)
+    }
+    func (RasterRenderer) DrawRectangle(w, h float64) string {
+        return fmt.Sprintf("raster pixels for rect %gx%g", w, h)
+    }
+
+    // Abstraction: composes a renderer.
+    type Circle struct {
+        renderer Renderer
+        radius   float64
+    }
+
+    func (c Circle) Draw() string { return c.renderer.DrawCircle(c.radius) }
+
+    func main() {
+        fmt.Println(Circle{VectorRenderer{}, 5}.Draw()) // vector circle r=5
+        fmt.Println(Circle{RasterRenderer{}, 5}.Draw()) // raster pixels for circle r=5
+    }
+    ```
+  </TabItem>
+  <TabItem label="Rust">
+    ```rust
+    // Implementor: the low-level drawing operations.
+    trait Renderer {
+        fn draw_circle(&self, radius: f64) -> String;
+        fn draw_rectangle(&self, width: f64, height: f64) -> String;
+    }
+
+    struct VectorRenderer;
+    impl Renderer for VectorRenderer {
+        fn draw_circle(&self, r: f64) -> String {
+            format!("vector circle r={r}")
+        }
+        fn draw_rectangle(&self, w: f64, h: f64) -> String {
+            format!("vector rect {w}x{h}")
+        }
+    }
+
+    struct RasterRenderer;
+    impl Renderer for RasterRenderer {
+        fn draw_circle(&self, r: f64) -> String {
+            format!("raster pixels for circle r={r}")
+        }
+        fn draw_rectangle(&self, w: f64, h: f64) -> String {
+            format!("raster pixels for rect {w}x{h}")
+        }
+    }
+
+    // Abstraction: holds a renderer and delegates to it.
+    struct Circle<'a> {
+        renderer: &'a dyn Renderer,
+        radius: f64,
+    }
+
+    impl Circle<'_> {
+        fn draw(&self) -> String {
+            self.renderer.draw_circle(self.radius)
+        }
+    }
+
+    fn main() {
+        let circle = Circle { renderer: &VectorRenderer, radius: 5.0 };
+        println!("{}", circle.draw()); // vector circle r=5
+        let circle = Circle { renderer: &RasterRenderer, radius: 5.0 };
+        println!("{}", circle.draw()); // raster pixels for circle r=5
+    }
+    ```
+  </TabItem>
+</Tabs>
+
+## เมื่อไรควรใช้ / ข้อแลกเปลี่ยน
+
+- **ข้อดี:** abstraction และ implementation เติบโตบนแกนที่อิสระต่อกัน หลีกเลี่ยงการระเบิดของ class แบบ combinatorial
+- **ข้อดี:** คุณสามารถสลับ implementation ได้ตอน runtime เพราะ abstraction ถือเพียง reference เท่านั้น
+- **ข้อดี:** แต่ละลำดับชั้นสามารถพัฒนา ทดสอบ และต่อยอดได้โดยไม่ต้องแตะอีกฝั่ง
+- **ข้อเสีย:** มันเพิ่ม indirection และชิ้นส่วนที่เคลื่อนไหวมากขึ้นตั้งแต่แรก ซึ่งเกินจำเป็นเมื่อคุณมี implementation เพียงตัวเดียวเสมอ
+- **ข้อเสีย:** การออกแบบ interface ทั้งสองให้ดีต้องอาศัยการมองการณ์ไกลว่ามิติใดที่เปลี่ยนแปลงจริง ๆ
+
+## Pattern ที่เกี่ยวข้อง
+
+- [Adapter](/design-patterns-from-zero-to-hero/th/structural/adapter/) ทำให้ interface สองตัวที่มีอยู่แล้วทำงานร่วมกันได้ในภายหลัง ส่วน Bridge วางแผนไว้ตั้งแต่ต้นเพื่อให้สองลำดับชั้นวิวัฒน์แยกกัน
+- [Abstract Factory](/design-patterns-from-zero-to-hero/th/creational/abstract-factory/) สามารถสร้างและจับคู่ implementor ที่ถูกต้องเข้ากับ abstraction ได้ มักถูกใช้ควบคู่ไปกับ Bridge
+
+<Callout title="Adapter กับ Bridge">
+รูปแบบดูเหมือนกัน คือ object หนึ่ง delegate ไปยังอีก object หนึ่ง แต่เจตนาต่างกัน Adapter เป็นแบบตั้งรับ คุณมีของสองอย่างที่มีอยู่แล้วและต้องทำให้เข้ากัน ส่วน Bridge เป็นแบบเชิงรุก คุณแยกการออกแบบออกเป็นสองมิติ *ก่อน* ที่ความไม่เข้ากันจะเกิดขึ้น เพื่อให้แต่ละฝั่งเปลี่ยนแปลงได้ด้วยตัวเอง
+</Callout>
+
+export const quiz = [
+  {
+    q: 'Bridge pattern แยกอะไรออกจากกัน?',
+    options: [
+      'class ออกจาก instance ของมัน',
+      'abstraction ออกจาก implementation เพื่อให้แต่ละส่วนเปลี่ยนแปลงได้อย่างอิสระ',
+      'client ออกจาก server ของมัน',
+      'การอ่านออกจากการเขียนบน state ที่ใช้ร่วมกัน',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'Bridge ป้องกันปัญหาอะไรเมื่อเทียบกับ inheritance ธรรมดา?',
+    options: [
+      'หน่วยความจำรั่วจาก object ที่ไม่ถูกปลดปล่อย',
+      'การระเบิดแบบ combinatorial ของ subclass ข้ามสองมิติ',
+      'race condition ระหว่างการ construct',
+      'การสูญเสีย type safety ตอน compile',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'ในตัวอย่าง Renderer มีบทบาทอะไร?',
+    options: [
+      'abstraction',
+      'client',
+      'implementor ที่ abstraction delegate ให้',
+      'flyweight ที่ถูก cache ไว้',
+    ],
+    answer: 2,
+  },
+  {
+    q: 'Bridge ต่างจาก Adapter อย่างไรในแง่เจตนา?',
+    options: [
+      'Bridge วางแผนไว้ตั้งแต่ต้น ส่วน Adapter เข้ามาปรับ interface ที่มีอยู่แล้ว',
+      'Bridge เปลี่ยน interface ส่วน Adapter ไม่เคยเปลี่ยน',
+      'Bridge ต้องใช้ inheritance ส่วน Adapter ห้ามใช้',
+      'ทั้งสองมีเจตนาเหมือนกัน',
+    ],
+    answer: 0,
+  },
+];
+
+<Quiz client:visible id="structural/bridge" questions={quiz} />
+
+<ProgressTracker client:visible id="structural/bridge" />

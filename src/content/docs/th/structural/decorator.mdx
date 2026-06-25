@@ -1,0 +1,311 @@
+---
+title: Decorator
+description: 'เพิ่มความรับผิดชอบให้กับ object ด้วยการห่อมัน ซ้อนพฤติกรรมเป็นชั้น ๆ โดยไม่ต้อง subclassing'
+sidebar:
+  order: 5
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+## เจตนา
+
+Decorator แนบความรับผิดชอบเพิ่มเติมให้กับ object แบบ dynamic ด้วยการห่อมันไว้ใน object อีกตัวที่ใช้ interface เดียวกัน เป็นทางเลือกที่ยืดหยุ่นแทนการ subclassing สำหรับการต่อยอดพฤติกรรม
+
+## ปัญหา
+
+คุณมี data source ที่สามารถอ่านและเขียนไบต์ได้ ตอนนี้คุณต้องการฟีเจอร์เสริม คือบีบอัดข้อมูล เข้ารหัสมัน หรืออาจทั้งสองอย่างในลำดับที่เลือกไว้ การ subclass ทุกการผสม คือ `CompressedSource`, `EncryptedSource`, `CompressedEncryptedSource`, `EncryptedCompressedSource` ระเบิดออกอย่างรวดเร็วและฝังตัวเลือกไว้ตั้งแต่ตอน compile คุณไม่สามารถเปิดฟีเจอร์สำหรับ object ตัวหนึ่งและปิดสำหรับอีกตัวตอน runtime ได้
+
+Decorator แก้ปัญหานี้ด้วย composition ฟีเจอร์แต่ละตัวเป็น wrapper ที่ implement interface เดียวกับสิ่งที่มันห่อ ถือ reference ไปยัง object ภายใน เพิ่มพฤติกรรมของตัวเอง แล้วจึงส่งต่อไปยังตัวภายใน เนื่องจาก decorator *เป็น* interface นั้น คุณจึงซ้อนมันได้ คือการเข้ารหัสรอบการบีบอัดรอบ source ดิบ แต่ละชั้นทำส่วนของมันและส่งที่เหลือต่อไป คุณประกอบพฤติกรรมที่ต้องการได้อย่างแม่นยำตอน runtime แยกตาม object โดยไม่มี subclass ใหม่
+
+## เปรียบเทียบกับ inheritance
+
+inheritance กำหนดพฤติกรรมที่เพิ่มเข้ามาตายตัวตอน compile และใช้กับทุก instance ของ subclass คุณไม่สามารถผสมและจับคู่แยกตาม object หรือเปลี่ยนสแต็กในภายหลังได้ Decorator ย้ายตัวเลือกนั้นไปยัง runtime คือ object พื้นฐานตัวเดียวกันสามารถถูกห่อด้วยการผสมของ decorator ที่ต่างกัน ในลำดับที่ต่างกัน และคุณเพิ่ม decorator ใหม่ได้โดยไม่ต้องแตะ base class หรือ wrapper ที่มีอยู่ใด ๆ ต้นทุนคือ object เล็ก ๆ ที่มากขึ้นและ indirection จากการส่งต่อการเรียกผ่านแต่ละชั้น
+
+## โครงสร้าง
+
+export const decoratorUml = `classDiagram
+  class DataSource {
+    <<interface>>
+    +write(data) string
+    +read() string
+  }
+  class FileSource {
+    +write(data) string
+    +read() string
+  }
+  class SourceDecorator {
+    <<abstract>>
+    #wrappee: DataSource
+    +write(data) string
+    +read() string
+  }
+  class CompressionDecorator
+  class EncryptionDecorator
+  DataSource <|.. FileSource
+  DataSource <|.. SourceDecorator
+  SourceDecorator <|-- CompressionDecorator
+  SourceDecorator <|-- EncryptionDecorator
+  SourceDecorator o--> DataSource : wraps`;
+
+<Mermaid code={decoratorUml} title="decorator ใช้ component interface ร่วมกันและห่อ component ภายใน" />
+
+- **Component** (`DataSource`) — interface ที่ object ดิบและ decorator ใช้ร่วมกัน
+- **Concrete Component** (`FileSource`) — object พื้นฐานที่พฤติกรรมของมันถูกต่อยอด
+- **Decorator** (`SourceDecorator`) — wrapper แบบ abstract ที่ถือ component หนึ่งตัวและส่งต่อไปยังมันโดยปริยาย
+- **Concrete Decorator** (`CompressionDecorator`, `EncryptionDecorator`) — เพิ่มพฤติกรรมก่อนหรือหลังการ delegate ไปยัง component ที่ถูกห่อ
+
+## ตัวอย่าง
+
+data source ถูกห่อด้วยการบีบอัดแล้วตามด้วยการเข้ารหัส ตอน `write` แต่ละชั้นจะแปลงข้อมูลขาเข้า ตอน `read` แต่ละชั้นจะย้อนกลับขาออก
+
+<Tabs syncKey="lang">
+  <TabItem label="TypeScript">
+    ```ts
+    interface DataSource {
+      write(data: string): string;
+      read(stored: string): string;
+    }
+
+    class FileSource implements DataSource {
+      write = (data: string) => data;
+      read = (stored: string) => stored;
+    }
+
+    class CompressionDecorator implements DataSource {
+      constructor(private readonly inner: DataSource) {}
+      write = (data: string) => this.inner.write(`zip(${data})`);
+      read = (stored: string) => this.inner.read(stored).replace(/^zip\((.*)\)$/, '$1');
+    }
+
+    class EncryptionDecorator implements DataSource {
+      constructor(private readonly inner: DataSource) {}
+      write = (data: string) => this.inner.write(`enc(${data})`);
+      read = (stored: string) => this.inner.read(stored).replace(/^enc\((.*)\)$/, '$1');
+    }
+
+    const source = new EncryptionDecorator(new CompressionDecorator(new FileSource()));
+    const stored = source.write('hello');
+    console.log(stored); // zip(enc(hello))
+    console.log(source.read(stored)); // hello
+    ```
+  </TabItem>
+  <TabItem label="Python">
+    ```python
+    from typing import Protocol
+
+
+    class DataSource(Protocol):
+        def write(self, data: str) -> str: ...
+        def read(self, stored: str) -> str: ...
+
+
+    class FileSource:
+        def write(self, data: str) -> str:
+            return data
+
+        def read(self, stored: str) -> str:
+            return stored
+
+
+    class CompressionDecorator:
+        def __init__(self, inner: DataSource) -> None:
+            self._inner = inner
+
+        def write(self, data: str) -> str:
+            return self._inner.write(f"zip({data})")
+
+        def read(self, stored: str) -> str:
+            out = self._inner.read(stored)
+            return out[4:-1] if out.startswith("zip(") else out
+
+
+    class EncryptionDecorator:
+        def __init__(self, inner: DataSource) -> None:
+            self._inner = inner
+
+        def write(self, data: str) -> str:
+            return self._inner.write(f"enc({data})")
+
+        def read(self, stored: str) -> str:
+            out = self._inner.read(stored)
+            return out[4:-1] if out.startswith("enc(") else out
+
+
+    source = EncryptionDecorator(CompressionDecorator(FileSource()))
+    stored = source.write("hello")
+    print(stored)  # zip(enc(hello))
+    print(source.read(stored))  # hello
+    ```
+  </TabItem>
+  <TabItem label="Go">
+    ```go
+    package main
+
+    import (
+        "fmt"
+        "strings"
+    )
+
+    type DataSource interface {
+        Write(data string) string
+        Read(stored string) string
+    }
+
+    type FileSource struct{}
+
+    func (FileSource) Write(data string) string   { return data }
+    func (FileSource) Read(stored string) string  { return stored }
+
+    type CompressionDecorator struct{ inner DataSource }
+
+    func (c CompressionDecorator) Write(data string) string {
+        return c.inner.Write("zip(" + data + ")")
+    }
+    func (c CompressionDecorator) Read(stored string) string {
+        out := c.inner.Read(stored)
+        return strings.TrimSuffix(strings.TrimPrefix(out, "zip("), ")")
+    }
+
+    type EncryptionDecorator struct{ inner DataSource }
+
+    func (e EncryptionDecorator) Write(data string) string {
+        return e.inner.Write("enc(" + data + ")")
+    }
+    func (e EncryptionDecorator) Read(stored string) string {
+        out := e.inner.Read(stored)
+        return strings.TrimSuffix(strings.TrimPrefix(out, "enc("), ")")
+    }
+
+    func main() {
+        var source DataSource = EncryptionDecorator{CompressionDecorator{FileSource{}}}
+        stored := source.Write("hello")
+        fmt.Println(stored)            // zip(enc(hello))
+        fmt.Println(source.Read(stored)) // hello
+    }
+    ```
+  </TabItem>
+  <TabItem label="Rust">
+    ```rust
+    trait DataSource {
+        fn write(&self, data: &str) -> String;
+        fn read(&self, stored: &str) -> String;
+    }
+
+    struct FileSource;
+    impl DataSource for FileSource {
+        fn write(&self, data: &str) -> String {
+            data.to_string()
+        }
+        fn read(&self, stored: &str) -> String {
+            stored.to_string()
+        }
+    }
+
+    struct CompressionDecorator {
+        inner: Box<dyn DataSource>,
+    }
+    impl DataSource for CompressionDecorator {
+        fn write(&self, data: &str) -> String {
+            self.inner.write(&format!("zip({data})"))
+        }
+        fn read(&self, stored: &str) -> String {
+            let out = self.inner.read(stored);
+            out.strip_prefix("zip(").and_then(|s| s.strip_suffix(")"))
+                .map(str::to_string).unwrap_or(out)
+        }
+    }
+
+    struct EncryptionDecorator {
+        inner: Box<dyn DataSource>,
+    }
+    impl DataSource for EncryptionDecorator {
+        fn write(&self, data: &str) -> String {
+            self.inner.write(&format!("enc({data})"))
+        }
+        fn read(&self, stored: &str) -> String {
+            let out = self.inner.read(stored);
+            out.strip_prefix("enc(").and_then(|s| s.strip_suffix(")"))
+                .map(str::to_string).unwrap_or(out)
+        }
+    }
+
+    fn main() {
+        let source = EncryptionDecorator {
+            inner: Box::new(CompressionDecorator { inner: Box::new(FileSource) }),
+        };
+        let stored = source.write("hello");
+        println!("{stored}");                // zip(enc(hello))
+        println!("{}", source.read(&stored)); // hello
+    }
+    ```
+  </TabItem>
+</Tabs>
+
+## เมื่อไรควรใช้ / ข้อแลกเปลี่ยน
+
+- **ข้อดี:** เพิ่มหรือลบความรับผิดชอบได้ตอน runtime แยกตาม object โดยไม่ต้องแตะ base class
+- **ข้อดี:** หลีกเลี่ยงการระเบิดของ subclass สำหรับทุกการผสมฟีเจอร์
+- **ข้อดี:** แต่ละ decorator เป็นหน่วยเล็ก ๆ ที่มีจุดประสงค์เดียวและทดสอบได้อย่างอิสระ
+- **ข้อเสีย:** สแต็กลึกของ wrapper จิ๋ว ๆ ดีบักและไล่ทีละขั้นได้ยาก
+- **ข้อเสีย:** ลำดับมีความสำคัญ การเข้ารหัสแล้วบีบอัดต่างจากการบีบอัดแล้วเข้ารหัส และการต่อสายผิดได้ง่าย
+
+## Pattern ที่เกี่ยวข้อง
+
+- [Adapter](/design-patterns-from-zero-to-hero/th/structural/adapter/) ห่อเพื่อเปลี่ยน interface ส่วน Decorator ห่อในขณะที่คงไว้ซึ่ง interface เดิมและเพิ่มพฤติกรรม
+- [Composite](/design-patterns-from-zero-to-hero/th/structural/composite/) ใช้แนวคิด recursive-wrapping ร่วมกัน แต่มันรวมลูกหลายตัวแทนที่จะเสริมตัวเดียว
+- [Proxy](/design-patterns-from-zero-to-hero/th/structural/proxy/) ก็ห่อ object ด้วย interface เดียวกันเช่นกัน แต่เพื่อ *ควบคุมการเข้าถึง* แทนที่จะเพิ่มฟีเจอร์
+
+<Callout title="interface เดียวกัน เจตนาต่างกัน">
+Decorator และ Proxy ดูเหมือนกันบน class diagram คือทั้งคู่ห่อ object ไว้หลัง interface ของมันเอง ความต่างคือจุดประสงค์ decorator ทำให้ผลลัพธ์สมบูรณ์ยิ่งขึ้น ส่วน proxy ตัดสินใจว่าการเรียกตัวที่อยู่เบื้องล่างจะเกิดขึ้นหรือไม่ เมื่อใด หรือเพื่อใคร
+</Callout>
+
+export const quiz = [
+  {
+    q: 'Decorator เพิ่มพฤติกรรมให้กับ object อย่างไร?',
+    options: [
+      'ด้วยการ subclass มันตอน compile',
+      'ด้วยการห่อมันไว้ใน object อีกตัวที่ใช้ interface เดียวกัน',
+      'ด้วยการ copy มันแล้วแก้ไขตัว copy',
+      'ด้วยการลงทะเบียน global hook',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'Decorator มีข้อได้เปรียบอะไรเหนือ inheritance ในที่นี้?',
+    options: [
+      'มันทำงานเร็วกว่าการเรียก method',
+      'คุณสามารถผสมพฤติกรรมแยกตาม object ได้ตอน runtime โดยไม่ต้องมี subclass ใหม่',
+      'มันรับประกัน instance เดียว',
+      'มันขจัดความจำเป็นในการมี interface',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'decorator ถือ reference ไปยังอะไร?',
+    options: [
+      'รายการของ instance ทั้งหมดที่เคยถูกสร้างขึ้น',
+      'component ภายในที่มันห่อและส่งต่อการเรียกไปยัง',
+      'factory ที่สร้างมันขึ้นมา',
+      'singleton แบบ static ที่ใช้ร่วมกัน',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'อะไรแยกแยะ Decorator ออกจาก Proxy ทั้งที่มีรูปแบบคล้ายกัน?',
+    options: [
+      'Decorator เปลี่ยน interface ส่วน Proxy ไม่เปลี่ยน',
+      'Decorator เพิ่มพฤติกรรม ส่วน Proxy ควบคุมการเข้าถึง object ที่อยู่เบื้องล่าง',
+      'Proxy ห่อได้แค่ subsystem เท่านั้น',
+      'ทั้งสองเป็น pattern เดียวกัน',
+    ],
+    answer: 1,
+  },
+];
+
+<Quiz client:visible id="structural/decorator" questions={quiz} />
+
+<ProgressTracker client:visible id="structural/decorator" />

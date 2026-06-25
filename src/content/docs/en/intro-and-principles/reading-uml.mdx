@@ -1,0 +1,121 @@
+---
+title: Reading the UML Diagrams
+description: 'How to read the class diagrams used throughout this course — boxes, interfaces, and the arrows that connect them.'
+sidebar:
+  order: 5
+---
+
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+## Why a diagram at all
+
+Every pattern in this course includes a UML class diagram in its **Structure** section. UML — the Unified Modeling Language — is a standard notation for sketching the static shape of object-oriented code: which types exist, what they hold, and how they connect. A diagram says in one glance what a paragraph needs sentences to describe. This lesson covers only the subset of UML you actually need to read the diagrams here, and maps each piece to the Mermaid syntax that renders it.
+
+## Classes and interfaces
+
+A class is a box, optionally split into three rows: the name, its fields, and its operations. A leading `+` marks a public member, `-` a private one. An *interface* — a contract with no implementation — is drawn as a box with the `<<interface>>` stereotype above its name.
+
+export const classDiagram = `classDiagram
+  class Account {
+    -balance: number
+    +deposit(amount)
+    +withdraw(amount)
+  }
+  class Repository {
+    <<interface>>
+    +save(account)
+    +findById(id)
+  }`;
+
+<Mermaid code={classDiagram} title="A class with private and public members, and an interface" />
+
+## Inheritance and implementation
+
+Two arrows describe "kind-of" relationships, and they look similar, so the distinction matters. A **hollow triangle on a solid line** means *inheritance* — one class extends another. A **hollow triangle on a dashed line** means *implementation* — a class fulfils an interface's contract. In Mermaid, `<|--` is inheritance (the triangle points at the parent) and `..|>` is implementation (the dashes point at the interface).
+
+export const inheritanceDiagram = `classDiagram
+  class Shape {
+    <<interface>>
+    +area() number
+  }
+  class Polygon
+  class Circle
+  Shape <|-- Polygon : Polygon extends Shape
+  Circle ..|> Shape : Circle implements Shape`;
+
+<Mermaid code={inheritanceDiagram} title="Solid triangle = inheritance; dashed triangle = implementation" />
+
+## Association, aggregation, and composition
+
+The remaining arrows describe "has-a" relationships, ordered by how tightly the two objects are bound:
+
+- **Association** — a plain line (Mermaid `-->`). One object simply uses or refers to another, with no ownership implied. An `Order` references a `Customer`.
+- **Aggregation** — a hollow diamond (Mermaid `o--`) at the owner end. A whole-part relationship where the part can outlive the whole: a `Team` aggregates `Player` objects, but the players exist independently of the team.
+- **Composition** — a filled diamond (Mermaid `*--`) at the owner end. A stronger whole-part relationship where the part's lifetime is bound to the whole: a `House` is composed of `Room` objects that are destroyed with the house.
+
+export const relationsDiagram = `classDiagram
+  class Order
+  class Customer
+  class Team
+  class Player
+  class House
+  class Room
+  Order --> Customer : association (uses)
+  Team o-- Player : aggregation (shared part)
+  House *-- Room : composition (owned part)`;
+
+<Mermaid code={relationsDiagram} title="Association, aggregation, and composition, from loosest to tightest" />
+
+## A quick reference
+
+Keep this mapping in mind and every diagram in the course becomes readable:
+
+- `<|--` — inheritance (extends a class)
+- `..|>` — implementation (fulfils an interface)
+- `-->` — association (uses or refers to)
+- `o--` — aggregation (owns a part that can live independently)
+- `*--` — composition (owns a part whose life it controls)
+
+<Callout title="Read the arrows first">
+When a structure diagram looks busy, read the arrowheads before the boxes. The arrow type tells you the relationship — is-a, has-a, or owns — and that is usually the single most important thing a pattern's diagram is trying to communicate.
+</Callout>
+
+export const quiz = [
+  {
+    q: 'How is an interface marked in these class diagrams?',
+    options: [
+      'With a filled diamond',
+      'With the <<interface>> stereotype above its name',
+      'With a dashed border',
+      'With a leading minus sign',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'What does a hollow triangle on a solid line (Mermaid <|--) represent?',
+    options: ['Composition', 'Association', 'Inheritance', 'Aggregation'],
+    answer: 2,
+  },
+  {
+    q: 'Which relationship binds the part\'s lifetime to the whole?',
+    options: [
+      'Association',
+      'Aggregation',
+      'Composition',
+      'Implementation',
+    ],
+    answer: 2,
+  },
+  {
+    q: 'In Mermaid, which arrow denotes a plain association where one object simply uses another?',
+    options: ['-->', '*--', 'o--', '..|>'],
+    answer: 0,
+  },
+];
+
+<Quiz client:visible id="intro-and-principles/reading-uml" questions={quiz} />
+
+<ProgressTracker client:visible id="intro-and-principles/reading-uml" />

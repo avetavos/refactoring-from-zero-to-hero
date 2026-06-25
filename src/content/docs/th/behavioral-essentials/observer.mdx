@@ -1,0 +1,281 @@
+---
+title: Observer
+description: 'ยอมให้ subject แจ้งเตือนกลุ่มผู้พึ่งพาที่เปลี่ยนแปลงได้โดยอัตโนมัติเมื่อใดก็ตามที่สถานะของมันเปลี่ยน โดยไม่ต้องรู้ว่าพวกเขาเป็นใคร'
+sidebar:
+  order: 3
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+## Intent
+
+Observer นิยามการพึ่งพาแบบหนึ่ง-ต่อ-หลายระหว่างอ็อบเจ็กต์ เพื่อว่าเมื่ออ็อบเจ็กต์หนึ่ง คือ subject เปลี่ยนสถานะ ผู้พึ่งพาทั้งหมดของมันจะได้รับการแจ้งเตือนและอัปเดตโดยอัตโนมัติ subject เก็บรายการของ observer ไว้และกระจายข่าวสารไปยังพวกเขาโดยไม่ต้องรู้ชนิดที่เป็นรูปธรรมของพวกเขา
+
+## Problem
+
+สมมติว่าจดหมายข่าวเผยแพร่บทความใหม่ และมีหลายสิ่งที่ต้องตอบสนอง ได้แก่ ตัวส่งอีเมล log และฟีดสดบนหน้าแรก วิธีดิบ ๆ คือให้ผู้เผยแพร่เรียกแต่ละตัวโดยตรง แต่เมื่อนั้นผู้เผยแพร่ต้อง import และรู้จักผู้บริโภคทุกตัว และทุกครั้งที่คุณเพิ่มหรือลบผู้บริโภค คุณก็ต้องแก้ผู้เผยแพร่ ผู้เผยแพร่จึงกลายเป็นศูนย์กลางที่เชื่อมติดกับทุกสิ่งที่อยู่ปลายน้ำ
+
+ความผันแปรในที่นี้คือ *ใครกำลังฟังอยู่* และกลุ่มนั้นเปลี่ยนแปลงไปตามเวลา Observer พลิกกลับความสัมพันธ์นั้น ผู้บริโภคลงทะเบียนตัวเองกับ subject และ subject กระจายข่าวสารไปยังรายการใด ๆ ที่มันถืออยู่ในขณะนั้น ผู้เผยแพร่รู้จักแค่ observer interface เท่านั้น ผู้สมัครรับข่าวจึงเข้ามาและจากไปได้ในขณะรัน และผู้เผยแพร่ก็ไม่เคยเปลี่ยนแปลง
+
+## Structure
+
+export const observerUml = `classDiagram
+  class Subject {
+    -observers: List~Observer~
+    +subscribe(o)
+    +unsubscribe(o)
+    +notify(news)
+  }
+  class Observer {
+    <<interface>>
+    +update(news)
+  }
+  class EmailSubscriber {
+    +update(news)
+  }
+  class FeedSubscriber {
+    +update(news)
+  }
+  Subject o--> Observer
+  Observer <|.. EmailSubscriber
+  Observer <|.. FeedSubscriber`;
+
+<Mermaid code={observerUml} title="Subject กระจายการอัปเดตไปยังทุก Observer ที่ลงทะเบียนไว้" />
+
+- **Subject** — ถือรายการของ observer และเปิดเผยการ subscribe, unsubscribe และวิธีแจ้งเตือน เมื่อสถานะของมันเปลี่ยน มันจะกระจายข่าวสารไปยัง observer ทั้งหมด
+- **Observer** — interface ที่ผู้พึ่งพาทุกตัว implement โดยทั่วไปคือเมธอด update เดียวที่รับการเปลี่ยนแปลง
+- **Concrete Observer** — ผู้พึ่งพาหนึ่งตัว มันตอบสนองต่อการอัปเดตในแบบที่มันชอบ
+- **Client** — ลงทะเบียนและถอดถอน observer และกระตุ้นการเปลี่ยนสถานะบน subject
+
+## Example
+
+subject จดหมายข่าวที่กระจายแต่ละพาดหัวใหม่ไปยังผู้สมัครรับข่าวที่ลงทะเบียนอยู่ในขณะนั้น แต่ละภาษาใช้กลไก callback หรือ interface ที่เป็นสำนวนเฉพาะของมัน
+
+<Tabs syncKey="lang">
+  <TabItem label="TypeScript">
+    ```ts
+    interface Observer {
+      update(headline: string): void;
+    }
+
+    class Newsletter {
+      private observers = new Set<Observer>();
+
+      subscribe(o: Observer): void {
+        this.observers.add(o);
+      }
+      unsubscribe(o: Observer): void {
+        this.observers.delete(o);
+      }
+      publish(headline: string): void {
+        for (const o of this.observers) {
+          o.update(headline);
+        }
+      }
+    }
+
+    class EmailSubscriber implements Observer {
+      constructor(private readonly who: string) {}
+      update(headline: string): void {
+        console.log(`Email to ${this.who}: ${headline}`);
+      }
+    }
+
+    const news = new Newsletter();
+    const alice = new EmailSubscriber('alice');
+    news.subscribe(alice);
+    news.subscribe(new EmailSubscriber('bob'));
+    news.publish('Observer explained'); // both notified
+    news.unsubscribe(alice);
+    news.publish('Now without alice'); // only bob
+    ```
+  </TabItem>
+  <TabItem label="Python">
+    ```python
+    from typing import Protocol
+
+
+    class Observer(Protocol):
+        def update(self, headline: str) -> None: ...
+
+
+    class Newsletter:
+        def __init__(self) -> None:
+            self._observers: list[Observer] = []
+
+        def subscribe(self, o: Observer) -> None:
+            self._observers.append(o)
+
+        def unsubscribe(self, o: Observer) -> None:
+            self._observers.remove(o)
+
+        def publish(self, headline: str) -> None:
+            for o in list(self._observers):
+                o.update(headline)
+
+
+    class EmailSubscriber:
+        def __init__(self, who: str) -> None:
+            self.who = who
+
+        def update(self, headline: str) -> None:
+            print(f"Email to {self.who}: {headline}")
+
+
+    news = Newsletter()
+    alice = EmailSubscriber("alice")
+    news.subscribe(alice)
+    news.subscribe(EmailSubscriber("bob"))
+    news.publish("Observer explained")  # both notified
+    news.unsubscribe(alice)
+    news.publish("Now without alice")  # only bob
+    ```
+  </TabItem>
+  <TabItem label="Go">
+    ```go
+    package main
+
+    import "fmt"
+
+    // Observer is implemented by anything that wants to be notified.
+    type Observer interface {
+        Update(headline string)
+    }
+
+    type Newsletter struct {
+        observers []Observer
+    }
+
+    func (n *Newsletter) Subscribe(o Observer) {
+        n.observers = append(n.observers, o)
+    }
+
+    func (n *Newsletter) Publish(headline string) {
+        for _, o := range n.observers {
+            o.Update(headline)
+        }
+    }
+
+    type EmailSubscriber struct{ Who string }
+
+    func (e EmailSubscriber) Update(headline string) {
+        fmt.Printf("Email to %s: %s\n", e.Who, headline)
+    }
+
+    func main() {
+        news := &Newsletter{}
+        news.Subscribe(EmailSubscriber{Who: "alice"})
+        news.Subscribe(EmailSubscriber{Who: "bob"})
+        news.Publish("Observer explained") // both notified
+    }
+    ```
+  </TabItem>
+  <TabItem label="Rust">
+    ```rust
+    trait Observer {
+        fn update(&self, headline: &str);
+    }
+
+    struct Newsletter {
+        observers: Vec<Box<dyn Observer>>,
+    }
+    impl Newsletter {
+        fn new() -> Self {
+            Newsletter { observers: Vec::new() }
+        }
+        fn subscribe(&mut self, o: Box<dyn Observer>) {
+            self.observers.push(o);
+        }
+        fn publish(&self, headline: &str) {
+            for o in &self.observers {
+                o.update(headline);
+            }
+        }
+    }
+
+    struct EmailSubscriber {
+        who: String,
+    }
+    impl Observer for EmailSubscriber {
+        fn update(&self, headline: &str) {
+            println!("Email to {}: {}", self.who, headline);
+        }
+    }
+
+    fn main() {
+        let mut news = Newsletter::new();
+        news.subscribe(Box::new(EmailSubscriber { who: "alice".into() }));
+        news.subscribe(Box::new(EmailSubscriber { who: "bob".into() }));
+        news.publish("Observer explained"); // both notified
+    }
+    ```
+  </TabItem>
+</Tabs>
+
+## When to use / trade-offs
+
+- **ข้อดี:** subject และ observer ของมันเชื่อมโยงกันอย่างหลวม subject รู้จักแค่ observer interface เท่านั้น
+- **ข้อดี:** observer สามารถถูกเพิ่มหรือลบในขณะรันได้ รวมถึงแบบไดนามิกขณะที่โปรแกรมทำงาน
+- **ข้อดี:** มันเป็นกระดูกสันหลังของระบบ event การ binding ของ UI และ reactive data flow
+- **ข้อเสีย:** ลำดับการแจ้งเตือนมักไม่ถูกระบุไว้ ดังนั้น observer ต้องไม่พึ่งพาการทำงานตามลำดับตายตัว
+- **ข้อเสีย:** observer ที่ไม่ถูกถอดถอนทำให้เกิด memory leak และห่วงโซ่การแจ้งเตือนที่ยาวอาจไล่ตามหรือ debug ได้ยาก
+
+## Related patterns
+
+- [Mediator](/design-patterns-from-zero-to-hero/th/behavioral-advanced/mediator/) ก็แยกผู้ส่งออกจากผู้รับเช่นกัน แต่ส่งต่อผ่านศูนย์กลางแทนการกระจายข่าวโดยตรง
+- [Command](/design-patterns-from-zero-to-hero/th/behavioral-essentials/command/) มักเป็น payload ที่ observer ได้รับ เปลี่ยนการแจ้งเตือนให้กลายเป็นแอ็กชันที่ execute ได้
+
+<Callout title="push เทียบกับ pull">
+มีสองรูปแบบ subject สามารถ *push* ข้อมูลที่เปลี่ยนแปลงเข้าไปใน update หรือมันอาจ push เพียงสัญญาณแล้วปล่อยให้แต่ละ observer *pull* สิ่งที่มันต้องการจาก subject เอง การ push สะดวกแต่ผูก observer ไว้กับรูปทรงของข้อมูล การ pull เบากว่าแต่จุกจิกกว่า เลือกตามว่าแต่ละ observer ต้องการจริง ๆ มากแค่ไหน
+</Callout>
+
+export const quiz = [
+  {
+    q: 'Observer นิยามความสัมพันธ์แบบใด?',
+    options: [
+      'ตัวห่อหุ้มแบบหนึ่ง-ต่อ-หนึ่งรอบอ็อบเจ็กต์',
+      'การพึ่งพาแบบหนึ่ง-ต่อ-หลายที่ผู้พึ่งพาได้รับแจ้งเมื่อมีการเปลี่ยนแปลง',
+      'instance ที่แชร์ร่วมกันเพียงตัวเดียวสำหรับทั้งโปรแกรม',
+      'วิธีคัดลอกอ็อบเจ็กต์อย่างประหยัด',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'subject รู้อะไรเกี่ยวกับ observer ของมัน?',
+    options: [
+      'คลาสที่เป็นรูปธรรมของพวกเขาอย่างแม่นยำ',
+      'รู้เพียงว่าพวกเขา implement observer interface',
+      'แอดเดรสหน่วยความจำของพวกเขา ณ เวลาคอมไพล์',
+      'ไม่รู้อะไรเลย มันกระจายข่าวไปทั้งโปรแกรม',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'ทำไม observer จึงถูกเพิ่มและลบได้อย่างอิสระ?',
+    options: [
+      'เพราะ subject คอมไพล์ตัวเองใหม่ทุกครั้ง',
+      'เพราะ subject ถือรายการที่เปลี่ยนแปลงได้และพึ่งพาเพียง interface เท่านั้น',
+      'เพราะ observer เป็น singleton',
+      'เพราะ subject คัดลอก observer แต่ละตัว',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'สิ่งใดเป็นอันตรายจริงของ Observer?',
+    options: [
+      'มันห้ามมี observer มากกว่าหนึ่งตัว',
+      'observer ที่ถูกลืมอาจรั่ว memory และลำดับการแจ้งเตือนมักไม่ถูกระบุ',
+      'มันไม่สามารถทำงานในขณะรันได้',
+      'มันต้องสืบทอดจาก subject',
+    ],
+    answer: 1,
+  },
+];
+
+<Quiz client:visible id="behavioral-essentials/observer" questions={quiz} />
+
+<ProgressTracker client:visible id="behavioral-essentials/observer" />

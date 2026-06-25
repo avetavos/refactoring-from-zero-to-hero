@@ -1,0 +1,75 @@
+---
+title: Behavioral Patterns II
+description: 'อีกห้า behavioral pattern ที่กำหนดเส้นทางของ request, รวมศูนย์การสื่อสาร, จับเก็บสถานะ, และเดินผ่านโครงสร้างหรือไวยากรณ์ของภาษา'
+sidebar:
+  order: 1
+---
+
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+
+## Intent
+
+Behavioral pattern ควบคุมว่าออบเจ็กต์โต้ตอบกันอย่างไรและความรับผิดชอบถูกแบ่งปันกันระหว่างพวกมันอย่างไร โมดูลนี้ต่อยอดโดยตรงจาก *Behavioral Patterns I* โดยยึดเป้าหมายเดียวกัน — ลดการผูกติด (coupling) ระหว่างออบเจ็กต์ที่ทำงานร่วมกัน — แล้วนำไปใช้กับปัญหาที่ยากขึ้นห้าข้อ ได้แก่ การกำหนดเส้นทางของ request ผ่านแถวของผู้ที่อาจรับผิดชอบ, การส่งการสื่อสารแบบ many-to-many ทั้งหมดผ่านฮับเดียว, การถ่ายภาพและกู้คืนสถานะ, การแนบ operation ใหม่เข้ากับโครงสร้างที่ตายตัว, และการแปลงภาษาเล็ก ๆ ให้กลายเป็นโค้ดที่ทำงานได้
+
+## Problem
+
+ห้า pattern ในโมดูลแรกจัดการกับแกนของความผันแปรในชีวิตประจำวัน ได้แก่ อัลกอริทึม, ผู้รับการแจ้งเตือน, request ในฐานะค่า (value), โหมดของออบเจ็กต์, และวิธีที่คอลเล็กชันถูกเดินผ่าน ส่วน pattern ในโมดูลนี้รับมือกับสถานการณ์ที่รู้สึกเหมือนเป็นซับซิสเต็มเล็ก ๆ มากกว่าจะเป็นคลาสเดียว
+
+ใครควรเป็นผู้รับผิดชอบ request นี้ เมื่อมีออบเจ็กต์มากกว่าหนึ่งตัวที่อาจทำได้ จะหยุดยั้งวิดเจ็ตเป็นโหลที่ต่างก็ต้องรู้จักวิดเจ็ตอื่นทุกตัวได้อย่างไร จะเสนอ undo โดยไม่เปิดเผยฟิลด์ส่วนตัวของออบเจ็กต์ได้อย่างไร จะเพิ่ม operation อีกหนึ่งตัวเข้ากับ object tree ที่แผ่กว้างโดยไม่ต้องแก้ทุกคลาสในนั้นได้อย่างไร และจะประเมินนิพจน์ที่ผู้ใช้ป้อนมาโดยไม่ต้องเขียน parser เฉพาะกิจขึ้นใหม่ทุกครั้งได้อย่างไร แต่ละ pattern ด้านล่างแยกความกังวลข้อหนึ่งเหล่านี้ออกมา เพื่อให้ส่วนที่เหลือของระบบยังคงเรียบง่าย
+
+## Structure
+
+ห้า pattern เหล่านี้ต่อยอดจากรากฐานที่วางไว้ใน *Behavioral Patterns I* หากคุณยังไม่ได้อ่าน ให้เริ่มจาก [โมดูล Behavioral Patterns I](/design-patterns-from-zero-to-hero/th/behavioral-essentials/) ก่อน
+
+export const overviewUml = `classDiagram
+  class BehavioralPattern {
+    <<concept>>
+    +coordinate()
+  }
+  class ChainOfResponsibility {
+    +handle()
+  }
+  class Mediator {
+    +notify()
+  }
+  class Memento {
+    +getState()
+  }
+  class Visitor {
+    +visit()
+  }
+  class Interpreter {
+    +interpret()
+  }
+  BehavioralPattern <|.. ChainOfResponsibility
+  BehavioralPattern <|.. Mediator
+  BehavioralPattern <|.. Memento
+  BehavioralPattern <|.. Visitor
+  BehavioralPattern <|.. Interpreter`;
+
+<Mermaid code={overviewUml} title="ห้า pattern ที่ครอบคลุมใน Behavioral Patterns II" />
+
+ห้า pattern โดยสรุป:
+
+- **Chain of Responsibility** — ส่ง request ไปตามแถวของ handler ที่เรียงลำดับไว้ ปล่อยให้แต่ละตัวตัดสินใจว่าจะจัดการเองหรือส่งต่อ เพื่อให้ผู้ส่งและผู้รับยังคงแยกขาดจากกัน
+- **Mediator** — แทนที่การอ้างอิงแบบ many-to-many ที่พันกันยุ่งเหยิงด้วยผู้ประสานงานเพียงตัวเดียวที่เพื่อนร่วมงานทุกตัวพูดคุยด้วย เพื่อรวมศูนย์การสื่อสารที่ซับซ้อน
+- **Memento** — จับเก็บสถานะภายในของออบเจ็กต์ลงในโทเคนที่ทึบแสง (opaque) และกู้คืนภายหลัง เปิดทาง undo โดยไม่ทำลาย encapsulation
+- **Visitor** — ย้าย operation ออกจากคลาสของโครงสร้างไปไว้ใน visitor ที่แยกต่างหาก ทำให้เพิ่มพฤติกรรมได้โดยไม่ต้องแก้ไขโครงสร้าง
+- **Interpreter** — แทน grammar เล็ก ๆ ด้วยต้นไม้ของออบเจ็กต์แล้วประเมินผล แปลงนิพจน์ให้กลายเป็นผลลัพธ์
+
+## When to use / trade-offs
+
+- **ข้อดี:** แต่ละ pattern แยกความกังวลด้านการโต้ตอบหนึ่งเรื่องออกมา ทำให้โค้ดรอบ ๆ ยังคงแยกขาดและแก้ไขได้ง่ายขึ้น
+- **ข้อดี:** หลายตัวในนั้น — Memento, Chain of Responsibility, Visitor — จับคู่ได้อย่างเป็นธรรมชาติกับ pattern จากโมดูลแรก เช่น Command และ Composite
+- **ข้อเสีย:** เหล่านี้เป็นนามธรรมที่หนักกว่าตัวพื้นฐาน chain ของ handler ที่ไม่ได้ใช้หรือ visitor ที่มีเมท็อดเดียวเพิ่มพิธีรีตองโดยไม่คุ้มค่า
+- **ข้อเสีย:** หยิบมาใช้เมื่อปัญหาด้านการโต้ตอบมีอยู่จริงเท่านั้น ไม่ใช่เพราะคาดเดาว่ามันจะเกิด
+
+## Related patterns
+
+- [Behavioral Patterns I](/design-patterns-from-zero-to-hero/th/behavioral-essentials/) แนะนำ Strategy, Observer, Command, State, Template Method, และ Iterator
+- ต้นไม้ของ [Composite](/design-patterns-from-zero-to-hero/th/structural/) เป็นอินพุตคลาสสิกของ Visitor
+
+<Callout title="วิธีอ่านโมดูลนี้">
+แต่ละบทเรียนคงรูปแบบเดิมไว้ ได้แก่ intent, ตัวปัญหา, แผนภาพโครงสร้าง UML, ตัวอย่างที่ทำเสร็จหนึ่งชุดในภาษา TypeScript, Python, Go, และ Rust, การชั่งน้ำหนักข้อดีข้อเสีย, pattern ที่เกี่ยวข้อง, และแบบทดสอบสั้น ๆ อ่านตามลำดับ — Memento อ้างถึง Command และ Visitor ถือว่าคุณคุ้นเคยกับ object tree แล้ว
+</Callout>

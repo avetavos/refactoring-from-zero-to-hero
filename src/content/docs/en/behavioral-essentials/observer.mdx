@@ -1,0 +1,281 @@
+---
+title: Observer
+description: 'Let a subject notify a changing set of dependents automatically whenever its state changes, without knowing who they are.'
+sidebar:
+  order: 3
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+## Intent
+
+Observer defines a one-to-many dependency between objects so that when one object — the subject — changes state, all of its dependents are notified and updated automatically. The subject keeps a list of observers and broadcasts to them without knowing their concrete types.
+
+## Problem
+
+Suppose a newsletter publishes new articles, and several things must react: an email sender, a log, a live feed on the homepage. The crude approach is to have the publisher call each of them directly. But then the publisher must import and know every consumer, and every time you add or remove a consumer you edit the publisher. The publisher becomes a hub coupled to everything downstream.
+
+The variation here is *who is listening*, and that set changes over time. Observer inverts the relationship: consumers register themselves with the subject, and the subject broadcasts to whatever list it currently holds. The publisher knows only the observer interface, so subscribers can come and go at runtime and the publisher never changes.
+
+## Structure
+
+export const observerUml = `classDiagram
+  class Subject {
+    -observers: List~Observer~
+    +subscribe(o)
+    +unsubscribe(o)
+    +notify(news)
+  }
+  class Observer {
+    <<interface>>
+    +update(news)
+  }
+  class EmailSubscriber {
+    +update(news)
+  }
+  class FeedSubscriber {
+    +update(news)
+  }
+  Subject o--> Observer
+  Observer <|.. EmailSubscriber
+  Observer <|.. FeedSubscriber`;
+
+<Mermaid code={observerUml} title="A Subject broadcasts updates to every registered Observer" />
+
+- **Subject** — holds the list of observers and exposes subscribe, unsubscribe, and a way to notify. When its state changes it broadcasts to all observers.
+- **Observer** — the interface every dependent implements, typically a single update method that receives the change.
+- **Concrete Observer** — one dependent; it reacts to the update however it likes.
+- **Client** — registers and removes observers and triggers state changes on the subject.
+
+## Example
+
+A newsletter subject that broadcasts each new headline to whatever subscribers are currently registered. Each language uses its idiomatic callback or interface mechanism.
+
+<Tabs syncKey="lang">
+  <TabItem label="TypeScript">
+    ```ts
+    interface Observer {
+      update(headline: string): void;
+    }
+
+    class Newsletter {
+      private observers = new Set<Observer>();
+
+      subscribe(o: Observer): void {
+        this.observers.add(o);
+      }
+      unsubscribe(o: Observer): void {
+        this.observers.delete(o);
+      }
+      publish(headline: string): void {
+        for (const o of this.observers) {
+          o.update(headline);
+        }
+      }
+    }
+
+    class EmailSubscriber implements Observer {
+      constructor(private readonly who: string) {}
+      update(headline: string): void {
+        console.log(`Email to ${this.who}: ${headline}`);
+      }
+    }
+
+    const news = new Newsletter();
+    const alice = new EmailSubscriber('alice');
+    news.subscribe(alice);
+    news.subscribe(new EmailSubscriber('bob'));
+    news.publish('Observer explained'); // both notified
+    news.unsubscribe(alice);
+    news.publish('Now without alice'); // only bob
+    ```
+  </TabItem>
+  <TabItem label="Python">
+    ```python
+    from typing import Protocol
+
+
+    class Observer(Protocol):
+        def update(self, headline: str) -> None: ...
+
+
+    class Newsletter:
+        def __init__(self) -> None:
+            self._observers: list[Observer] = []
+
+        def subscribe(self, o: Observer) -> None:
+            self._observers.append(o)
+
+        def unsubscribe(self, o: Observer) -> None:
+            self._observers.remove(o)
+
+        def publish(self, headline: str) -> None:
+            for o in list(self._observers):
+                o.update(headline)
+
+
+    class EmailSubscriber:
+        def __init__(self, who: str) -> None:
+            self.who = who
+
+        def update(self, headline: str) -> None:
+            print(f"Email to {self.who}: {headline}")
+
+
+    news = Newsletter()
+    alice = EmailSubscriber("alice")
+    news.subscribe(alice)
+    news.subscribe(EmailSubscriber("bob"))
+    news.publish("Observer explained")  # both notified
+    news.unsubscribe(alice)
+    news.publish("Now without alice")  # only bob
+    ```
+  </TabItem>
+  <TabItem label="Go">
+    ```go
+    package main
+
+    import "fmt"
+
+    // Observer is implemented by anything that wants to be notified.
+    type Observer interface {
+        Update(headline string)
+    }
+
+    type Newsletter struct {
+        observers []Observer
+    }
+
+    func (n *Newsletter) Subscribe(o Observer) {
+        n.observers = append(n.observers, o)
+    }
+
+    func (n *Newsletter) Publish(headline string) {
+        for _, o := range n.observers {
+            o.Update(headline)
+        }
+    }
+
+    type EmailSubscriber struct{ Who string }
+
+    func (e EmailSubscriber) Update(headline string) {
+        fmt.Printf("Email to %s: %s\n", e.Who, headline)
+    }
+
+    func main() {
+        news := &Newsletter{}
+        news.Subscribe(EmailSubscriber{Who: "alice"})
+        news.Subscribe(EmailSubscriber{Who: "bob"})
+        news.Publish("Observer explained") // both notified
+    }
+    ```
+  </TabItem>
+  <TabItem label="Rust">
+    ```rust
+    trait Observer {
+        fn update(&self, headline: &str);
+    }
+
+    struct Newsletter {
+        observers: Vec<Box<dyn Observer>>,
+    }
+    impl Newsletter {
+        fn new() -> Self {
+            Newsletter { observers: Vec::new() }
+        }
+        fn subscribe(&mut self, o: Box<dyn Observer>) {
+            self.observers.push(o);
+        }
+        fn publish(&self, headline: &str) {
+            for o in &self.observers {
+                o.update(headline);
+            }
+        }
+    }
+
+    struct EmailSubscriber {
+        who: String,
+    }
+    impl Observer for EmailSubscriber {
+        fn update(&self, headline: &str) {
+            println!("Email to {}: {}", self.who, headline);
+        }
+    }
+
+    fn main() {
+        let mut news = Newsletter::new();
+        news.subscribe(Box::new(EmailSubscriber { who: "alice".into() }));
+        news.subscribe(Box::new(EmailSubscriber { who: "bob".into() }));
+        news.publish("Observer explained"); // both notified
+    }
+    ```
+  </TabItem>
+</Tabs>
+
+## When to use / trade-offs
+
+- **Pro:** the subject and its observers are loosely coupled — the subject knows only the observer interface.
+- **Pro:** observers can be added or removed at runtime, including dynamically as the program runs.
+- **Pro:** it is the backbone of event systems, UI bindings, and reactive data flows.
+- **Con:** notification order is usually unspecified, so observers must not depend on running in a fixed sequence.
+- **Con:** unremoved observers cause memory leaks, and a long notification chain can be hard to trace or debug.
+
+## Related patterns
+
+- [Mediator](/design-patterns-from-zero-to-hero/en/behavioral-advanced/mediator/) also decouples senders from receivers but routes through a central hub rather than direct broadcast.
+- [Command](/design-patterns-from-zero-to-hero/en/behavioral-essentials/command/) is often the payload an observer receives, turning a notification into an executable action.
+
+<Callout title="Push versus pull">
+There are two flavours: the subject can *push* the changed data into update, or it can push only a signal and let each observer *pull* whatever it needs from the subject. Pushing is convenient but couples observers to the data shape; pulling is leaner but chattier. Choose based on how much each observer actually needs.
+</Callout>
+
+export const quiz = [
+  {
+    q: 'What relationship does Observer define?',
+    options: [
+      'A one-to-one wrapper around an object',
+      'A one-to-many dependency where dependents are notified of changes',
+      'A single shared instance for the whole program',
+      'A way to clone objects cheaply',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'What does the subject know about its observers?',
+    options: [
+      'Their exact concrete classes',
+      'Only that they implement the observer interface',
+      'Their memory addresses at compile time',
+      'Nothing — it broadcasts to the whole program',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'Why can observers be added and removed freely?',
+    options: [
+      'Because the subject recompiles itself each time',
+      'Because the subject holds a mutable list and depends only on the interface',
+      'Because observers are singletons',
+      'Because the subject copies each observer',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'Which is a real hazard of Observer?',
+    options: [
+      'It forbids more than one observer',
+      'Forgotten observers can leak memory and notification order is often unspecified',
+      'It cannot work at runtime',
+      'It requires inheritance from the subject',
+    ],
+    answer: 1,
+  },
+];
+
+<Quiz client:visible id="behavioral-essentials/observer" questions={quiz} />
+
+<ProgressTracker client:visible id="behavioral-essentials/observer" />

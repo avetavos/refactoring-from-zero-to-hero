@@ -1,0 +1,213 @@
+---
+title: Singleton
+description: 'Guarantee one shared instance of a class and a single, lazy point of access to it.'
+sidebar:
+  order: 2
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+## Intent
+
+Singleton ensures a class is instantiated exactly once and exposes that single instance through a shared access point, creating it lazily on first use.
+
+## Problem
+
+Some things in a program are genuinely singular: the parsed configuration, a connection pool, an in-memory registry, a logger. If every part of the system constructs its own copy, they drift out of sync and waste resources. You want one object, created the first time anyone asks, and reused forever after — and you want that guarantee enforced rather than relying on convention.
+
+The subtle part is *who* enforces it. Ordinary code can call a constructor as many times as it likes. Singleton moves construction behind a controlled accessor so the class itself owns the rule. The price is that the instance becomes global state, with all the testing and concurrency hazards that implies — which is why the discipline of *one* matters more than the trick of hiding the constructor.
+
+## Structure
+
+export const singletonUml = `classDiagram
+  class Singleton {
+    -instance: Singleton$
+    -Singleton()
+    +getInstance() Singleton$
+    +operation()
+  }
+  Singleton --> Singleton : holds static reference`;
+
+<Mermaid code={singletonUml} title="A Singleton holds a static reference to its own sole instance" />
+
+- **Singleton** — the class itself. It hides its constructor, holds a private static reference to the one instance, and exposes a static accessor that creates the instance on first call and returns the same reference thereafter.
+- **Client** — any caller. It never constructs the object directly; it asks the accessor for the shared instance.
+
+## Example
+
+A small read-only application config that loads once and is shared everywhere. Each language uses its idiomatic mechanism for "create exactly once, lazily, and safely."
+
+<Tabs syncKey="lang">
+  <TabItem label="TypeScript">
+    ```ts
+    class AppConfig {
+      private static instance: AppConfig | null = null;
+      readonly env: string;
+      readonly maxConnections: number;
+
+      private constructor() {
+        // Pretend this reads from disk or the environment once.
+        this.env = process.env.APP_ENV ?? 'development';
+        this.maxConnections = 10;
+      }
+
+      static get(): AppConfig {
+        if (AppConfig.instance === null) {
+          AppConfig.instance = new AppConfig();
+        }
+        return AppConfig.instance;
+      }
+    }
+
+    const a = AppConfig.get();
+    const b = AppConfig.get();
+    console.log(a === b); // true — same shared instance
+    console.log(a.env, a.maxConnections);
+    ```
+  </TabItem>
+  <TabItem label="Python">
+    ```python
+    class AppConfig:
+        _instance = None
+
+        def __new__(cls):
+            if cls._instance is None:
+                cls._instance = super().__new__(cls)
+                # Initialise the single instance exactly once.
+                instance = cls._instance
+                instance.env = "development"
+                instance.max_connections = 10
+            return cls._instance
+
+
+    a = AppConfig()
+    b = AppConfig()
+    print(a is b)  # True — __new__ returns the same object
+    print(a.env, a.max_connections)
+    ```
+  </TabItem>
+  <TabItem label="Go">
+    ```go
+    package main
+
+    import (
+        "fmt"
+        "sync"
+    )
+
+    type AppConfig struct {
+        Env            string
+        MaxConnections int
+    }
+
+    var (
+        instance *AppConfig
+        once     sync.Once
+    )
+
+    // Get returns the single AppConfig, building it on first call.
+    func Get() *AppConfig {
+        once.Do(func() {
+            instance = &AppConfig{Env: "development", MaxConnections: 10}
+        })
+        return instance
+    }
+
+    func main() {
+        a := Get()
+        b := Get()
+        fmt.Println(a == b) // true — sync.Once guards construction
+        fmt.Println(a.Env, a.MaxConnections)
+    }
+    ```
+  </TabItem>
+  <TabItem label="Rust">
+    ```rust
+    use std::sync::OnceLock;
+
+    struct AppConfig {
+        env: String,
+        max_connections: u32,
+    }
+
+    fn config() -> &'static AppConfig {
+        static INSTANCE: OnceLock<AppConfig> = OnceLock::new();
+        INSTANCE.get_or_init(|| AppConfig {
+            env: "development".to_string(),
+            max_connections: 10,
+        })
+    }
+
+    fn main() {
+        let a = config();
+        let b = config();
+        // Both references point at the same static instance.
+        println!("{}", std::ptr::eq(a, b)); // true
+        println!("{} {}", a.env, a.max_connections);
+    }
+    ```
+  </TabItem>
+</Tabs>
+
+## When to use / trade-offs
+
+- **Pro:** guarantees a single instance and one obvious access point for genuinely shared state.
+- **Pro:** the instance is created lazily, so you pay the setup cost only if it is actually used.
+- **Con:** it is global mutable state in disguise; hidden dependencies make code harder to reason about.
+- **Con:** it complicates testing — tests share one instance and cannot easily inject a fake unless you design for it.
+- **Con:** naive lazy initialisation is a race condition under concurrency; you must guard it (as `sync.Once` and `OnceLock` do above).
+
+## Related patterns
+
+- [Abstract Factory](/design-patterns-from-zero-to-hero/en/creational/abstract-factory/) is often implemented as a Singleton so one factory is shared.
+- [Prototype](/design-patterns-from-zero-to-hero/en/creational/prototype/) offers the opposite stance — make many copies cheaply rather than share one.
+
+<Callout title="Use with care">
+A Singleton is global state wearing a class. It couples callers to a specific instance and makes tests order-dependent, because they all touch the same object. Prefer passing dependencies in explicitly; reach for a Singleton only when the thing is truly singular and you can live with the global-state cost.
+</Callout>
+
+export const quiz = [
+  {
+    q: 'What does a Singleton guarantee?',
+    options: [
+      'A new instance for every caller',
+      'Exactly one instance with a shared access point',
+      'That a class cannot be subclassed',
+      'Thread-safe field access on any object',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'Why does naive lazy initialisation need extra care under concurrency?',
+    options: [
+      'Constructors are always slow',
+      'Two threads can both see no instance and each create one',
+      'Lazy code cannot run on multiple cores',
+      'The garbage collector deletes singletons',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'Which Go mechanism makes singleton construction run at most once?',
+    options: ['sync.Mutex.Lock', 'sync.Once.Do', 'go func()', 'defer close(ch)'],
+    answer: 1,
+  },
+  {
+    q: 'What is the main testability drawback of Singletons?',
+    options: [
+      'They cannot hold any fields',
+      'They are shared global state that tests cannot easily isolate or fake',
+      'They run only in production builds',
+      'They forbid the use of interfaces',
+    ],
+    answer: 1,
+  },
+];
+
+<Quiz client:visible id="creational/singleton" questions={quiz} />
+
+<ProgressTracker client:visible id="creational/singleton" />

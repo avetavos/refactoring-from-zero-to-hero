@@ -1,0 +1,318 @@
+---
+title: Visitor
+description: 'เพิ่ม operation ใหม่ให้กับโครงสร้างออบเจ็กต์ที่ตายตัวโดยไม่ต้องเปลี่ยนคลาสของมัน ด้วยเทคนิค double dispatch'
+sidebar:
+  order: 5
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+## Intent
+
+Visitor ให้คุณนิยาม operation ใหม่บนโครงสร้างของออบเจ็กต์โดยไม่ต้องแก้ไขคลาสที่ประกอบกันเป็นโครงสร้างนั้น คุณห่อ operation ไว้ใน visitor แล้วปล่อยให้แต่ละ element รับ (accept) มันเข้ามา
+
+## Problem
+
+สมมติว่าคุณมีลำดับชั้นของรูปทรง — วงกลม, สี่เหลี่ยมผืนผ้า, และอื่น ๆ — และคุณต้องการ operation ใหม่ ๆ ทั่วทั้งหมดอยู่เรื่อย ๆ ได้แก่ คำนวณพื้นที่, เรนเดอร์เป็น SVG, serialize เป็น JSON, ประมาณค่าสี หากแต่ละ operation อยู่ในฐานะเมท็อดบนทุกคลาสรูปทรง การเพิ่ม operation หนึ่งก็หมายถึงการแก้ไขทุกคลาส และคลาสรูปทรงก็ค่อย ๆ สะสมความกังวลที่ไม่เกี่ยวข้องกันเข้ามา
+
+Visitor พลิกกลับเรื่องนี้ operation ย้ายเข้าไปอยู่ในออบเจ็กต์ของตัวเอง — visitor — โดยมีหนึ่งเมท็อดต่อ element หนึ่งชนิด แต่ละ element เปิดเผยเมท็อด `accept` ที่เรียกกลับไปยังเมท็อดของ visitor ที่ตรงกัน พร้อมส่งตัวมันเองไปด้วย การ dispatch สองขั้นนี้ (element เลือกเมท็อดของ visitor ส่วน runtime เลือกชนิดของ element) คือ *double dispatch* นั่นคือโค้ดที่ถูกรันขึ้นอยู่กับทั้ง visitor และ element การเพิ่ม operation ใหม่ตอนนี้จึงเป็นเพียงการเขียน visitor ใหม่ โดยไม่ต้องเปลี่ยนรูปทรงเลย จุดที่ต้องระวังคือภาพสะท้อนกลับด้าน — การเพิ่มรูปทรงใหม่บังคับให้ต้องเปลี่ยนทุก visitor
+
+## Structure
+
+export const visitorUml = `classDiagram
+  class Shape {
+    <<interface>>
+    +accept(v Visitor) double
+  }
+  class Circle {
+    +radius: double
+    +accept(v Visitor) double
+  }
+  class Rectangle {
+    +width: double
+    +height: double
+    +accept(v Visitor) double
+  }
+  class Visitor {
+    <<interface>>
+    +visitCircle(c Circle) double
+    +visitRectangle(r Rectangle) double
+  }
+  class AreaVisitor {
+    +visitCircle(c Circle) double
+    +visitRectangle(r Rectangle) double
+  }
+  Shape <|.. Circle
+  Shape <|.. Rectangle
+  Visitor <|.. AreaVisitor
+  Circle ..> Visitor : accept
+  Rectangle ..> Visitor : accept`;
+
+<Mermaid code={visitorUml} title="แต่ละ element รับ visitor และ dispatch ไปยังเมท็อดสำหรับชนิดของตนเอง" />
+
+- **Shape (Element)** — อินเทอร์เฟซสำหรับสมาชิกของโครงสร้าง มันประกาศเมท็อด `accept` ที่รับ visitor เข้ามา
+- **Circle, Rectangle** — concrete element แต่ละตัวเมท็อด `accept` จะเรียกกลับไปยังเมท็อดของ visitor ที่เจาะจงตามชนิดของตน พร้อมส่งตัวมันเองไปด้วย
+- **Visitor** — อินเทอร์เฟซที่ประกาศเมท็อด visit หนึ่งตัวต่อ element หนึ่งชนิด
+- **AreaVisitor** — concrete operation เมท็อด visit แต่ละตัว implement operation สำหรับ element หนึ่งชนิด
+
+## Example
+
+ลำดับชั้นของรูปทรงพร้อม operation คำนวณพื้นที่ที่ห่อไว้ในรูปของ visitor operation ใหม่กลายเป็น visitor ใหม่ ส่วนรูปทรงไม่เปลี่ยนแปลงเลย
+
+<Tabs syncKey="lang">
+  <TabItem label="TypeScript">
+    ```ts
+    interface ShapeVisitor {
+      visitCircle(c: Circle): number;
+      visitRectangle(r: Rectangle): number;
+    }
+
+    interface Shape {
+      accept(v: ShapeVisitor): number;
+    }
+
+    class Circle implements Shape {
+      constructor(readonly radius: number) {}
+      accept(v: ShapeVisitor): number {
+        return v.visitCircle(this);
+      }
+    }
+
+    class Rectangle implements Shape {
+      constructor(readonly width: number, readonly height: number) {}
+      accept(v: ShapeVisitor): number {
+        return v.visitRectangle(this);
+      }
+    }
+
+    class AreaVisitor implements ShapeVisitor {
+      visitCircle(c: Circle): number {
+        return Math.PI * c.radius * c.radius;
+      }
+      visitRectangle(r: Rectangle): number {
+        return r.width * r.height;
+      }
+    }
+
+    const shapes: Shape[] = [new Circle(1), new Rectangle(2, 3)];
+    const area = new AreaVisitor();
+    for (const s of shapes) {
+      console.log(s.accept(area).toFixed(2)); // 3.14, then 6.00
+    }
+    ```
+  </TabItem>
+  <TabItem label="Python">
+    ```python
+    from __future__ import annotations
+    import math
+    from abc import ABC, abstractmethod
+
+
+    class ShapeVisitor(ABC):
+        @abstractmethod
+        def visit_circle(self, c: "Circle") -> float: ...
+
+        @abstractmethod
+        def visit_rectangle(self, r: "Rectangle") -> float: ...
+
+
+    class Shape(ABC):
+        @abstractmethod
+        def accept(self, v: ShapeVisitor) -> float: ...
+
+
+    class Circle(Shape):
+        def __init__(self, radius: float) -> None:
+            self.radius = radius
+
+        def accept(self, v: ShapeVisitor) -> float:
+            return v.visit_circle(self)
+
+
+    class Rectangle(Shape):
+        def __init__(self, width: float, height: float) -> None:
+            self.width = width
+            self.height = height
+
+        def accept(self, v: ShapeVisitor) -> float:
+            return v.visit_rectangle(self)
+
+
+    class AreaVisitor(ShapeVisitor):
+        def visit_circle(self, c: Circle) -> float:
+            return math.pi * c.radius * c.radius
+
+        def visit_rectangle(self, r: Rectangle) -> float:
+            return r.width * r.height
+
+
+    shapes: list[Shape] = [Circle(1), Rectangle(2, 3)]
+    area = AreaVisitor()
+    for s in shapes:
+        print(f"{s.accept(area):.2f}")  # 3.14, then 6.00
+    ```
+  </TabItem>
+  <TabItem label="Go">
+    ```go
+    package main
+
+    import (
+        "fmt"
+        "math"
+    )
+
+    // Visitor declares one method per concrete element type.
+    type Visitor interface {
+        VisitCircle(c Circle) float64
+        VisitRectangle(r Rectangle) float64
+    }
+
+    type Shape interface {
+        Accept(v Visitor) float64
+    }
+
+    type Circle struct{ Radius float64 }
+
+    func (c Circle) Accept(v Visitor) float64 {
+        return v.VisitCircle(c)
+    }
+
+    type Rectangle struct{ Width, Height float64 }
+
+    func (r Rectangle) Accept(v Visitor) float64 {
+        return v.VisitRectangle(r)
+    }
+
+    type AreaVisitor struct{}
+
+    func (AreaVisitor) VisitCircle(c Circle) float64 {
+        return math.Pi * c.Radius * c.Radius
+    }
+
+    func (AreaVisitor) VisitRectangle(r Rectangle) float64 {
+        return r.Width * r.Height
+    }
+
+    func main() {
+        shapes := []Shape{Circle{Radius: 1}, Rectangle{Width: 2, Height: 3}}
+        area := AreaVisitor{}
+        for _, s := range shapes {
+            fmt.Printf("%.2f\n", s.Accept(area)) // 3.14, then 6.00
+        }
+    }
+    ```
+  </TabItem>
+  <TabItem label="Rust">
+    ```rust
+    use std::f64::consts::PI;
+
+    // Visitor has one method per element variant.
+    trait Visitor {
+        fn visit_circle(&self, c: &Circle) -> f64;
+        fn visit_rectangle(&self, r: &Rectangle) -> f64;
+    }
+
+    trait Shape {
+        fn accept(&self, v: &dyn Visitor) -> f64;
+    }
+
+    struct Circle {
+        radius: f64,
+    }
+    impl Shape for Circle {
+        fn accept(&self, v: &dyn Visitor) -> f64 {
+            v.visit_circle(self)
+        }
+    }
+
+    struct Rectangle {
+        width: f64,
+        height: f64,
+    }
+    impl Shape for Rectangle {
+        fn accept(&self, v: &dyn Visitor) -> f64 {
+            v.visit_rectangle(self)
+        }
+    }
+
+    struct AreaVisitor;
+    impl Visitor for AreaVisitor {
+        fn visit_circle(&self, c: &Circle) -> f64 {
+            PI * c.radius * c.radius
+        }
+        fn visit_rectangle(&self, r: &Rectangle) -> f64 {
+            r.width * r.height
+        }
+    }
+
+    fn main() {
+        let shapes: Vec<Box<dyn Shape>> = vec![
+            Box::new(Circle { radius: 1.0 }),
+            Box::new(Rectangle { width: 2.0, height: 3.0 }),
+        ];
+        let area = AreaVisitor;
+        for s in &shapes {
+            println!("{:.2}", s.accept(&area)); // 3.14, then 6.00
+        }
+    }
+    ```
+  </TabItem>
+</Tabs>
+
+## When to use / trade-offs
+
+- **ข้อดี:** เพิ่ม operation ใหม่บนโครงสร้างได้ด้วยการเขียน visitor ใหม่ โดยไม่ต้องเปลี่ยนคลาสของ element
+- **ข้อดี:** พฤติกรรมที่เกี่ยวข้องกันของ operation หนึ่งอยู่รวมกันใน visitor ตัวเดียว แทนที่จะถูกป้ายกระจายไปทั่วทุก element
+- **ข้อเสีย:** การเพิ่ม element ชนิดใหม่บังคับให้ต้องเปลี่ยนทุก visitor — ข้อแลกเปลี่ยนตรงกันข้ามพอดี ดังนั้นจงใช้มันเฉพาะเมื่อชุดของ element นิ่งแล้วเท่านั้น
+- **ข้อเสีย:** visitor มักต้องเข้าถึงส่วนภายในของ element ซึ่งอาจทำให้ encapsulation อ่อนแอลง
+- **ข้อเสีย:** พิธีรีตองของ double dispatch (เมท็อด accept บวกกับเมท็อด visit) เยิ่นเย้อเกินไปสำหรับลำดับชั้นเล็ก ๆ
+
+## Related patterns
+
+- ต้นไม้ของ [Composite](/design-patterns-from-zero-to-hero/th/structural/) คือโครงสร้างต้นแบบที่ visitor เดินผ่าน visitor เดินผ่าน composite และนำ operation ไปใช้ที่แต่ละโหนด
+- [Iterator](/design-patterns-from-zero-to-hero/th/behavioral-essentials/) สามารถป้อน element ให้แก่ visitor แยก *วิธีที่คุณเดินผ่าน* ออกจาก *สิ่งที่คุณทำ* ที่แต่ละ element
+
+<Callout title="Visitor เทียบกับการเพิ่มเมท็อด">
+Visitor คุ้มค่าเมื่อ operation เปลี่ยนบ่อยแต่ชนิดของ element นิ่ง หากในทางกลับกันคุณเพิ่มชนิดของ element อยู่เรื่อย ๆ การใช้เมท็อดธรรมดาบนแต่ละ element จะเรียบง่ายกว่า — pattern นี้จะบังคับให้คุณต้องแก้ทุก visitor ทุกครั้ง จงเลือกแกนที่คุณคาดว่าจะเติบโต
+</Callout>
+
+export const quiz = [
+  {
+    q: 'Visitor pattern ให้คุณเพิ่มอะไรได้โดยไม่ต้องเปลี่ยนคลาสของ element?',
+    options: [
+      'element ชนิดใหม่',
+      'operation ใหม่บนโครงสร้างที่มีอยู่',
+      'constructor ใหม่',
+      'รากการสืบทอด (inheritance root) ใหม่',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'double dispatch ใน Visitor pattern คืออะไร?',
+    options: [
+      'การเรียกเมท็อดสองครั้งเพื่อความน่าเชื่อถือ',
+      'โค้ดที่ถูกรันขึ้นอยู่กับทั้งชนิดของ visitor และชนิดของ element',
+      'การส่งงานไปยังสองเธรด',
+      'การส่ง request ไปยังสอง handler',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'ข้อเสียหลักของ Visitor คืออะไร?',
+    options: [
+      'การเพิ่ม operation ใหม่ต้องแก้ไขทุก element',
+      'การเพิ่ม element ชนิดใหม่ต้องแก้ไขทุก visitor',
+      'มันคืนค่าไม่ได้',
+      'มันห้ามใช้อินเทอร์เฟซ',
+    ],
+    answer: 1,
+  },
+];
+
+<Quiz client:visible id="behavioral-advanced/visitor" questions={quiz} />
+
+<ProgressTracker client:visible id="behavioral-advanced/visitor" />

@@ -1,0 +1,317 @@
+---
+title: Memento
+description: 'จับเก็บและกู้คืนสถานะภายในของออบเจ็กต์โดยไม่เปิดเผยส่วนภายในของมัน เปิดทางให้ทำ undo ได้'
+sidebar:
+  order: 4
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+## Intent
+
+Memento จับเก็บสถานะภายในของออบเจ็กต์ลงในโทเคนที่แยกต่างหาก เพื่อให้สถานะนั้นถูกกู้คืนภายหลังได้ ทั้งหมดนี้โดยไม่เปิดเผยว่าสถานะนั้นถูกเก็บไว้อย่างไร มันคือ pattern ที่อยู่เบื้องหลัง undo
+
+## Problem
+
+โปรแกรมแก้ไขข้อความต้องการคำสั่ง undo เพื่อกู้คืนสถานะก่อนหน้า ต้องมีบางอย่างที่จดจำว่าเอกสารหน้าตาเป็นอย่างไรก่อนการแก้ไขแต่ละครั้ง วิธีที่เห็นได้ชัด — ปล่อยให้กลไก undo อ่านและเขียนฟิลด์ส่วนตัวของโปรแกรมแก้ไขโดยตรง — ทำลาย encapsulation ตอนนี้โค้ดประวัติกลับพึ่งพา layout ภายในของโปรแกรมแก้ไข และการเปลี่ยนแปลง layout นั้นใด ๆ ก็จะกระเพื่อมออกไปด้านนอก
+
+Memento เก็บภาพถ่ายให้ทึบแสง (opaque) ออบเจ็กต์ที่คุณต้องการบันทึกสถานะของมัน (*originator*) สร้าง memento ที่จับเก็บสถานะของมัน ส่วน *caretaker* ถือ memento ไว้แต่ปฏิบัติต่อมันเหมือนกล่องที่ปิดผนึก มันสามารถส่งกล่องคืนให้ originator เพื่อกู้คืนได้ แต่ไม่สามารถแอบมองข้างในได้ originator จึงยังคงควบคุมได้เต็มที่ว่าจะบันทึกอะไรและบันทึกอย่างไร ส่วนภายในของมันจึงยังคงเป็นส่วนตัว แม้ว่าประวัติของมันจะถูกบันทึกไว้แล้วก็ตาม
+
+## Structure
+
+export const mementoUml = `classDiagram
+  class Editor {
+    -content: string
+    +type(text)
+    +save() Memento
+    +restore(m Memento)
+  }
+  class Memento {
+    -state: string
+    +getState() string
+  }
+  class History {
+    -snapshots: List~Memento~
+    +push(m Memento)
+    +pop() Memento
+  }
+  Editor ..> Memento : creates
+  History o-- Memento : stores
+  Editor ..> History : uses`;
+
+<Mermaid code={mementoUml} title="originator สร้าง memento ส่วน caretaker เก็บมันไว้โดยไม่ตรวจสอบข้างใน" />
+
+- **Editor (Originator)** — ออบเจ็กต์ที่สถานะของมันสำคัญ มันสร้าง memento ที่จับเก็บสถานะปัจจุบันของตนและสามารถกู้คืนตัวเองจาก memento ได้
+- **Memento** — ภาพถ่ายที่ทึบแสง มีเพียง originator เท่านั้นที่เข้าใจเนื้อหาของมัน ทุกคนอื่นปฏิบัติต่อมันเหมือนกล่องดำ
+- **History (Caretaker)** — เก็บ stack ของ memento และตัดสินใจว่าจะบันทึกเมื่อใดและจะย้อนกลับเมื่อใด โดยไม่อ่านภาพถ่ายเหล่านั้น
+
+## Example
+
+โปรแกรมแก้ไขจิ๋วที่มี undo การบันทึกแต่ละครั้งจะ push ภาพถ่ายขึ้นไปบน stack ประวัติ ส่วน undo จะ pop ภาพถ่ายล่าสุดออกมาแล้วกู้คืนมัน
+
+<Tabs syncKey="lang">
+  <TabItem label="TypeScript">
+    ```ts
+    class Memento {
+      constructor(readonly state: string) {}
+    }
+
+    class Editor {
+      private content = '';
+
+      type(text: string): void {
+        this.content += text;
+      }
+
+      read(): string {
+        return this.content;
+      }
+
+      save(): Memento {
+        return new Memento(this.content);
+      }
+
+      restore(m: Memento): void {
+        this.content = m.state;
+      }
+    }
+
+    class History {
+      private snapshots: Memento[] = [];
+      push(m: Memento): void {
+        this.snapshots.push(m);
+      }
+      pop(): Memento | undefined {
+        return this.snapshots.pop();
+      }
+    }
+
+    const editor = new Editor();
+    const history = new History();
+
+    editor.type('hello ');
+    history.push(editor.save());
+    editor.type('world');
+    console.log(editor.read()); // hello world
+
+    const snapshot = history.pop();
+    if (snapshot) editor.restore(snapshot);
+    console.log(editor.read()); // hello
+    ```
+  </TabItem>
+  <TabItem label="Python">
+    ```python
+    from __future__ import annotations
+    from dataclasses import dataclass
+
+
+    @dataclass(frozen=True)
+    class Memento:
+        state: str
+
+
+    class Editor:
+        def __init__(self) -> None:
+            self._content = ""
+
+        def type(self, text: str) -> None:
+            self._content += text
+
+        def read(self) -> str:
+            return self._content
+
+        def save(self) -> Memento:
+            return Memento(self._content)
+
+        def restore(self, m: Memento) -> None:
+            self._content = m.state
+
+
+    class History:
+        def __init__(self) -> None:
+            self._snapshots: list[Memento] = []
+
+        def push(self, m: Memento) -> None:
+            self._snapshots.append(m)
+
+        def pop(self) -> Memento | None:
+            return self._snapshots.pop() if self._snapshots else None
+
+
+    editor = Editor()
+    history = History()
+
+    editor.type("hello ")
+    history.push(editor.save())
+    editor.type("world")
+    print(editor.read())  # hello world
+
+    snapshot = history.pop()
+    if snapshot:
+        editor.restore(snapshot)
+    print(editor.read())  # hello
+    ```
+  </TabItem>
+  <TabItem label="Go">
+    ```go
+    package main
+
+    import "fmt"
+
+    // Memento is an opaque snapshot of the editor's state.
+    type Memento struct {
+        state string
+    }
+
+    type Editor struct {
+        content string
+    }
+
+    func (e *Editor) Type(text string) {
+        e.content += text
+    }
+
+    func (e *Editor) Read() string {
+        return e.content
+    }
+
+    func (e *Editor) Save() Memento {
+        return Memento{state: e.content}
+    }
+
+    func (e *Editor) Restore(m Memento) {
+        e.content = m.state
+    }
+
+    type History struct {
+        snapshots []Memento
+    }
+
+    func (h *History) Push(m Memento) {
+        h.snapshots = append(h.snapshots, m)
+    }
+
+    func (h *History) Pop() (Memento, bool) {
+        if len(h.snapshots) == 0 {
+            return Memento{}, false
+        }
+        last := h.snapshots[len(h.snapshots)-1]
+        h.snapshots = h.snapshots[:len(h.snapshots)-1]
+        return last, true
+    }
+
+    func main() {
+        editor := &Editor{}
+        history := &History{}
+
+        editor.Type("hello ")
+        history.Push(editor.Save())
+        editor.Type("world")
+        fmt.Println(editor.Read()) // hello world
+
+        if snapshot, ok := history.Pop(); ok {
+            editor.Restore(snapshot)
+        }
+        fmt.Println(editor.Read()) // hello
+    }
+    ```
+  </TabItem>
+  <TabItem label="Rust">
+    ```rust
+    // The memento is a plain value; only the editor knows what it means.
+    #[derive(Clone)]
+    struct Memento {
+        state: String,
+    }
+
+    struct Editor {
+        content: String,
+    }
+
+    impl Editor {
+        fn new() -> Self {
+            Editor { content: String::new() }
+        }
+
+        fn type_text(&mut self, text: &str) {
+            self.content.push_str(text);
+        }
+
+        fn save(&self) -> Memento {
+            Memento { state: self.content.clone() }
+        }
+
+        fn restore(&mut self, m: Memento) {
+            self.content = m.state;
+        }
+    }
+
+    fn main() {
+        let mut editor = Editor::new();
+        let mut history: Vec<Memento> = Vec::new();
+
+        editor.type_text("hello ");
+        history.push(editor.save());
+        editor.type_text("world");
+        println!("{}", editor.content); // hello world
+
+        if let Some(snapshot) = history.pop() {
+            editor.restore(snapshot);
+        }
+        println!("{}", editor.content); // hello
+    }
+    ```
+  </TabItem>
+</Tabs>
+
+## When to use / trade-offs
+
+- **ข้อดี:** เปิดทางให้ทำ undo, rollback, และ checkpoint ได้โดยไม่เปิดเผยฟิลด์ภายในของ originator
+- **ข้อดี:** originator ยังคงควบคุมได้เต็มที่ว่าจะบันทึกอะไร encapsulation จึงยังคงอยู่ครบถ้วน
+- **ข้อเสีย:** การเก็บภาพถ่ายเต็มจำนวนมากอาจสิ้นเปลืองหน่วยความจำ สถานะขนาดใหญ่อาจต้องใช้การ diff หรือกำหนดขีดจำกัด
+- **ข้อเสีย:** caretaker ต้องจัดการอายุของ memento และภาพถ่ายที่เก่าค้างอาจพอกพูนหากไม่เคยถูกทิ้ง
+
+## Related patterns
+
+- [Command](/design-patterns-from-zero-to-hero/th/behavioral-essentials/) และ Memento เป็นคู่หูที่เป็นธรรมชาติสำหรับ undo คำสั่งสามารถเก็บ memento ของสถานะที่มันเปลี่ยนแปลงไว้ และกู้คืนมันเมื่อถูกย้อนกลับ
+- [Iterator](/design-patterns-from-zero-to-hero/th/behavioral-essentials/) สามารถใช้ memento เพื่อจับเก็บตำแหน่งของมัน เมื่อสถานะการเดินผ่านต้องคงอยู่นอกตัว iterator
+
+<Callout title="คงให้ภาพถ่ายทึบแสงไว้">
+คุณค่าทั้งหมดของ Memento คือ caretaker อ่านหรือเปลี่ยนแปลงภาพถ่ายไม่ได้ หากโค้ดประวัติเริ่มตรวจสอบสถานะที่บันทึกไว้ คุณก็ได้นำการผูกติด (coupling) ที่ pattern นี้มีอยู่เพื่อกำจัดกลับเข้ามาอีกครั้ง จงปล่อยให้มีเพียง originator เท่านั้นที่ตีความ memento ได้
+</Callout>
+
+export const quiz = [
+  {
+    q: 'Memento pattern ปกป้องอะไรในขณะที่บันทึกสถานะ?',
+    options: [
+      'ความเร็วของโปรแกรม',
+      'encapsulation ของสถานะภายในของ originator',
+      'ลำดับการเรียกเมท็อด',
+      'จำนวนอินสแตนซ์ของออบเจ็กต์',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'บทบาทของ caretaker คืออะไร?',
+    options: [
+      'มันอ่านและแก้ไขสถานะที่บันทึกไว้โดยตรง',
+      'มันเก็บ memento โดยไม่ตรวจสอบเนื้อหาของมัน',
+      'มันสร้าง originator',
+      'มันกำหนดอินเทอร์เฟซของ originator',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'pattern ใดที่จับคู่กับ Memento บ่อยที่สุดเพื่อทำ undo?',
+    options: ['Singleton', 'Command', 'Adapter', 'Flyweight'],
+    answer: 1,
+  },
+];
+
+<Quiz client:visible id="behavioral-advanced/memento" questions={quiz} />
+
+<ProgressTracker client:visible id="behavioral-advanced/memento" />

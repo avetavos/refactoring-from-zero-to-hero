@@ -1,0 +1,301 @@
+---
+title: Mediator
+description: 'รวมศูนย์การสื่อสารที่ซับซ้อนระหว่างออบเจ็กต์ เพื่อให้พวกมันไม่ต้องอ้างถึงกันโดยตรงอีกต่อไป'
+sidebar:
+  order: 3
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+## Intent
+
+Mediator แนะนำออบเจ็กต์ที่ห่อหุ้มวิธีที่ออบเจ็กต์กลุ่มหนึ่งโต้ตอบกัน แทนที่ออบเจ็กต์แต่ละตัวจะถือ reference ไปยังตัวอื่นทั้งหมด พวกมันทุกตัวจะพูดคุยกับ mediator ซึ่งเป็นผู้ตัดสินว่าใครจำเป็นต้องรู้อะไร
+
+## Problem
+
+เมื่อมีออบเจ็กต์หลายตัวที่ต้องประสานงานกัน วิธีที่ตรงไปตรงมาคือต่อสายพวกมันเข้าหากันโดยตรง ในห้องแชต ผู้เข้าร่วมแต่ละคนจะต้องเก็บรายชื่อผู้เข้าร่วมคนอื่นทุกคน ในกล่องโต้ตอบฟอร์ม ปุ่ม submit จะอ้างถึงช่องข้อความ ซึ่งอ้างถึง checkbox ซึ่งอ้างถึง label จำนวนการเชื่อมต่อจะเติบโตตามกำลังสองของจำนวนออบเจ็กต์ และออบเจ็กต์แต่ละตัวก็นำกลับมาใช้ซ้ำได้ยากเพราะมันลากผู้ทำงานร่วมของมันติดมาด้วย
+
+Mediator ยุบสายใยนั้นให้กลายเป็นฮับและซี่ล้อ (hub and spokes) เพื่อนร่วมงานแต่ละตัวรู้จักแค่ mediator เมื่อมีอะไรเกิดขึ้น มันจะบอก mediator และ mediator จะส่งผลที่ตามมาไปยังเพื่อนร่วมงานตัวใดก็ตามที่สนใจ เพื่อนร่วมงานจึงเรียบง่ายขึ้นและนำกลับมาใช้ซ้ำได้อย่างอิสระ และตรรกะการโต้ตอบก็อยู่ในที่เดียวซึ่งคุณอ่านและแก้ไขได้ ข้อแลกเปลี่ยนคือ mediator เองอาจขยายตัวใหญ่ขึ้นได้หากคุณปล่อยให้มันดูดซับทุกอย่างมากเกินไป
+
+## Structure
+
+export const mediatorUml = `classDiagram
+  class Mediator {
+    <<interface>>
+    +notify(sender, event)
+  }
+  class ChatRoom {
+    -members: List~Colleague~
+    +register(c Colleague)
+    +notify(sender, event)
+  }
+  class Colleague {
+    -mediator Mediator
+    +send(msg)
+    +receive(from, msg)
+  }
+  Mediator <|.. ChatRoom
+  ChatRoom o-- Colleague : coordinates
+  Colleague --> Mediator : talks to`;
+
+<Mermaid code={mediatorUml} title="เพื่อนร่วมงานพูดคุยกับ mediator เท่านั้น ซึ่งเป็นผู้กำหนดเส้นทางข้อความระหว่างพวกมัน" />
+
+- **Mediator** — อินเทอร์เฟซสำหรับฮับ เพื่อนร่วมงานเรียกมันเมื่อมีอะไรเกิดขึ้น
+- **ChatRoom** — concrete mediator มันถือเพื่อนร่วมงานไว้และบรรจุตรรกะสำหรับกำหนดเส้นทางของเหตุการณ์ระหว่างพวกมัน
+- **Colleague** — ผู้เข้าร่วม มันรู้จัก mediator แต่ไม่รู้จักเพื่อนร่วมงานตัวอื่น จึงยังคงแยกขาดจากพวกมัน
+
+## Example
+
+ห้องแชตในฐานะ mediator ผู้ใช้แต่ละคนส่งผ่านห้อง และห้องจะกระจายข้อความไปยังผู้ใช้คนอื่นทุกคน — ไม่มีผู้ใช้คนใดอ้างถึงผู้ใช้อีกคนโดยตรงเลย
+
+<Tabs syncKey="lang">
+  <TabItem label="TypeScript">
+    ```ts
+    interface ChatMediator {
+      register(user: User): void;
+      broadcast(from: User, message: string): void;
+    }
+
+    class ChatRoom implements ChatMediator {
+      private users: User[] = [];
+
+      register(user: User): void {
+        this.users.push(user);
+      }
+
+      broadcast(from: User, message: string): void {
+        for (const user of this.users) {
+          if (user !== from) user.receive(from.name, message);
+        }
+      }
+    }
+
+    class User {
+      constructor(readonly name: string, private room: ChatMediator) {
+        room.register(this);
+      }
+
+      send(message: string): void {
+        this.room.broadcast(this, message);
+      }
+
+      receive(from: string, message: string): void {
+        console.log(`[${this.name}] ${from}: ${message}`);
+      }
+    }
+
+    const room = new ChatRoom();
+    const alice = new User('Alice', room);
+    const bob = new User('Bob', room);
+
+    alice.send('hi'); // [Bob] Alice: hi
+    bob.send('hello'); // [Alice] Bob: hello
+    ```
+  </TabItem>
+  <TabItem label="Python">
+    ```python
+    from __future__ import annotations
+    from abc import ABC, abstractmethod
+
+
+    class ChatMediator(ABC):
+        @abstractmethod
+        def register(self, user: "User") -> None: ...
+
+        @abstractmethod
+        def broadcast(self, sender: "User", message: str) -> None: ...
+
+
+    class ChatRoom(ChatMediator):
+        def __init__(self) -> None:
+            self._users: list[User] = []
+
+        def register(self, user: "User") -> None:
+            self._users.append(user)
+
+        def broadcast(self, sender: "User", message: str) -> None:
+            for user in self._users:
+                if user is not sender:
+                    user.receive(sender.name, message)
+
+
+    class User:
+        def __init__(self, name: str, room: ChatMediator) -> None:
+            self.name = name
+            self._room = room
+            room.register(self)
+
+        def send(self, message: str) -> None:
+            self._room.broadcast(self, message)
+
+        def receive(self, sender: str, message: str) -> None:
+            print(f"[{self.name}] {sender}: {message}")
+
+
+    room = ChatRoom()
+    alice = User("Alice", room)
+    bob = User("Bob", room)
+
+    alice.send("hi")     # [Bob] Alice: hi
+    bob.send("hello")    # [Alice] Bob: hello
+    ```
+  </TabItem>
+  <TabItem label="Go">
+    ```go
+    package main
+
+    import "fmt"
+
+    type Mediator interface {
+        Register(u *User)
+        Broadcast(sender *User, message string)
+    }
+
+    type ChatRoom struct {
+        users []*User
+    }
+
+    func (r *ChatRoom) Register(u *User) {
+        r.users = append(r.users, u)
+    }
+
+    func (r *ChatRoom) Broadcast(sender *User, message string) {
+        for _, u := range r.users {
+            if u != sender {
+                u.Receive(sender.name, message)
+            }
+        }
+    }
+
+    type User struct {
+        name string
+        room Mediator
+    }
+
+    func NewUser(name string, room Mediator) *User {
+        u := &User{name: name, room: room}
+        room.Register(u)
+        return u
+    }
+
+    func (u *User) Send(message string) {
+        u.room.Broadcast(u, message)
+    }
+
+    func (u *User) Receive(from, message string) {
+        fmt.Printf("[%s] %s: %s\n", u.name, from, message)
+    }
+
+    func main() {
+        room := &ChatRoom{}
+        alice := NewUser("Alice", room)
+        bob := NewUser("Bob", room)
+
+        alice.Send("hi")    // [Bob] Alice: hi
+        bob.Send("hello")   // [Alice] Bob: hello
+    }
+    ```
+  </TabItem>
+  <TabItem label="Rust">
+    ```rust
+    use std::cell::RefCell;
+
+    // The ChatRoom owns the users and routes messages between them.
+    struct ChatRoom {
+        users: Vec<String>,
+        log: RefCell<Vec<String>>,
+    }
+
+    impl ChatRoom {
+        fn new() -> Self {
+            ChatRoom { users: Vec::new(), log: RefCell::new(Vec::new()) }
+        }
+
+        fn register(&mut self, name: &str) {
+            self.users.push(name.to_string());
+        }
+
+        fn broadcast(&self, sender: &str, message: &str) {
+            for user in &self.users {
+                if user != sender {
+                    self.log
+                        .borrow_mut()
+                        .push(format!("[{user}] {sender}: {message}"));
+                }
+            }
+        }
+    }
+
+    fn main() {
+        let mut room = ChatRoom::new();
+        room.register("Alice");
+        room.register("Bob");
+
+        room.broadcast("Alice", "hi");
+        room.broadcast("Bob", "hello");
+
+        for line in room.log.borrow().iter() {
+            println!("{line}"); // [Bob] Alice: hi / [Alice] Bob: hello
+        }
+    }
+    ```
+  </TabItem>
+</Tabs>
+
+## When to use / trade-offs
+
+- **ข้อดี:** เปลี่ยนสายใย reference แบบ many-to-many ที่พันกันยุ่งให้กลายเป็นการเชื่อมต่อแบบฮับและซี่ล้อที่เรียบง่าย
+- **ข้อดี:** เพื่อนร่วมงานนำกลับมาใช้ซ้ำได้เพราะพึ่งพาแค่อินเทอร์เฟซของ mediator ไม่ใช่พึ่งพากันเอง
+- **ข้อดี:** ตรรกะการโต้ตอบอยู่ในที่เดียวที่อ่านได้ แทนที่จะกระจัดกระจายอยู่ทั่วเพื่อนร่วมงาน
+- **ข้อเสีย:** mediator อาจพองตัวกลายเป็น god object ที่รู้ทุกอย่าง กลายเป็นความซับซ้อนตัวนั้นเองที่คุณพยายามกำจัด
+- **ข้อเสีย:** มันเพิ่มชั้นของการอ้อมค้อม (indirection) ที่อาจบดบังว่าใครเป็นผู้ตอบสนองต่อเหตุการณ์ในที่สุด
+
+## Related patterns
+
+- [Observer](/design-patterns-from-zero-to-hero/th/behavioral-essentials/) ก็แยกผู้ส่งออกจากผู้รับเช่นกัน แต่มันกระจายไปยังผู้สมัครรับ (subscriber) แทนที่จะรวมศูนย์ตรรกะการกำหนดเส้นทางตามอำเภอใจ
+- [Facade](/design-patterns-from-zero-to-hero/th/structural/) ก็เสนอจุดติดต่อจุดเดียวเช่นกัน แต่ facade เพียงทำให้การเรียกทางเดียวเข้าสู่ซับซิสเต็มเรียบง่ายขึ้น ขณะที่ mediator ประสานงานการจราจรสองทางระหว่างเพื่อนที่เท่าเทียมกัน
+
+<Callout title="ระวังน้ำหนักของ mediator">
+mediator มีสุขภาพดีเมื่อมันกำหนดเส้นทางของการโต้ตอบ มันเริ่มไม่มีสุขภาพดีเมื่อเพื่อนร่วมงานยัดตรรกะทั้งหมดของตนเข้าไปในมันแล้วกลายเป็นเปลือกที่ไร้เลือดเนื้อ จงเก็บพฤติกรรมที่เป็นของเพื่อนร่วมงานไว้ที่เพื่อนร่วมงาน และปล่อยให้ mediator เป็นเจ้าของเพียงการต่อสายระหว่างพวกมันเท่านั้น
+</Callout>
+
+export const quiz = [
+  {
+    q: 'Mediator รวมศูนย์อะไร?',
+    options: [
+      'การสร้างออบเจ็กต์',
+      'ตรรกะการสื่อสารและการประสานงานระหว่างออบเจ็กต์กลุ่มหนึ่ง',
+      'การจัดสรรหน่วยความจำ',
+      'ลำดับชั้นการสืบทอดของเพื่อนร่วมงาน',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'เพื่อนร่วมงานอ้างถึงกันอย่างไรภายใต้ Mediator pattern?',
+    options: [
+      'แต่ละตัวเก็บ reference โดยตรงไปยังเพื่อนร่วมงานทุกตัว',
+      'พวกมันไม่อ้างถึงกัน รู้จักแค่ mediator เท่านั้น',
+      'ผ่านตัวแปร global ที่ใช้ร่วมกัน',
+      'โดยการสืบทอดจาก parent ตัวเดียวกัน',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'อะไรคือความเสี่ยงหลักของ Mediator pattern?',
+    options: [
+      'เพื่อนร่วมงานนำกลับมาใช้ซ้ำไม่ได้เลย',
+      'mediator อาจเติบโตกลายเป็น god object ที่แบกภาระเกินตัว',
+      'มันต้องใช้การสืบทอดจึงจะทำงานได้',
+      'มันเพิ่มจำนวนการเชื่อมต่อเป็นสองเท่า',
+    ],
+    answer: 1,
+  },
+];
+
+<Quiz client:visible id="behavioral-advanced/mediator" questions={quiz} />
+
+<ProgressTracker client:visible id="behavioral-advanced/mediator" />

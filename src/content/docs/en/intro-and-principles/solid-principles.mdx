@@ -1,0 +1,222 @@
+---
+title: The SOLID Principles
+description: 'Five design principles that keep object-oriented code flexible and testable — and that most design patterns quietly apply.'
+sidebar:
+  order: 3
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+## Five principles, one goal
+
+SOLID is an acronym for five principles of object-oriented design. They share a single aim: code that absorbs change without breaking, and that you can test in isolation. Almost every pattern later in this course is really one of these principles applied to a specific problem, so learning them now means the patterns will feel familiar rather than arbitrary.
+
+## Single Responsibility Principle
+
+A class should have one reason to change. If a class both formats a report and emails it, a change to the email logic risks breaking the formatting, and vice versa. Splitting those concerns into separate classes means each has a single, well-defined job — and a single force that can require it to change.
+
+## Open/Closed Principle
+
+Software should be open for extension but closed for modification. You should be able to add new behaviour by adding new code, not by editing tried-and-tested code. A payment processor that switches on a payment-type string must be edited for every new method; one that accepts a `PaymentMethod` interface gains new methods by adding a class, leaving the processor untouched.
+
+## Liskov Substitution Principle
+
+Any subtype must be usable wherever its base type is expected, without surprising the caller. If a `Square` subclass of `Rectangle` silently changes both dimensions when you set the width, code that worked with rectangles breaks with squares. The subtype broke the contract; substitution must be honest.
+
+## Interface Segregation Principle
+
+Clients should not be forced to depend on methods they do not use. A fat `Machine` interface with `print`, `scan`, and `fax` forces a simple printer to implement `fax` it cannot perform. Several small, focused interfaces let each client depend on exactly what it needs.
+
+## Dependency Inversion Principle
+
+High-level policy should not depend on low-level details; both should depend on an abstraction. Below, a `NotificationService` depends on a `MessageSender` interface rather than a concrete email class. Swapping in SMS — or a fake for tests — requires no change to the service at all.
+
+<Tabs syncKey="lang">
+  <TabItem label="TypeScript">
+    ```ts
+    interface MessageSender {
+      send(to: string, body: string): void;
+    }
+
+    class EmailSender implements MessageSender {
+      send(to: string, body: string): void {
+        console.log(`email to ${to}: ${body}`);
+      }
+    }
+
+    class NotificationService {
+      // Depends on the abstraction, not a concrete sender.
+      constructor(private readonly sender: MessageSender) {}
+
+      notify(user: string): void {
+        this.sender.send(user, 'Your order has shipped');
+      }
+    }
+
+    const service = new NotificationService(new EmailSender());
+    service.notify('ada@example.com');
+    ```
+  </TabItem>
+  <TabItem label="Python">
+    ```python
+    from typing import Protocol
+
+
+    class MessageSender(Protocol):
+        def send(self, to: str, body: str) -> None: ...
+
+
+    class EmailSender:
+        def send(self, to: str, body: str) -> None:
+            print(f"email to {to}: {body}")
+
+
+    class NotificationService:
+        # Depends on the abstraction, not a concrete sender.
+        def __init__(self, sender: MessageSender) -> None:
+            self._sender = sender
+
+        def notify(self, user: str) -> None:
+            self._sender.send(user, "Your order has shipped")
+
+
+    service = NotificationService(EmailSender())
+    service.notify("ada@example.com")
+    ```
+  </TabItem>
+  <TabItem label="Go">
+    ```go
+    package main
+
+    import "fmt"
+
+    type MessageSender interface {
+        Send(to, body string)
+    }
+
+    type EmailSender struct{}
+
+    func (EmailSender) Send(to, body string) {
+        fmt.Printf("email to %s: %s\n", to, body)
+    }
+
+    // NotificationService depends on the abstraction, not a concrete sender.
+    type NotificationService struct {
+        sender MessageSender
+    }
+
+    func (n NotificationService) Notify(user string) {
+        n.sender.Send(user, "Your order has shipped")
+    }
+
+    func main() {
+        service := NotificationService{sender: EmailSender{}}
+        service.Notify("ada@example.com")
+    }
+    ```
+  </TabItem>
+  <TabItem label="Rust">
+    ```rust
+    trait MessageSender {
+        fn send(&self, to: &str, body: &str);
+    }
+
+    struct EmailSender;
+
+    impl MessageSender for EmailSender {
+        fn send(&self, to: &str, body: &str) {
+            println!("email to {to}: {body}");
+        }
+    }
+
+    // Depends on the abstraction, not a concrete sender.
+    struct NotificationService {
+        sender: Box<dyn MessageSender>,
+    }
+
+    impl NotificationService {
+        fn notify(&self, user: &str) {
+            self.sender.send(user, "Your order has shipped");
+        }
+    }
+
+    fn main() {
+        let service = NotificationService { sender: Box::new(EmailSender) };
+        service.notify("ada@example.com");
+    }
+    ```
+  </TabItem>
+</Tabs>
+
+## Inverting a dependency
+
+The diagram below contrasts the rigid version, where high-level policy points straight at a concrete detail, with the inverted version, where both depend on an abstraction.
+
+export const dipDiagram = `classDiagram
+  class NotificationService
+  class MessageSender {
+    <<interface>>
+    +send(to, body)
+  }
+  class EmailSender
+  class SmsSender
+  NotificationService --> MessageSender : depends on abstraction
+  EmailSender ..|> MessageSender : implements
+  SmsSender ..|> MessageSender : implements`;
+
+<Mermaid code={dipDiagram} title="Dependency Inversion: policy and details both depend on an interface" />
+
+<Callout title="SOLID underlies the patterns">
+You will meet these five principles again in almost every pattern. Strategy and Factory Method live on the Open/Closed Principle; dependency injection is the Dependency Inversion Principle in practice. Treat SOLID as the why, and the patterns as worked answers to specific questions it raises.
+</Callout>
+
+export const quiz = [
+  {
+    q: 'What does the Single Responsibility Principle state?',
+    options: [
+      'A class should expose only one public method',
+      'A class should have one reason to change',
+      'A class should never be subclassed',
+      'A program should contain only one class',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'The Open/Closed Principle says software should be:',
+    options: [
+      'Open for modification but closed for extension',
+      'Open for extension but closed for modification',
+      'Closed to both extension and modification',
+      'Open to both, with no rules',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'In the Dependency Inversion example, what does NotificationService depend on?',
+    options: [
+      'The concrete EmailSender class',
+      'The MessageSender abstraction',
+      'A global mutable variable',
+      'Nothing — it sends mail directly',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'Which principle is violated when a subtype breaks the behaviour callers expect from its base type?',
+    options: [
+      'Interface Segregation Principle',
+      'Liskov Substitution Principle',
+      'Single Responsibility Principle',
+      'Open/Closed Principle',
+    ],
+    answer: 1,
+  },
+];
+
+<Quiz client:visible id="intro-and-principles/solid-principles" questions={quiz} />
+
+<ProgressTracker client:visible id="intro-and-principles/solid-principles" />

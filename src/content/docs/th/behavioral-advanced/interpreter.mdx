@@ -1,0 +1,268 @@
+---
+title: Interpreter
+description: 'แทน grammar เล็ก ๆ ด้วยต้นไม้ของออบเจ็กต์ แล้วประเมินนิพจน์ที่เขียนด้วยภาษานั้น'
+sidebar:
+  order: 6
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+## Intent
+
+Interpreter ให้วิธีแทน grammar ของภาษาเล็ก ๆ ในรูปของลำดับชั้นคลาส และประเมินประโยคในภาษานั้นด้วยการเดินผ่านต้นไม้ที่สร้างขึ้นจากคลาสเหล่านั้น
+
+## Problem
+
+บางครั้งปัญหาแสดงออกได้อย่างเป็นธรรมชาติในรูปของภาษาเล็ก ๆ เช่น ตัวกรองการค้นหา, กฎการตั้งราคา, เงื่อนไข feature-flag, สูตรคำนวณ คุณอาจ hard-code แต่ละความผันแปร แต่ความผันแปรก็มีเข้ามาเรื่อย ๆ สิ่งที่คุณต้องการจริง ๆ คือปล่อยให้ผู้ใช้เขียนนิพจน์อย่าง `true AND (false OR true)` แล้วให้โปรแกรมประเมินผลมันได้
+
+Interpreter โมเดลกฎแต่ละข้อของ grammar ในรูปของคลาส ค่าคงที่ (literal) และตัวแปรกลายเป็นนิพจน์แบบ *terminal* ส่วนตัวดำเนินการอย่าง AND และ OR กลายเป็นนิพจน์แบบ *non-terminal* ที่ถือนิพจน์ย่อยไว้ นิพจน์ในภาษานี้กลายเป็นต้นไม้ของออบเจ็กต์เหล่านี้ — abstract syntax tree — และการประเมินผลมันหมายถึงการขอให้ราก (root) ตีความตัวเอง ซึ่งจะเรียกซ้ำลงไปยังลูก ๆ ของมัน grammar อาศัยอยู่ในระบบชนิด (type system) ดังนั้นการขยายภาษาจึงเป็นเรื่องของการเพิ่มคลาสนิพจน์ pattern นี้เปล่งประกายกับ grammar เล็ก ๆ ที่นิ่งแล้ว และกลายเป็นของเทอะทะหากภาษาเติบโตใหญ่ขึ้น ในกรณีนั้น parser จริง ๆ และกลยุทธ์การประเมินผลแบบอื่นเหมาะกว่า
+
+## Structure
+
+export const interpreterUml = `classDiagram
+  class Expr {
+    <<interface>>
+    +interpret() bool
+  }
+  class Literal {
+    -value: bool
+    +interpret() bool
+  }
+  class And {
+    -left: Expr
+    -right: Expr
+    +interpret() bool
+  }
+  class Or {
+    -left: Expr
+    -right: Expr
+    +interpret() bool
+  }
+  Expr <|.. Literal
+  Expr <|.. And
+  Expr <|.. Or
+  And o-- Expr : left and right
+  Or o-- Expr : left and right`;
+
+<Mermaid code={interpreterUml} title="ตัวดำเนินการเป็นนิพจน์แบบ non-terminal ที่ถือนิพจน์ย่อยไว้ ส่วน literal เป็น terminal" />
+
+- **Expr** — อินเทอร์เฟซร่วม ทุกโหนดรู้วิธี `interpret` ตัวเองและคืนผลลัพธ์
+- **Literal** — นิพจน์แบบ terminal นั่นคือค่าคงที่ที่ไม่มีลูก
+- **And, Or** — นิพจน์แบบ non-terminal แต่ละตัวถือนิพจน์ย่อยไว้และรวมผลลัพธ์ของพวกมัน
+- **Client** — ประกอบต้นไม้ของนิพจน์ (ด้วยมือหรือผ่าน parser) แล้วเรียก `interpret` ที่ราก
+
+## Example
+
+ตัวประเมินนิพจน์บูลีนจิ๋ว เราสร้างต้นไม้สำหรับ `true AND (false OR true)` โดยตรงแล้วตีความมัน ผลลัพธ์คือ `true`
+
+<Tabs syncKey="lang">
+  <TabItem label="TypeScript">
+    ```ts
+    interface Expr {
+      interpret(): boolean;
+    }
+
+    class Literal implements Expr {
+      constructor(private value: boolean) {}
+      interpret(): boolean {
+        return this.value;
+      }
+    }
+
+    class And implements Expr {
+      constructor(private left: Expr, private right: Expr) {}
+      interpret(): boolean {
+        return this.left.interpret() && this.right.interpret();
+      }
+    }
+
+    class Or implements Expr {
+      constructor(private left: Expr, private right: Expr) {}
+      interpret(): boolean {
+        return this.left.interpret() || this.right.interpret();
+      }
+    }
+
+    // true AND (false OR true)
+    const expr = new And(new Literal(true), new Or(new Literal(false), new Literal(true)));
+    console.log(expr.interpret()); // true
+    ```
+  </TabItem>
+  <TabItem label="Python">
+    ```python
+    from __future__ import annotations
+    from abc import ABC, abstractmethod
+
+
+    class Expr(ABC):
+        @abstractmethod
+        def interpret(self) -> bool: ...
+
+
+    class Literal(Expr):
+        def __init__(self, value: bool) -> None:
+            self._value = value
+
+        def interpret(self) -> bool:
+            return self._value
+
+
+    class And(Expr):
+        def __init__(self, left: Expr, right: Expr) -> None:
+            self._left = left
+            self._right = right
+
+        def interpret(self) -> bool:
+            return self._left.interpret() and self._right.interpret()
+
+
+    class Or(Expr):
+        def __init__(self, left: Expr, right: Expr) -> None:
+            self._left = left
+            self._right = right
+
+        def interpret(self) -> bool:
+            return self._left.interpret() or self._right.interpret()
+
+
+    # true AND (false OR true)
+    expr = And(Literal(True), Or(Literal(False), Literal(True)))
+    print(expr.interpret())  # True
+    ```
+  </TabItem>
+  <TabItem label="Go">
+    ```go
+    package main
+
+    import "fmt"
+
+    // Expr is any node in the boolean expression tree.
+    type Expr interface {
+        Interpret() bool
+    }
+
+    type Literal struct{ value bool }
+
+    func (l Literal) Interpret() bool {
+        return l.value
+    }
+
+    type And struct{ left, right Expr }
+
+    func (a And) Interpret() bool {
+        return a.left.Interpret() && a.right.Interpret()
+    }
+
+    type Or struct{ left, right Expr }
+
+    func (o Or) Interpret() bool {
+        return o.left.Interpret() || o.right.Interpret()
+    }
+
+    func main() {
+        // true AND (false OR true)
+        expr := And{
+            left:  Literal{value: true},
+            right: Or{left: Literal{value: false}, right: Literal{value: true}},
+        }
+        fmt.Println(expr.Interpret()) // true
+    }
+    ```
+  </TabItem>
+  <TabItem label="Rust">
+    ```rust
+    // Every node in the grammar knows how to interpret itself.
+    trait Expr {
+        fn interpret(&self) -> bool;
+    }
+
+    struct Literal(bool);
+    impl Expr for Literal {
+        fn interpret(&self) -> bool {
+            self.0
+        }
+    }
+
+    struct And(Box<dyn Expr>, Box<dyn Expr>);
+    impl Expr for And {
+        fn interpret(&self) -> bool {
+            self.0.interpret() && self.1.interpret()
+        }
+    }
+
+    struct Or(Box<dyn Expr>, Box<dyn Expr>);
+    impl Expr for Or {
+        fn interpret(&self) -> bool {
+            self.0.interpret() || self.1.interpret()
+        }
+    }
+
+    fn main() {
+        // true AND (false OR true)
+        let expr = And(
+            Box::new(Literal(true)),
+            Box::new(Or(Box::new(Literal(false)), Box::new(Literal(true)))),
+        );
+        println!("{}", expr.interpret()); // true
+    }
+    ```
+  </TabItem>
+</Tabs>
+
+## When to use / trade-offs
+
+- **ข้อดี:** grammar เล็ก ๆ ที่นิ่งแล้วจับคู่ลงตัวกับหนึ่งคลาสต่อหนึ่งกฎ และแต่ละคลาสอ่านและทดสอบแยกได้ง่าย
+- **ข้อดี:** การขยายภาษามักหมายถึงการเพิ่มคลาสนิพจน์หนึ่งตัว ไม่ใช่การแก้ไขตัวประเมินผลแบบโมโนลิธ
+- **ข้อเสีย:** กฎทุกข้อของ grammar กลายเป็นคลาส ดังนั้น grammar ขนาดใหญ่จึงผลิตคลาสเล็ก ๆ ระเบิดออกมาจำนวนมากซึ่งดูแลรักษายาก
+- **ข้อเสีย:** การสร้างต้นไม้ด้วยมือนั้นน่าเบื่อ คุณมักยังต้องมี parser เพื่อแปลงข้อความให้เป็นออบเจ็กต์นิพจน์อยู่ดี
+- **ข้อเสีย:** การตีความแบบเดินผ่านต้นไม้ช้าสำหรับ hot path เมื่อเทียบกับแนวทางแบบคอมไพล์หรือ bytecode
+
+## Related patterns
+
+- [Composite](/design-patterns-from-zero-to-hero/th/structural/) อธิบายรูปทรงต้นไม้ที่นิพจน์ของ interpreter ก่อร่างขึ้น นิพจน์แบบ non-terminal คือ composite ของนิพจน์ย่อย
+- [Visitor](/design-patterns-from-zero-to-hero/th/behavioral-advanced/visitor/) มักเสริม Interpreter แทนที่จะใส่ `interpret` ไว้บนทุกโหนด คุณสามารถย้ายการประเมินผล, การพิมพ์, หรือการปรับให้เหมาะสมไปไว้ใน visitor แยกต่างหากบน syntax tree ได้
+
+<Callout title="รู้ว่าเมื่อใดควรหยุด">
+Interpreter เหมาะกับภาษา *เล็ก ๆ* เมื่อ grammar เริ่มมีกฎลำดับความสำคัญ (precedence) จริงจัง, การกู้คืนจากข้อผิดพลาด, และความต้องการด้านประสิทธิภาพ การสร้างคลาสต่อหนึ่งกฎด้วยมือจะกลายเป็นภาระ ณ จุดนั้น จงหยิบ parser generator และตัวประเมินผลเฉพาะกิจมาใช้ และเก็บ pattern นี้ไว้สำหรับกรณีที่เล็กจิ๋วจริง ๆ
+</Callout>
+
+export const quiz = [
+  {
+    q: 'Interpreter pattern แทนอะไรในรูปของลำดับชั้นคลาส?',
+    options: [
+      'สคีมาของฐานข้อมูล',
+      'grammar ของภาษาเล็ก ๆ',
+      'thread pool',
+      'เลย์เอาต์ของส่วนติดต่อผู้ใช้',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'นิพจน์แบบ non-terminal อย่าง AND ผลิตผลลัพธ์ของมันอย่างไร?',
+    options: [
+      'โดยการอ่านตัวแปร global',
+      'โดยการตีความนิพจน์ย่อยของมันแล้วรวมผลลัพธ์ของพวกมัน',
+      'โดยการ clone ตัวเอง',
+      'โดยการสอบถาม mediator',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'เมื่อใดที่ Interpreter pattern กลายเป็นตัวเลือกที่ไม่เหมาะ?',
+    options: [
+      'เมื่อ grammar เล็กจิ๋วและนิ่ง',
+      'เมื่อ grammar เติบโตใหญ่และอ่อนไหวต่อประสิทธิภาพ',
+      'เมื่อนิพจน์คืนค่าบูลีน',
+      'เมื่อต้นไม้ถูกสร้างโดย client',
+    ],
+    answer: 1,
+  },
+];
+
+<Quiz client:visible id="behavioral-advanced/interpreter" questions={quiz} />
+
+<ProgressTracker client:visible id="behavioral-advanced/interpreter" />

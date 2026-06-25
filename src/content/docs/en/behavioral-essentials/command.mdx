@@ -1,0 +1,343 @@
+---
+title: Command
+description: 'Encapsulate a request as an object so it can be stored, passed around, logged, and reversed through undo.'
+sidebar:
+  order: 4
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+## Intent
+
+Command turns a request into a first-class object that carries everything needed to perform an action — and, crucially, to reverse it. Because the request is an object, it can be queued, logged, passed to whoever will run it later, and pushed onto a history stack to support undo.
+
+## Problem
+
+A text editor needs typing, deleting, and formatting, all triggered from menus, buttons, and keyboard shortcuts. If each control calls editor methods directly, the controls and the editor are welded together, and a feature like undo becomes a nightmare: there is no record of *what* happened, only the resulting state. To undo, you would have to reconstruct the inverse of every possible action inline.
+
+The missing concept is the *request itself as a value you can keep*. Command makes each action an object with an execute method and an undo method. A control just hands a command to an invoker; the invoker runs it and remembers it on a stack. Undo is then uniform: pop the last command and call its undo. The editor no longer cares who triggered the action.
+
+## Structure
+
+export const commandUml = `classDiagram
+  class Command {
+    <<interface>>
+    +execute()
+    +undo()
+  }
+  class InsertText {
+    +execute()
+    +undo()
+  }
+  class Editor {
+    -text: string
+    +insert(s)
+    +deleteLast(n)
+  }
+  class History {
+    -stack: List~Command~
+    +run(cmd)
+    +undo()
+  }
+  Command <|.. InsertText
+  InsertText --> Editor : acts on
+  History o--> Command : remembers`;
+
+<Mermaid code={commandUml} title="A History invoker runs Command objects that act on the Editor receiver and can be undone" />
+
+- **Command** — the interface declaring execute and undo.
+- **Concrete Command** — binds a receiver to an action and stores whatever it needs to reverse that action.
+- **Receiver** — the object that does the real work; here, the editor that holds the text.
+- **Invoker** — triggers commands and keeps the history; here, the history stack that also drives undo.
+- **Client** — creates concrete commands and hands them to the invoker.
+
+## Example
+
+An editor with insert commands recorded on a history stack so the last action can be undone. Each command stores enough information to reverse itself.
+
+<Tabs syncKey="lang">
+  <TabItem label="TypeScript">
+    ```ts
+    class Editor {
+      text = '';
+      insert(s: string): void {
+        this.text += s;
+      }
+      deleteLast(n: number): void {
+        this.text = this.text.slice(0, -n);
+      }
+    }
+
+    interface Command {
+      execute(): void;
+      undo(): void;
+    }
+
+    class InsertText implements Command {
+      constructor(private editor: Editor, private value: string) {}
+      execute(): void {
+        this.editor.insert(this.value);
+      }
+      undo(): void {
+        this.editor.deleteLast(this.value.length);
+      }
+    }
+
+    class History {
+      private stack: Command[] = [];
+      run(cmd: Command): void {
+        cmd.execute();
+        this.stack.push(cmd);
+      }
+      undo(): void {
+        const cmd = this.stack.pop();
+        if (cmd) cmd.undo();
+      }
+    }
+
+    const editor = new Editor();
+    const history = new History();
+    history.run(new InsertText(editor, 'hello '));
+    history.run(new InsertText(editor, 'world'));
+    console.log(editor.text); // "hello world"
+    history.undo();
+    console.log(editor.text); // "hello "
+    ```
+  </TabItem>
+  <TabItem label="Python">
+    ```python
+    from typing import Protocol
+
+
+    class Editor:
+        def __init__(self) -> None:
+            self.text = ""
+
+        def insert(self, s: str) -> None:
+            self.text += s
+
+        def delete_last(self, n: int) -> None:
+            self.text = self.text[:-n] if n else self.text
+
+
+    class Command(Protocol):
+        def execute(self) -> None: ...
+        def undo(self) -> None: ...
+
+
+    class InsertText:
+        def __init__(self, editor: Editor, value: str) -> None:
+            self.editor = editor
+            self.value = value
+
+        def execute(self) -> None:
+            self.editor.insert(self.value)
+
+        def undo(self) -> None:
+            self.editor.delete_last(len(self.value))
+
+
+    class History:
+        def __init__(self) -> None:
+            self._stack: list[Command] = []
+
+        def run(self, cmd: Command) -> None:
+            cmd.execute()
+            self._stack.append(cmd)
+
+        def undo(self) -> None:
+            if self._stack:
+                self._stack.pop().undo()
+
+
+    editor = Editor()
+    history = History()
+    history.run(InsertText(editor, "hello "))
+    history.run(InsertText(editor, "world"))
+    print(editor.text)  # "hello world"
+    history.undo()
+    print(editor.text)  # "hello "
+    ```
+  </TabItem>
+  <TabItem label="Go">
+    ```go
+    package main
+
+    import "fmt"
+
+    type Editor struct{ Text string }
+
+    func (e *Editor) Insert(s string) { e.Text += s }
+
+    func (e *Editor) DeleteLast(n int) {
+        if n <= len(e.Text) {
+            e.Text = e.Text[:len(e.Text)-n]
+        }
+    }
+
+    // Command bundles an action with its inverse.
+    type Command interface {
+        Execute()
+        Undo()
+    }
+
+    type InsertText struct {
+        editor *Editor
+        value  string
+    }
+
+    func (c *InsertText) Execute() { c.editor.Insert(c.value) }
+    func (c *InsertText) Undo()    { c.editor.DeleteLast(len(c.value)) }
+
+    type History struct{ stack []Command }
+
+    func (h *History) Run(cmd Command) {
+        cmd.Execute()
+        h.stack = append(h.stack, cmd)
+    }
+
+    func (h *History) Undo() {
+        if n := len(h.stack); n > 0 {
+            h.stack[n-1].Undo()
+            h.stack = h.stack[:n-1]
+        }
+    }
+
+    func main() {
+        editor := &Editor{}
+        history := &History{}
+        history.Run(&InsertText{editor, "hello "})
+        history.Run(&InsertText{editor, "world"})
+        fmt.Println(editor.Text) // "hello world"
+        history.Undo()
+        fmt.Println(editor.Text) // "hello "
+    }
+    ```
+  </TabItem>
+  <TabItem label="Rust">
+    ```rust
+    struct Editor {
+        text: String,
+    }
+    impl Editor {
+        fn insert(&mut self, s: &str) {
+            self.text.push_str(s);
+        }
+        fn delete_last(&mut self, n: usize) {
+            let keep = self.text.len().saturating_sub(n);
+            self.text.truncate(keep);
+        }
+    }
+
+    trait Command {
+        fn execute(&self, editor: &mut Editor);
+        fn undo(&self, editor: &mut Editor);
+    }
+
+    struct InsertText {
+        value: String,
+    }
+    impl Command for InsertText {
+        fn execute(&self, editor: &mut Editor) {
+            editor.insert(&self.value);
+        }
+        fn undo(&self, editor: &mut Editor) {
+            editor.delete_last(self.value.len());
+        }
+    }
+
+    struct History {
+        stack: Vec<Box<dyn Command>>,
+    }
+    impl History {
+        fn run(&mut self, cmd: Box<dyn Command>, editor: &mut Editor) {
+            cmd.execute(editor);
+            self.stack.push(cmd);
+        }
+        fn undo(&mut self, editor: &mut Editor) {
+            if let Some(cmd) = self.stack.pop() {
+                cmd.undo(editor);
+            }
+        }
+    }
+
+    fn main() {
+        let mut editor = Editor { text: String::new() };
+        let mut history = History { stack: Vec::new() };
+        history.run(Box::new(InsertText { value: "hello ".into() }), &mut editor);
+        history.run(Box::new(InsertText { value: "world".into() }), &mut editor);
+        println!("{}", editor.text); // "hello world"
+        history.undo(&mut editor);
+        println!("{}", editor.text); // "hello "
+    }
+    ```
+  </TabItem>
+</Tabs>
+
+## When to use / trade-offs
+
+- **Pro:** decouples the object that triggers an action from the object that performs it.
+- **Pro:** because each request is an object, you get undo, redo, queues, logging, and macros almost for free.
+- **Pro:** new commands are added without changing the invoker or the receiver.
+- **Con:** every action becomes a class, which is a lot of ceremony for a one-off call.
+- **Con:** reliable undo requires each command to capture enough state to reverse itself, which can be tricky for complex operations.
+
+## Related patterns
+
+- [Memento](/design-patterns-from-zero-to-hero/en/behavioral-advanced/memento/) is a common partner: instead of computing an inverse, a command can snapshot state with a memento and restore it on undo.
+- [Strategy](/design-patterns-from-zero-to-hero/en/behavioral-essentials/strategy/) also wraps behaviour in an object, but a strategy is chosen to vary an algorithm, while a command represents a specific deferred request.
+
+<Callout title="Undo is the payoff">
+The single execute method makes Command look like a glorified function pointer. The real reason to reach for it is the pairing of execute with undo and a history stack — that combination is what turns an ad-hoc pile of actions into reliable, uniform undo and redo.
+</Callout>
+
+export const quiz = [
+  {
+    q: 'What does the Command pattern encapsulate?',
+    options: [
+      'A single shared instance',
+      'A request as a standalone object, including how to perform and reverse it',
+      'The layout of a collection in memory',
+      'The family of subclasses a base class can create',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'What role does the invoker play?',
+    options: [
+      'It performs the real work on the receiver directly',
+      'It triggers commands and typically keeps a history of them',
+      'It defines the command interface',
+      'It clones commands before running them',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'Why is undo natural with Command?',
+    options: [
+      'Because commands cannot fail',
+      'Because each command carries an undo method and history is a stack of commands',
+      'Because the receiver records everything itself',
+      'Because commands run in parallel',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'Which is a genuine downside of Command?',
+    options: [
+      'It cannot decouple sender from receiver',
+      'Every action becomes its own class, adding ceremony',
+      'It forbids queuing requests',
+      'It requires a singleton receiver',
+    ],
+    answer: 1,
+  },
+];
+
+<Quiz client:visible id="behavioral-essentials/command" questions={quiz} />
+
+<ProgressTracker client:visible id="behavioral-essentials/command" />

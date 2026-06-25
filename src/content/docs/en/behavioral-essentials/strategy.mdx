@@ -1,0 +1,312 @@
+---
+title: Strategy
+description: 'Capture a family of interchangeable algorithms behind one interface so the choice of algorithm varies independently of its caller.'
+sidebar:
+  order: 2
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+## Intent
+
+Strategy defines a family of algorithms, puts each one behind a common interface, and makes them interchangeable. The object that needs the work delegates to a strategy chosen at runtime, so the algorithm can vary without touching the code that uses it.
+
+## Problem
+
+Imagine a checkout that computes a final price. At first there is one rule. Then marketing adds a percentage discount for members, a flat coupon, a buy-one-get-one offer, and a seasonal sale. If all of this lives inside one method, it grows into a long chain of branches that you must reopen and re-test every time a new rule appears, and the pricing logic gets tangled with the order code around it.
+
+The variation here is the *pricing algorithm itself*. Strategy isolates that axis: each rule becomes its own small object implementing a shared interface, and the order holds a reference to whichever one applies. Adding a rule means adding a class, not editing a conditional. Swapping the rule at runtime — member versus guest, sale versus normal — is just assigning a different strategy.
+
+## Structure
+
+export const strategyUml = `classDiagram
+  class Context {
+    -strategy: PricingStrategy
+    +setStrategy(s)
+    +priceFor(amount) number
+  }
+  class PricingStrategy {
+    <<interface>>
+    +apply(amount) number
+  }
+  class RegularPricing {
+    +apply(amount) number
+  }
+  class MemberPricing {
+    +apply(amount) number
+  }
+  class CouponPricing {
+    +apply(amount) number
+  }
+  Context o--> PricingStrategy
+  PricingStrategy <|.. RegularPricing
+  PricingStrategy <|.. MemberPricing
+  PricingStrategy <|.. CouponPricing`;
+
+<Mermaid code={strategyUml} title="A Context delegates to one of several interchangeable PricingStrategy implementations" />
+
+- **Strategy** — the common interface that every algorithm implements. The context depends only on this.
+- **Concrete Strategy** — one implementation of the interface; here, each pricing rule.
+- **Context** — holds a reference to a strategy and delegates the work to it. It can be reconfigured with a different strategy at runtime.
+- **Client** — picks the concrete strategy and hands it to the context.
+
+## Example
+
+A pricing context that computes a final amount by delegating to an interchangeable pricing strategy. Each language expresses the strategy as whatever is idiomatic — an interface, a protocol, a function type, or a trait object.
+
+<Tabs syncKey="lang">
+  <TabItem label="TypeScript">
+    ```ts
+    interface PricingStrategy {
+      apply(amount: number): number;
+    }
+
+    class RegularPricing implements PricingStrategy {
+      apply(amount: number): number {
+        return amount;
+      }
+    }
+
+    class MemberPricing implements PricingStrategy {
+      apply(amount: number): number {
+        return amount * 0.9; // 10% off
+      }
+    }
+
+    class CouponPricing implements PricingStrategy {
+      constructor(private readonly off: number) {}
+      apply(amount: number): number {
+        return Math.max(0, amount - this.off);
+      }
+    }
+
+    class Checkout {
+      constructor(private strategy: PricingStrategy) {}
+      setStrategy(strategy: PricingStrategy): void {
+        this.strategy = strategy;
+      }
+      priceFor(amount: number): number {
+        return this.strategy.apply(amount);
+      }
+    }
+
+    const checkout = new Checkout(new RegularPricing());
+    console.log(checkout.priceFor(100)); // 100
+    checkout.setStrategy(new MemberPricing());
+    console.log(checkout.priceFor(100)); // 90
+    checkout.setStrategy(new CouponPricing(15));
+    console.log(checkout.priceFor(100)); // 85
+    ```
+  </TabItem>
+  <TabItem label="Python">
+    ```python
+    from typing import Protocol
+
+
+    class PricingStrategy(Protocol):
+        def apply(self, amount: float) -> float: ...
+
+
+    class RegularPricing:
+        def apply(self, amount: float) -> float:
+            return amount
+
+
+    class MemberPricing:
+        def apply(self, amount: float) -> float:
+            return amount * 0.9  # 10% off
+
+
+    class CouponPricing:
+        def __init__(self, off: float) -> None:
+            self.off = off
+
+        def apply(self, amount: float) -> float:
+            return max(0.0, amount - self.off)
+
+
+    class Checkout:
+        def __init__(self, strategy: PricingStrategy) -> None:
+            self._strategy = strategy
+
+        def set_strategy(self, strategy: PricingStrategy) -> None:
+            self._strategy = strategy
+
+        def price_for(self, amount: float) -> float:
+            return self._strategy.apply(amount)
+
+
+    checkout = Checkout(RegularPricing())
+    print(checkout.price_for(100))  # 100
+    checkout.set_strategy(MemberPricing())
+    print(checkout.price_for(100))  # 90.0
+    checkout.set_strategy(CouponPricing(15))
+    print(checkout.price_for(100))  # 85
+    ```
+  </TabItem>
+  <TabItem label="Go">
+    ```go
+    package main
+
+    import "fmt"
+
+    // PricingStrategy is the common interface every rule implements.
+    type PricingStrategy interface {
+        Apply(amount float64) float64
+    }
+
+    type RegularPricing struct{}
+
+    func (RegularPricing) Apply(amount float64) float64 { return amount }
+
+    type MemberPricing struct{}
+
+    func (MemberPricing) Apply(amount float64) float64 { return amount * 0.9 }
+
+    type CouponPricing struct{ Off float64 }
+
+    func (c CouponPricing) Apply(amount float64) float64 {
+        if v := amount - c.Off; v > 0 {
+            return v
+        }
+        return 0
+    }
+
+    type Checkout struct{ strategy PricingStrategy }
+
+    func (c *Checkout) SetStrategy(s PricingStrategy) { c.strategy = s }
+
+    func (c *Checkout) PriceFor(amount float64) float64 {
+        return c.strategy.Apply(amount)
+    }
+
+    func main() {
+        checkout := &Checkout{strategy: RegularPricing{}}
+        fmt.Println(checkout.PriceFor(100)) // 100
+        checkout.SetStrategy(MemberPricing{})
+        fmt.Println(checkout.PriceFor(100)) // 90
+        checkout.SetStrategy(CouponPricing{Off: 15})
+        fmt.Println(checkout.PriceFor(100)) // 85
+    }
+    ```
+  </TabItem>
+  <TabItem label="Rust">
+    ```rust
+    trait PricingStrategy {
+        fn apply(&self, amount: f64) -> f64;
+    }
+
+    struct RegularPricing;
+    impl PricingStrategy for RegularPricing {
+        fn apply(&self, amount: f64) -> f64 {
+            amount
+        }
+    }
+
+    struct MemberPricing;
+    impl PricingStrategy for MemberPricing {
+        fn apply(&self, amount: f64) -> f64 {
+            amount * 0.9
+        }
+    }
+
+    struct CouponPricing {
+        off: f64,
+    }
+    impl PricingStrategy for CouponPricing {
+        fn apply(&self, amount: f64) -> f64 {
+            (amount - self.off).max(0.0)
+        }
+    }
+
+    struct Checkout {
+        strategy: Box<dyn PricingStrategy>,
+    }
+    impl Checkout {
+        fn set_strategy(&mut self, strategy: Box<dyn PricingStrategy>) {
+            self.strategy = strategy;
+        }
+        fn price_for(&self, amount: f64) -> f64 {
+            self.strategy.apply(amount)
+        }
+    }
+
+    fn main() {
+        let mut checkout = Checkout { strategy: Box::new(RegularPricing) };
+        println!("{}", checkout.price_for(100.0)); // 100
+        checkout.set_strategy(Box::new(MemberPricing));
+        println!("{}", checkout.price_for(100.0)); // 90
+        checkout.set_strategy(Box::new(CouponPricing { off: 15.0 }));
+        println!("{}", checkout.price_for(100.0)); // 85
+    }
+    ```
+  </TabItem>
+</Tabs>
+
+## When to use / trade-offs
+
+- **Pro:** swaps algorithms at runtime and adds new ones without editing the context or existing strategies.
+- **Pro:** replaces a sprawling conditional with small, individually testable units.
+- **Pro:** each strategy can be unit-tested in isolation, free of the surrounding context.
+- **Con:** introduces extra objects and an interface; for two trivial branches a plain `if` is simpler.
+- **Con:** the client must know enough to choose the right strategy, which moves a decision outward.
+
+## Related patterns
+
+- [State](/design-patterns-from-zero-to-hero/en/behavioral-essentials/state/) has the same structure but a different intent — its objects swap *themselves* as state changes, rather than being chosen by the client.
+- [Template Method](/design-patterns-from-zero-to-hero/en/behavioral-essentials/template-method/) varies an algorithm through inheritance and overridden steps, where Strategy varies it through composition.
+
+<Callout title="Composition over a switch">
+The heart of Strategy is replacing "branch on a type code" with "hold a reference to the behaviour." When you find a conditional that keeps growing every time a new variant appears, that conditional is a strategy waiting to be extracted.
+</Callout>
+
+export const quiz = [
+  {
+    q: 'What does the Strategy pattern make interchangeable?',
+    options: [
+      'The fields of a class',
+      'A family of algorithms behind a common interface',
+      'The number of instances of a class',
+      'The order in which objects are created',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'How does a Context use a Strategy?',
+    options: [
+      'It inherits from the strategy',
+      'It holds a reference to a strategy and delegates the work to it',
+      'It copies the strategy into a global variable',
+      'It recompiles the strategy on each call',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'What is the main advantage over a large conditional?',
+    options: [
+      'It runs without any objects',
+      'New algorithms are added as classes without editing existing code',
+      'It removes the need for an interface',
+      'It guarantees only one instance exists',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'How does Strategy differ from State?',
+    options: [
+      'They have completely different class structures',
+      'Strategy is chosen by the client; State swaps itself as internal state changes',
+      'State cannot change behaviour at runtime',
+      'Strategy can only hold one algorithm ever',
+    ],
+    answer: 1,
+  },
+];
+
+<Quiz client:visible id="behavioral-essentials/strategy" questions={quiz} />
+
+<ProgressTracker client:visible id="behavioral-essentials/strategy" />

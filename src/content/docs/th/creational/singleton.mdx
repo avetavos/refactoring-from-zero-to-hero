@@ -1,0 +1,213 @@
+---
+title: Singleton
+description: 'รับประกัน instance ที่แชร์กันเพียงหนึ่งเดียวของคลาส พร้อมจุดเข้าถึงเพียงจุดเดียวแบบ lazy'
+sidebar:
+  order: 2
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+## เจตนา
+
+Singleton รับประกันว่าคลาสถูกสร้าง instance เพียงครั้งเดียวเท่านั้น และเปิดเผย instance เดียวนั้นผ่านจุดเข้าถึงที่แชร์กัน โดยสร้างมันแบบ lazy ในการใช้งานครั้งแรก
+
+## ปัญหา
+
+บางสิ่งในโปรแกรมเป็นเอกพจน์อย่างแท้จริง: configuration ที่ parse แล้ว, connection pool, registry ในหน่วยความจำ, หรือ logger หากทุกส่วนของระบบสร้างสำเนาของตัวเองขึ้นมา พวกมันก็จะหลุดออกจากกันและสิ้นเปลืองทรัพยากร คุณต้องการออบเจ็กต์เดียว สร้างขึ้นในครั้งแรกที่มีใครร้องขอ และนำกลับมาใช้ซ้ำตลอดไป และคุณต้องการให้การรับประกันนั้นถูกบังคับใช้จริง ไม่ใช่อาศัยแค่ข้อตกลงร่วมกัน
+
+ส่วนที่ละเอียดอ่อนคือ *ใคร* เป็นผู้บังคับใช้มัน โค้ดทั่วไปสามารถเรียก constructor ได้กี่ครั้งก็ได้ตามใจ Singleton ย้ายการสร้างไปไว้หลัง accessor ที่ควบคุมได้ เพื่อให้คลาสเองเป็นเจ้าของกฎ ราคาที่ต้องจ่ายคือ instance นั้นกลายเป็น global state พร้อมกับอันตรายด้านการทดสอบและ concurrency ทั้งหมดที่ตามมา ซึ่งเป็นเหตุผลว่าทำไมวินัยของการมี *หนึ่งเดียว* จึงสำคัญกว่าลูกเล่นของการซ่อน constructor
+
+## โครงสร้าง
+
+export const singletonUml = `classDiagram
+  class Singleton {
+    -instance: Singleton$
+    -Singleton()
+    +getInstance() Singleton$
+    +operation()
+  }
+  Singleton --> Singleton : holds static reference`;
+
+<Mermaid code={singletonUml} title="Singleton ถือ static reference ไปยัง instance เดียวของตัวมันเอง" />
+
+- **Singleton** — ตัวคลาสเอง มันซ่อน constructor ของตัวเอง ถือ private static reference ไปยัง instance เดียวนั้น และเปิดเผย static accessor ที่สร้าง instance ในการเรียกครั้งแรกแล้วคืน reference เดิมกลับมาทุกครั้งหลังจากนั้น
+- **Client** — ผู้เรียกใด ๆ มันไม่เคยสร้างออบเจ็กต์โดยตรง แต่ขอ instance ที่แชร์กันจาก accessor
+
+## ตัวอย่าง
+
+application config แบบอ่านอย่างเดียวขนาดเล็กที่โหลดเพียงครั้งเดียวและถูกแชร์ไปทุกที่ แต่ละภาษาใช้กลไกตามสำนวนของตนเองสำหรับ "สร้างเพียงครั้งเดียวเท่านั้น แบบ lazy และปลอดภัย"
+
+<Tabs syncKey="lang">
+  <TabItem label="TypeScript">
+    ```ts
+    class AppConfig {
+      private static instance: AppConfig | null = null;
+      readonly env: string;
+      readonly maxConnections: number;
+
+      private constructor() {
+        // Pretend this reads from disk or the environment once.
+        this.env = process.env.APP_ENV ?? 'development';
+        this.maxConnections = 10;
+      }
+
+      static get(): AppConfig {
+        if (AppConfig.instance === null) {
+          AppConfig.instance = new AppConfig();
+        }
+        return AppConfig.instance;
+      }
+    }
+
+    const a = AppConfig.get();
+    const b = AppConfig.get();
+    console.log(a === b); // true — same shared instance
+    console.log(a.env, a.maxConnections);
+    ```
+  </TabItem>
+  <TabItem label="Python">
+    ```python
+    class AppConfig:
+        _instance = None
+
+        def __new__(cls):
+            if cls._instance is None:
+                cls._instance = super().__new__(cls)
+                # Initialise the single instance exactly once.
+                instance = cls._instance
+                instance.env = "development"
+                instance.max_connections = 10
+            return cls._instance
+
+
+    a = AppConfig()
+    b = AppConfig()
+    print(a is b)  # True — __new__ returns the same object
+    print(a.env, a.max_connections)
+    ```
+  </TabItem>
+  <TabItem label="Go">
+    ```go
+    package main
+
+    import (
+        "fmt"
+        "sync"
+    )
+
+    type AppConfig struct {
+        Env            string
+        MaxConnections int
+    }
+
+    var (
+        instance *AppConfig
+        once     sync.Once
+    )
+
+    // Get returns the single AppConfig, building it on first call.
+    func Get() *AppConfig {
+        once.Do(func() {
+            instance = &AppConfig{Env: "development", MaxConnections: 10}
+        })
+        return instance
+    }
+
+    func main() {
+        a := Get()
+        b := Get()
+        fmt.Println(a == b) // true — sync.Once guards construction
+        fmt.Println(a.Env, a.MaxConnections)
+    }
+    ```
+  </TabItem>
+  <TabItem label="Rust">
+    ```rust
+    use std::sync::OnceLock;
+
+    struct AppConfig {
+        env: String,
+        max_connections: u32,
+    }
+
+    fn config() -> &'static AppConfig {
+        static INSTANCE: OnceLock<AppConfig> = OnceLock::new();
+        INSTANCE.get_or_init(|| AppConfig {
+            env: "development".to_string(),
+            max_connections: 10,
+        })
+    }
+
+    fn main() {
+        let a = config();
+        let b = config();
+        // Both references point at the same static instance.
+        println!("{}", std::ptr::eq(a, b)); // true
+        println!("{} {}", a.env, a.max_connections);
+    }
+    ```
+  </TabItem>
+</Tabs>
+
+## เมื่อไรควรใช้ / ข้อแลกเปลี่ยน
+
+- **ข้อดี:** รับประกัน instance เดียวและจุดเข้าถึงที่ชัดเจนเพียงจุดเดียวสำหรับ state ที่แชร์กันจริง ๆ
+- **ข้อดี:** instance ถูกสร้างแบบ lazy คุณจึงจ่ายค่าตั้งค่าก็ต่อเมื่อมันถูกใช้งานจริงเท่านั้น
+- **ข้อเสีย:** มันคือ global mutable state ที่อำพรางไว้ dependency ที่ซ่อนอยู่ทำให้โค้ดทำความเข้าใจได้ยากขึ้น
+- **ข้อเสีย:** มันทำให้การทดสอบยุ่งยาก เทสต์แชร์ instance เดียวกันและไม่สามารถฉีด fake เข้าไปได้ง่าย ๆ เว้นแต่คุณออกแบบเผื่อไว้
+- **ข้อเสีย:** การทำ lazy initialisation แบบไร้เดียงสาคือ race condition ภายใต้ concurrency คุณต้องป้องกันมัน (อย่างที่ `sync.Once` และ `OnceLock` ทำข้างต้น)
+
+## Pattern ที่เกี่ยวข้อง
+
+- [Abstract Factory](/design-patterns-from-zero-to-hero/th/creational/abstract-factory/) มักถูก implement เป็น Singleton เพื่อให้ factory ตัวเดียวถูกแชร์กัน
+- [Prototype](/design-patterns-from-zero-to-hero/th/creational/prototype/) เสนอจุดยืนตรงข้าม — สร้างสำเนาจำนวนมากอย่างประหยัดแทนที่จะแชร์ตัวเดียว
+
+<Callout title="ใช้อย่างระมัดระวัง">
+Singleton คือ global state ที่สวมเสื้อคลุมเป็นคลาส มันผูกผู้เรียกเข้ากับ instance ตัวหนึ่งโดยเฉพาะ และทำให้เทสต์ขึ้นกับลำดับการรัน เพราะทุกเทสต์ล้วนแตะออบเจ็กต์เดียวกัน จงเลือกส่ง dependency เข้าไปอย่างชัดแจ้งดีกว่า แล้วหยิบ Singleton มาใช้ก็ต่อเมื่อสิ่งนั้นเป็นเอกพจน์อย่างแท้จริงและคุณรับต้นทุนของ global state ได้เท่านั้น
+</Callout>
+
+export const quiz = [
+  {
+    q: 'Singleton รับประกันอะไร?',
+    options: [
+      'instance ใหม่สำหรับผู้เรียกทุกราย',
+      'instance เพียงหนึ่งเดียวเท่านั้น พร้อมจุดเข้าถึงที่แชร์กัน',
+      'ว่าคลาสไม่สามารถถูก subclass ได้',
+      'การเข้าถึง field แบบ thread-safe บนออบเจ็กต์ใด ๆ',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'ทำไม lazy initialisation แบบไร้เดียงสาจึงต้องระวังเป็นพิเศษภายใต้ concurrency?',
+    options: [
+      'constructor ช้าเสมอ',
+      'สอง thread อาจมองเห็นว่ายังไม่มี instance ทั้งคู่ แล้วต่างฝ่ายต่างสร้างขึ้นมาคนละตัว',
+      'โค้ดแบบ lazy ไม่สามารถรันบนหลายคอร์ได้',
+      'garbage collector ลบ singleton ทิ้ง',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'กลไกใดของ Go ทำให้การสร้าง singleton รันได้มากที่สุดเพียงครั้งเดียว?',
+    options: ['sync.Mutex.Lock', 'sync.Once.Do', 'go func()', 'defer close(ch)'],
+    answer: 1,
+  },
+  {
+    q: 'ข้อเสียหลักด้านความสามารถในการทดสอบของ Singleton คืออะไร?',
+    options: [
+      'พวกมันไม่สามารถถือ field ใด ๆ ได้',
+      'พวกมันเป็น global state ที่แชร์กัน ซึ่งเทสต์แยกออกหรือทำ fake ได้ยาก',
+      'พวกมันรันเฉพาะใน production build เท่านั้น',
+      'พวกมันห้ามการใช้ interface',
+    ],
+    answer: 1,
+  },
+];
+
+<Quiz client:visible id="creational/singleton" questions={quiz} />
+
+<ProgressTracker client:visible id="creational/singleton" />

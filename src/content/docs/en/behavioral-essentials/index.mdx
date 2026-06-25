@@ -1,0 +1,82 @@
+---
+title: Behavioral Patterns I
+description: 'How behavioral patterns coordinate object interaction and distribute responsibility across collaborating objects.'
+sidebar:
+  order: 1
+---
+
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+
+## Intent
+
+Behavioral patterns describe how objects talk to one another: who holds which responsibility, how a request travels from sender to handler, and how collaborators stay coordinated as a program runs. Where creational patterns answer *how objects come into being* and structural patterns answer *how objects are composed*, behavioral patterns answer *how objects behave together over time*.
+
+## Problem
+
+A working system is rarely one object doing everything. It is many small objects passing messages, reacting to changes, and dividing labour. Left unmanaged, that interaction calcifies into tangled dependencies: a class that knows the concrete type of everything it talks to, a giant conditional that branches on a status field, an algorithm welded so tightly to its caller that you cannot swap it.
+
+Behavioral patterns loosen those couplings. Each one isolates a single axis of variation — the algorithm, the recipient of a notification, the request itself, the current mode of an object, the order of steps, the way a collection is traversed — and gives it a home of its own. The shared goal is to let one part of the interaction change without forcing every other part to change with it.
+
+## Structure
+
+This module covers six core behavioral patterns. Five more — Mediator, Chain of Responsibility, Visitor, Memento, and Interpreter — live in the next module, *Behavioral Patterns II*.
+
+export const overviewUml = `classDiagram
+  class BehavioralPattern {
+    <<concept>>
+    +coordinate()
+  }
+  class Strategy {
+    +execute()
+  }
+  class Observer {
+    +notify()
+  }
+  class Command {
+    +execute()
+    +undo()
+  }
+  class State {
+    +handle()
+  }
+  class TemplateMethod {
+    +run()
+  }
+  class Iterator {
+    +next()
+  }
+  BehavioralPattern <|.. Strategy
+  BehavioralPattern <|.. Observer
+  BehavioralPattern <|.. Command
+  BehavioralPattern <|.. State
+  BehavioralPattern <|.. TemplateMethod
+  BehavioralPattern <|.. Iterator`;
+
+<Mermaid code={overviewUml} title="The six core behavioral patterns and their shared role" />
+
+The six patterns at a glance:
+
+- **Strategy** — captures a family of interchangeable algorithms behind one interface so the choice of algorithm can vary independently of the code that uses it.
+- **Observer** — lets a subject notify a changing set of dependents automatically whenever its state changes, without knowing who they are.
+- **Command** — turns a request into a standalone object, which makes requests queueable, loggable, and reversible through undo.
+- **State** — lets an object change its behaviour when its internal state changes, so it appears to switch class at runtime instead of branching on a flag.
+- **Template Method** — fixes the skeleton of an algorithm in a base class while letting subclasses override individual steps.
+- **Iterator** — provides sequential access to the elements of a collection without exposing how the collection stores them.
+
+## When to use / trade-offs
+
+- **Pro:** each pattern isolates one kind of change, so behaviour evolves without rippling through unrelated code.
+- **Pro:** they replace sprawling conditionals and rigid call chains with small, named, testable collaborators.
+- **Con:** every pattern adds objects and indirection; on simple logic a direct call or a plain loop is clearer.
+- **Con:** overusing them scatters behaviour across many tiny classes, which can obscure the overall flow.
+
+## Related patterns
+
+- [Strategy](/design-patterns-from-zero-to-hero/en/behavioral-essentials/strategy/)
+- [Observer](/design-patterns-from-zero-to-hero/en/behavioral-essentials/observer/)
+- [State](/design-patterns-from-zero-to-hero/en/behavioral-essentials/state/)
+
+<Callout title="How to read this module">
+Each lesson keeps the same shape: the intent, the problem it solves, a UML structure diagram, one worked example shown in TypeScript, Python, Go, and Rust, the trade-offs, and a short quiz. Work through them in order — Strategy and Observer set up vocabulary that the later lessons reuse.
+</Callout>

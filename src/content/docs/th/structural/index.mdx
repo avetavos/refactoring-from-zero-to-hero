@@ -1,0 +1,87 @@
+---
+title: Structural Patterns
+description: 'Structural design patterns ประกอบ object และ class เข้าเป็นโครงสร้างที่ใหญ่ขึ้นได้อย่างไรในขณะที่ยังคงความยืดหยุ่นไว้'
+sidebar:
+  order: 1
+---
+
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+
+## เจตนา
+
+Structural patterns อธิบายวิธีประกอบ class และ object เข้าเป็นโครงสร้างที่ใหญ่ขึ้นโดยที่โครงสร้างเหล่านั้นยังคงความยืดหยุ่น เพื่อให้คุณนำชิ้นส่วนต่าง ๆ มารวมกันใหม่ได้โดยไม่ต้องเขียนมันขึ้นมาใหม่
+
+## ปัญหา
+
+เมื่อคุณมี object ที่เหมาะสมแล้ว คำถามถัดมาคือมันจะประกอบเข้าด้วยกันอย่างไร interface สองตัวที่ควรจะทำงานร่วมกันกลับไม่เข้ากัน พฤติกรรมต้องเติบโตขึ้นโดยไม่ทำให้ subclass ระเบิดออกมาเป็นจำนวนมาก subsystem ที่มี class นับสิบทำให้ผู้เรียกใช้รับมือไม่ไหว ต้นไม้ของชิ้นส่วนที่ซ้อนกันอยู่ต้องถูกปฏิบัติแบบเดียวกันไม่ว่า node นั้นจะเป็นใบหรือกิ่ง เหล่านี้ล้วนเป็นปัญหาเรื่อง *การประกอบ (composition)* ทั้งสิ้น คือ object แต่ละตัวไม่มีปัญหา แต่วิธีที่มันเชื่อมต่อกันนั้นเงอะงะ แข็งทื่อ หรือสิ้นเปลือง
+
+Structural patterns คือสูตรสำหรับการเชื่อมต่อเหล่านั้น บางตัวทำงานในระดับ class ผ่านการ inheritance แต่ส่วนใหญ่ทำงานด้วยการต่อ object เข้าด้วยกันตอน runtime ไม่ว่าจะเป็นการห่อ (wrapping) การส่งต่อ (forwarding) หรือการแบ่งปัน (sharing) ซึ่งทำให้การจัดวางหลวมและเปลี่ยนแปลงได้ เป้าหมายตลอดทั้งหมดเหมือนกัน คือสร้างสิ่งที่ใหญ่ขึ้นจากสิ่งที่เล็กกว่าโดยไม่เชื่อมมันติดถาวรเข้าด้วยกัน
+
+## โครงสร้าง
+
+โมดูลนี้ครอบคลุม structural pattern คลาสสิกทั้งเจ็ดตัวจาก Gang of Four
+
+export const overviewUml = `classDiagram
+  class StructuralPattern {
+    <<concept>>
+    +compose() Structure
+  }
+  class Adapter {
+    +request()
+  }
+  class Bridge {
+    +operation()
+  }
+  class Composite {
+    +add(child)
+    +operation()
+  }
+  class Decorator {
+    +operation()
+  }
+  class Facade {
+    +simpleCall()
+  }
+  class Flyweight {
+    +draw(extrinsic)
+  }
+  class Proxy {
+    +request()
+  }
+  StructuralPattern <|.. Adapter
+  StructuralPattern <|.. Bridge
+  StructuralPattern <|.. Composite
+  StructuralPattern <|.. Decorator
+  StructuralPattern <|.. Facade
+  StructuralPattern <|.. Flyweight
+  StructuralPattern <|.. Proxy`;
+
+<Mermaid code={overviewUml} title="structural pattern ทั้งเจ็ดตัวและบทบาทร่วมกันของพวกมัน" />
+
+ภาพรวมของ pattern ทั้งเจ็ดอย่างย่อ:
+
+- **Adapter** — ห่อ object เพื่อให้ interface ของมันตรงกับที่ client คาดหวัง ทำให้ type ที่เข้ากันไม่ได้ทำงานร่วมกันได้
+- **Bridge** — แยก abstraction ออกจาก implementation เพื่อให้ลำดับชั้นทั้งสองเปลี่ยนแปลงได้อย่างอิสระต่อกัน
+- **Composite** — จัดวาง object เข้าเป็นต้นไม้แบบ part-whole และให้ client ปฏิบัติต่อใบและกิ่งได้แบบเดียวกัน
+- **Decorator** — เพิ่มความรับผิดชอบให้กับ object ด้วยการห่อมัน ซ้อนพฤติกรรมเป็นชั้น ๆ โดยไม่ต้อง subclassing
+- **Facade** — เสนอ interface ที่เรียบง่ายตัวเดียวครอบ subsystem ที่ซับซ้อนซึ่งมี class จำนวนมาก
+- **Flyweight** — แบ่งปัน state ร่วมกันระหว่าง object ละเอียดจำนวนมากเพื่อลดการใช้หน่วยความจำ
+- **Proxy** — วางตัวแทนไว้หน้า object เพื่อควบคุมการเข้าถึงมัน เช่น การโหลดแบบ lazy หรือการตรวจสอบสิทธิ์
+
+## เมื่อไรควรใช้ / ข้อแลกเปลี่ยน
+
+- **ข้อดี:** composition over inheritance ทำให้โครงสร้างยืดหยุ่นและนำมาประกอบใหม่ได้ตอน runtime
+- **ข้อดี:** แต่ละ pattern แยกความกังวลด้านโครงสร้างออกมาเรื่องหนึ่ง ทำให้ client ยังเรียบง่ายและไม่ผูกติดกัน
+- **ข้อเสีย:** ทุกชั้นของ wrapper หรือ indirection เพิ่ม hop หนึ่งและ class หนึ่งตัวที่ต้องทำความเข้าใจ
+- **ข้อเสีย:** ถ้าใช้มากเกินไป pattern เหล่านี้จะฝังการเรียกที่เรียบง่ายไว้ใต้ชั้นของการส่งต่อ ให้หยิบมาใช้ก็ต่อเมื่อปัญหาด้านโครงสร้างมีอยู่จริงเท่านั้น
+
+## Pattern ที่เกี่ยวข้อง
+
+- [Adapter](/design-patterns-from-zero-to-hero/th/structural/adapter/)
+- [Decorator](/design-patterns-from-zero-to-hero/th/structural/decorator/)
+- [Proxy](/design-patterns-from-zero-to-hero/th/structural/proxy/)
+
+<Callout title="วิธีอ่านโมดูลนี้">
+แต่ละบทเรียนมีรูปแบบเดียวกัน คือ เจตนา ปัญหาที่มันแก้ ไดอะแกรมโครงสร้าง UML ตัวอย่างที่ลงมือทำจริงหนึ่งตัวอย่างซึ่งแสดงด้วย TypeScript, Python, Go และ Rust ข้อแลกเปลี่ยน และแบบทดสอบสั้น ๆ pattern หลายตัวในนี้ดูคล้ายกันบนไดอะแกรมแต่ต่างกันที่ *จุดประสงค์* ให้สังเกตความแตกต่างที่ชี้ออกมาในบทเรียน Decorator และ Proxy
+</Callout>

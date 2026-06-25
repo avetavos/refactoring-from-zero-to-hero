@@ -1,0 +1,262 @@
+---
+title: Template Method
+description: 'Fix the skeleton of an algorithm in a base class while letting subclasses override individual steps.'
+sidebar:
+  order: 6
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+## Intent
+
+Template Method defines the overall structure of an algorithm in one place — the *template method* — and defers selected steps to subclasses. The skeleton, including the fixed order of steps, lives in the base class; the parts that vary are overridable hooks. Subclasses change *what* happens at each step without changing the *sequence*.
+
+## Problem
+
+Many tasks share the same shape but differ in the details. A data-processing pipeline always reads input, parses it, transforms the records, and writes the result — but a CSV source and a JSON source parse differently, and one report might filter rows that another keeps. Copying the whole pipeline for each variant duplicates the read-write scaffolding and invites them to drift apart over time.
+
+The fixed part here is the *order of steps*; the varying part is the *content* of some of them. Template Method captures the order once in a base method that calls the individual steps in sequence. Subclasses override only the steps that differ. The control flow is owned by the base class, so every variant runs the steps in the same proven order — an example of the "don't call us, we'll call you" inversion of control.
+
+## Structure
+
+export const templateUml = `classDiagram
+  class Pipeline {
+    <<abstract>>
+    +run(raw) string
+    #parse(raw)* 
+    #transform(rows)
+    #format(rows)* 
+  }
+  class CsvPipeline {
+    #parse(raw)
+    #format(rows)
+  }
+  class JsonPipeline {
+    #parse(raw)
+    #format(rows)
+  }
+  Pipeline <|-- CsvPipeline
+  Pipeline <|-- JsonPipeline`;
+
+<Mermaid code={templateUml} title="The base Pipeline fixes run(); subclasses override the parse and format steps" />
+
+- **Abstract class** — defines the template method that calls the steps in a fixed order. Some steps are abstract (must be overridden), some are concrete defaults (may be overridden), and the template method itself is usually not overridden.
+- **Concrete class** — overrides the variable steps to specialise the algorithm.
+- **Client** — calls the template method and gets the whole algorithm, customised by whichever subclass it uses.
+
+## Example
+
+A data-processing pipeline whose `run` method fixes the read-parse-transform-format order, while subclasses supply the parse and format steps. Languages without classical inheritance express the same idea with composition or function fields.
+
+<Tabs syncKey="lang">
+  <TabItem label="TypeScript">
+    ```ts
+    abstract class Pipeline {
+      // The template method: a fixed sequence of steps.
+      run(raw: string): string {
+        const rows = this.parse(raw);
+        const kept = this.transform(rows);
+        return this.format(kept);
+      }
+
+      protected abstract parse(raw: string): string[];
+
+      // A default step subclasses may override.
+      protected transform(rows: string[]): string[] {
+        return rows.filter((r) => r.length > 0);
+      }
+
+      protected abstract format(rows: string[]): string;
+    }
+
+    class CsvPipeline extends Pipeline {
+      protected parse(raw: string): string[] {
+        return raw.split('\n');
+      }
+      protected format(rows: string[]): string {
+        return rows.join(',');
+      }
+    }
+
+    const csv = new CsvPipeline();
+    console.log(csv.run('a\nb\n\nc')); // "a,b,c"
+    ```
+  </TabItem>
+  <TabItem label="Python">
+    ```python
+    from abc import ABC, abstractmethod
+
+
+    class Pipeline(ABC):
+        def run(self, raw: str) -> str:
+            rows = self.parse(raw)
+            kept = self.transform(rows)
+            return self.format(kept)
+
+        @abstractmethod
+        def parse(self, raw: str) -> list[str]: ...
+
+        def transform(self, rows: list[str]) -> list[str]:
+            return [r for r in rows if r]
+
+        @abstractmethod
+        def format(self, rows: list[str]) -> str: ...
+
+
+    class CsvPipeline(Pipeline):
+        def parse(self, raw: str) -> list[str]:
+            return raw.split("\n")
+
+        def format(self, rows: list[str]) -> str:
+            return ",".join(rows)
+
+
+    csv = CsvPipeline()
+    print(csv.run("a\nb\n\nc"))  # "a,b,c"
+    ```
+  </TabItem>
+  <TabItem label="Go">
+    ```go
+    package main
+
+    import (
+        "fmt"
+        "strings"
+    )
+
+    // Go has no inheritance, so the varying steps are function fields and
+    // the fixed sequence lives in Run.
+    type Pipeline struct {
+        Parse  func(raw string) []string
+        Format func(rows []string) string
+    }
+
+    func (p Pipeline) transform(rows []string) []string {
+        kept := rows[:0]
+        for _, r := range rows {
+            if r != "" {
+                kept = append(kept, r)
+            }
+        }
+        return kept
+    }
+
+    func (p Pipeline) Run(raw string) string {
+        rows := p.Parse(raw)
+        kept := p.transform(rows)
+        return p.Format(kept)
+    }
+
+    func main() {
+        csv := Pipeline{
+            Parse:  func(raw string) []string { return strings.Split(raw, "\n") },
+            Format: func(rows []string) string { return strings.Join(rows, ",") },
+        }
+        fmt.Println(csv.Run("a\nb\n\nc")) // "a,b,c"
+    }
+    ```
+  </TabItem>
+  <TabItem label="Rust">
+    ```rust
+    // The trait holds the fixed run() as a default method that calls the
+    // overridable steps. Implementors supply only parse and format.
+    trait Pipeline {
+        fn parse(&self, raw: &str) -> Vec<String>;
+        fn format(&self, rows: &[String]) -> String;
+
+        fn transform(&self, rows: Vec<String>) -> Vec<String> {
+            rows.into_iter().filter(|r| !r.is_empty()).collect()
+        }
+
+        fn run(&self, raw: &str) -> String {
+            let rows = self.parse(raw);
+            let kept = self.transform(rows);
+            self.format(&kept)
+        }
+    }
+
+    struct CsvPipeline;
+    impl Pipeline for CsvPipeline {
+        fn parse(&self, raw: &str) -> Vec<String> {
+            raw.split('\n').map(str::to_string).collect()
+        }
+        fn format(&self, rows: &[String]) -> String {
+            rows.join(",")
+        }
+    }
+
+    fn main() {
+        let csv = CsvPipeline;
+        println!("{}", csv.run("a\nb\n\nc")); // "a,b,c"
+    }
+    ```
+  </TabItem>
+</Tabs>
+
+## When to use / trade-offs
+
+- **Pro:** removes duplication by keeping the common skeleton in one place.
+- **Pro:** the base class enforces the correct order of steps, so subclasses cannot accidentally reorder them.
+- **Pro:** new variants need only override the steps that differ.
+- **Con:** it relies on inheritance, which is rigid — a subclass is locked to one base algorithm.
+- **Con:** too many hooks make the base method hard to follow, and overriding the wrong step can subtly break the contract.
+
+## Related patterns
+
+- [Strategy](/design-patterns-from-zero-to-hero/en/behavioral-essentials/strategy/) achieves variation through composition rather than inheritance; it can swap the whole algorithm at runtime, where Template Method varies fixed steps at subclass time.
+- [Factory Method](/design-patterns-from-zero-to-hero/en/creational/factory-method/) is often a step *within* a template method — the base algorithm calls an overridable creation step.
+
+<Callout title="Inversion of control">
+The defining trait of Template Method is that the base class is in charge of the flow and calls down into your overridden steps, not the other way round. If you find yourself wanting to swap the entire procedure at runtime rather than just a step or two, you probably want Strategy instead.
+</Callout>
+
+export const quiz = [
+  {
+    q: 'What does the template method itself define?',
+    options: [
+      'A single shared instance',
+      'The fixed skeleton and order of an algorithm, calling overridable steps',
+      'A way to traverse a collection',
+      'The list of observers to notify',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'Which parts do subclasses change?',
+    options: [
+      'The order in which steps run',
+      'The content of individual steps, not their sequence',
+      'The entire algorithm at runtime',
+      'Nothing — the base class is final in every respect',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'What inversion of control does Template Method embody?',
+    options: [
+      'The subclass calls the base for every step',
+      'The base class owns the flow and calls down into overridden steps',
+      'The client supplies the whole algorithm',
+      'Steps run in random order each time',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'What is a key limitation compared with Strategy?',
+    options: [
+      'It cannot remove duplication',
+      'It relies on inheritance, locking a subclass to one base algorithm',
+      'It cannot fix the order of steps',
+      'It requires a singleton',
+    ],
+    answer: 1,
+  },
+];
+
+<Quiz client:visible id="behavioral-essentials/template-method" questions={quiz} />
+
+<ProgressTracker client:visible id="behavioral-essentials/template-method" />

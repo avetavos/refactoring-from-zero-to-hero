@@ -1,0 +1,89 @@
+---
+title: What Are Design Patterns
+description: 'A first look at design patterns as named, reusable solutions to recurring design problems — and the three families that organise them.'
+sidebar:
+  order: 1
+---
+
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+## A name for a recurring solution
+
+A design pattern is a named, reusable description of how to solve a problem that keeps coming up when you arrange objects and classes. It is not a finished piece of code you paste into a project. It is closer to a recipe or a blueprint: it tells you which parts to create, how they should relate, and which forces the arrangement balances — and then you adapt that shape to your own concrete types and constraints.
+
+Two ideas matter here. First, patterns are about *recurring* problems. If a difficulty shows up once, you just solve it. A pattern earns its name only because the same shape of problem appears again and again across unrelated systems. Second, patterns give you *vocabulary*. Saying "let's put a Facade in front of that subsystem" communicates an entire design — its structure, intent, and trade-offs — in two words, the way a chess player says "fork" instead of describing the board.
+
+## What a pattern is not
+
+It is easy to mistake other useful things for patterns. Three distinctions keep the term honest:
+
+- **Not copy-paste code.** A pattern is a design idea expressed at the level of roles and relationships. The same pattern looks different in TypeScript, Python, Go, and Rust because each language has its own way to express the same structure.
+- **Not an idiom.** An *idiom* is a low-level, language-specific convention — a list comprehension in Python, the comma-ok form in Go. Idioms are valuable, but they live below the level of design patterns.
+- **Not an anti-pattern.** An *anti-pattern* is a common solution that looks reasonable and reliably backfires — a God Object that does everything, or a Singleton smuggled in as global state. Patterns describe what tends to work; anti-patterns name what tends to hurt.
+
+## The three families
+
+The classic catalogue sorts patterns into three families by the kind of problem they address: how objects are *created*, how they are *composed* into larger structures, and how they *interact* at runtime.
+
+export const familiesDiagram = `flowchart TD
+  P[Design Patterns]
+  P --> C[Creational]
+  P --> S[Structural]
+  P --> B[Behavioral]
+  C --> C1[how objects get created]
+  S --> S1[how objects are composed]
+  B --> B1[how objects communicate]`;
+
+<Mermaid code={familiesDiagram} title="The three families of patterns and the question each one answers" />
+
+- **Creational** patterns control *how* objects come into existence — choosing a concrete type, sharing one instance, or assembling something complex step by step.
+- **Structural** patterns describe *how* objects and classes combine into larger structures while keeping those structures flexible and efficient.
+- **Behavioral** patterns concern *how* responsibilities and messages flow between objects at runtime.
+
+## How to read this course
+
+Every lesson follows the same shape so you always know where to look: the **intent** in one sentence, the **problem** it solves, a **UML structure** diagram, one worked **example** in TypeScript, Python, Go, and Rust, the **trade-offs**, and a short quiz. Before diving into the catalogue, this module grounds you in the underlying principles — SOLID, composition over inheritance, and the UML notation used throughout — so that each pattern reads as an application of ideas you already understand rather than a trick to memorise.
+
+<Callout title="Patterns are a language, not a checklist">
+The goal is never to use as many patterns as possible. It is to recognise the shape of a problem and reach for the arrangement that fits — sometimes that is a named pattern, and often it is a plain constructor. Learn the vocabulary so you can think and talk about design clearly, then apply it sparingly.
+</Callout>
+
+export const quiz = [
+  {
+    q: 'Which best describes a design pattern?',
+    options: [
+      'A library you install to get the behaviour for free',
+      'A named, reusable solution to a recurring design problem',
+      'A block of code you copy unchanged into every project',
+      'A rule the compiler enforces automatically',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'What distinguishes an idiom from a design pattern?',
+    options: [
+      'An idiom is a low-level, language-specific convention; a pattern is a higher-level design idea',
+      'An idiom is always slower than a pattern',
+      'Idioms apply only to object-oriented languages',
+      'There is no difference; the terms are interchangeable',
+    ],
+    answer: 0,
+  },
+  {
+    q: 'Which question do behavioral patterns primarily address?',
+    options: [
+      'How objects are created',
+      'How objects are composed into larger structures',
+      'How responsibilities and messages flow between objects at runtime',
+      'How source files are organised on disk',
+    ],
+    answer: 2,
+  },
+];
+
+<Quiz client:visible id="intro-and-principles/index" questions={quiz} />
+
+<ProgressTracker client:visible id="intro-and-principles/index" />

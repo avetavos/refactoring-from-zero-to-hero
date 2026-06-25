@@ -1,0 +1,301 @@
+---
+title: Factory Method
+description: 'Let a base class defer the choice of which concrete product to create to its subclasses.'
+sidebar:
+  order: 3
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+## Intent
+
+Factory Method defines an interface for creating an object but lets each subclass decide which concrete class to instantiate, so the surrounding workflow stays the same while the product varies.
+
+## Problem
+
+You have a process that is identical no matter what it operates on, except for one detail: the kind of object it works with. A logistics planner schedules deliveries the same way whether the cargo travels by truck or by ship — but it must produce the right kind of vehicle. If you hard-code `new Truck()` into the planner, supporting ships means editing the planner and risking the shared logic.
+
+Factory Method extracts that single varying step into an overridable method. The base class writes the workflow in terms of an abstract product and calls its own factory method to obtain the concrete object. Subclasses override only the factory method. The workflow is inherited unchanged; the product is chosen by the subclass. This keeps the open/closed principle intact — you add a new product by adding a subclass, not by editing existing code.
+
+## Structure
+
+export const factoryMethodUml = `classDiagram
+  class Product {
+    <<interface>>
+    +deliver() string
+  }
+  class Truck {
+    +deliver() string
+  }
+  class Ship {
+    +deliver() string
+  }
+  class Logistics {
+    +planDelivery() string
+    +createTransport()* Product
+  }
+  class RoadLogistics {
+    +createTransport() Product
+  }
+  class SeaLogistics {
+    +createTransport() Product
+  }
+  Product <|.. Truck
+  Product <|.. Ship
+  Logistics <|-- RoadLogistics
+  Logistics <|-- SeaLogistics
+  Logistics ..> Product : creates
+  RoadLogistics ..> Truck
+  SeaLogistics ..> Ship`;
+
+<Mermaid code={factoryMethodUml} title="A Creator calls its own factory method; subclasses pick the Product" />
+
+- **Product** — the interface returned by the factory method. The workflow only ever depends on this type.
+- **Concrete Products** (`Truck`, `Ship`) — the specific implementations the workflow stays unaware of.
+- **Creator** (`Logistics`) — holds the shared workflow (`planDelivery`) and declares the abstract factory method (`createTransport`).
+- **Concrete Creators** (`RoadLogistics`, `SeaLogistics`) — override the factory method to return a particular product.
+
+## Example
+
+A `Logistics` planner whose `planDelivery` step is shared, while subclasses choose the transport.
+
+<Tabs syncKey="lang">
+  <TabItem label="TypeScript">
+    ```ts
+    interface Transport {
+      deliver(): string;
+    }
+
+    class Truck implements Transport {
+      deliver(): string {
+        return 'Delivering by road in a truck.';
+      }
+    }
+
+    class Ship implements Transport {
+      deliver(): string {
+        return 'Delivering by sea in a ship.';
+      }
+    }
+
+    abstract class Logistics {
+      // Shared workflow, written against the Transport interface.
+      planDelivery(): string {
+        const transport = this.createTransport();
+        return `Planned. ${transport.deliver()}`;
+      }
+      // The factory method subclasses override.
+      protected abstract createTransport(): Transport;
+    }
+
+    class RoadLogistics extends Logistics {
+      protected createTransport(): Transport {
+        return new Truck();
+      }
+    }
+
+    class SeaLogistics extends Logistics {
+      protected createTransport(): Transport {
+        return new Ship();
+      }
+    }
+
+    console.log(new RoadLogistics().planDelivery());
+    console.log(new SeaLogistics().planDelivery());
+    ```
+  </TabItem>
+  <TabItem label="Python">
+    ```python
+    from abc import ABC, abstractmethod
+
+
+    class Transport(ABC):
+        @abstractmethod
+        def deliver(self) -> str: ...
+
+
+    class Truck(Transport):
+        def deliver(self) -> str:
+            return "Delivering by road in a truck."
+
+
+    class Ship(Transport):
+        def deliver(self) -> str:
+            return "Delivering by sea in a ship."
+
+
+    class Logistics(ABC):
+        def plan_delivery(self) -> str:
+            transport = self.create_transport()  # the factory method
+            return f"Planned. {transport.deliver()}"
+
+        @abstractmethod
+        def create_transport(self) -> Transport: ...
+
+
+    class RoadLogistics(Logistics):
+        def create_transport(self) -> Transport:
+            return Truck()
+
+
+    class SeaLogistics(Logistics):
+        def create_transport(self) -> Transport:
+            return Ship()
+
+
+    print(RoadLogistics().plan_delivery())
+    print(SeaLogistics().plan_delivery())
+    ```
+  </TabItem>
+  <TabItem label="Go">
+    ```go
+    package main
+
+    import "fmt"
+
+    type Transport interface {
+        Deliver() string
+    }
+
+    type Truck struct{}
+
+    func (Truck) Deliver() string { return "Delivering by road in a truck." }
+
+    type Ship struct{}
+
+    func (Ship) Deliver() string { return "Delivering by sea in a ship." }
+
+    // Go has no inheritance; the "factory method" is a function field that
+    // each concrete logistics provides, and a shared helper holds the workflow.
+    type Logistics struct {
+        createTransport func() Transport
+    }
+
+    func (l Logistics) PlanDelivery() string {
+        t := l.createTransport()
+        return "Planned. " + t.Deliver()
+    }
+
+    func NewRoadLogistics() Logistics {
+        return Logistics{createTransport: func() Transport { return Truck{} }}
+    }
+
+    func NewSeaLogistics() Logistics {
+        return Logistics{createTransport: func() Transport { return Ship{} }}
+    }
+
+    func main() {
+        fmt.Println(NewRoadLogistics().PlanDelivery())
+        fmt.Println(NewSeaLogistics().PlanDelivery())
+    }
+    ```
+  </TabItem>
+  <TabItem label="Rust">
+    ```rust
+    trait Transport {
+        fn deliver(&self) -> String;
+    }
+
+    struct Truck;
+    impl Transport for Truck {
+        fn deliver(&self) -> String {
+            "Delivering by road in a truck.".to_string()
+        }
+    }
+
+    struct Ship;
+    impl Transport for Ship {
+        fn deliver(&self) -> String {
+            "Delivering by sea in a ship.".to_string()
+        }
+    }
+
+    // The trait holds the shared workflow as a default method and declares
+    // the factory method that implementors must provide.
+    trait Logistics {
+        fn create_transport(&self) -> Box<dyn Transport>;
+
+        fn plan_delivery(&self) -> String {
+            let transport = self.create_transport();
+            format!("Planned. {}", transport.deliver())
+        }
+    }
+
+    struct RoadLogistics;
+    impl Logistics for RoadLogistics {
+        fn create_transport(&self) -> Box<dyn Transport> {
+            Box::new(Truck)
+        }
+    }
+
+    struct SeaLogistics;
+    impl Logistics for SeaLogistics {
+        fn create_transport(&self) -> Box<dyn Transport> {
+            Box::new(Ship)
+        }
+    }
+
+    fn main() {
+        println!("{}", RoadLogistics.plan_delivery());
+        println!("{}", SeaLogistics.plan_delivery());
+    }
+    ```
+  </TabItem>
+</Tabs>
+
+## When to use / trade-offs
+
+- **Pro:** the shared workflow never names a concrete product, so adding a new product means adding a subclass, not editing callers.
+- **Pro:** product construction is in one overridable method, easy to find and replace.
+- **Con:** each new product variant tends to require a new creator subclass, which can multiply small classes.
+- **Con:** for a single product type it is overkill — a plain constructor or function is clearer.
+
+## Related patterns
+
+- [Abstract Factory](/design-patterns-from-zero-to-hero/en/creational/abstract-factory/) often uses several factory methods together to build a product family.
+- [Prototype](/design-patterns-from-zero-to-hero/en/creational/prototype/) is an alternative when the new object should copy an existing one rather than be built fresh.
+
+<Callout title="One varying step">
+The heart of Factory Method is isolating the *single* creation step that varies while keeping the surrounding algorithm fixed. If more than the product type varies between subclasses, you are likely looking at a different pattern.
+</Callout>
+
+export const quiz = [
+  {
+    q: 'In Factory Method, who decides the concrete class to instantiate?',
+    options: [
+      'The client that calls the workflow',
+      'The subclass that overrides the factory method',
+      'A global registry',
+      'The product itself',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'What stays the same across concrete creators?',
+    options: [
+      'The shared workflow that uses the product through its interface',
+      'The exact product class returned',
+      'The constructor arguments',
+      'Nothing — everything is overridden',
+    ],
+    answer: 0,
+  },
+  {
+    q: 'Why does Factory Method support the open/closed principle?',
+    options: [
+      'It makes all fields immutable',
+      'You add a product by adding a subclass instead of editing existing code',
+      'It removes the need for interfaces',
+      'It compiles faster',
+    ],
+    answer: 1,
+  },
+];
+
+<Quiz client:visible id="creational/factory-method" questions={quiz} />
+
+<ProgressTracker client:visible id="creational/factory-method" />

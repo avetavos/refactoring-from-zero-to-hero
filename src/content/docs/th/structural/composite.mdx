@@ -1,0 +1,266 @@
+---
+title: Composite
+description: 'จัดวาง object เข้าเป็นต้นไม้แบบ part-whole และปฏิบัติต่อใบและกิ่งได้แบบเดียวกัน'
+sidebar:
+  order: 4
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+## เจตนา
+
+Composite ทำให้คุณสร้างโครงสร้างต้นไม้ของลำดับชั้นแบบ part-whole และปฏิบัติต่อ object แต่ละตัวและองค์ประกอบของ object ผ่าน interface เดียวกัน เพื่อให้ client ไม่จำเป็นต้องรู้ว่ามันถืออยู่เป็นใบหรือกิ่งทั้งกิ่ง
+
+## ปัญหา
+
+ลองนึกถึงระบบไฟล์ ไฟล์มีขนาด และโฟลเดอร์บรรจุไฟล์และโฟลเดอร์อื่น ๆ โดยขนาดของมันคือผลรวมของทุกอย่างที่อยู่ข้างใน ถ้าคุณจำลองไฟล์และโฟลเดอร์เป็น type ที่ไม่เกี่ยวข้องกัน โค้ด client ทุกชิ้นที่เดินสำรวจต้นไม้ต้องถามว่า "นี่คือไฟล์หรือโฟลเดอร์?" แล้วแยกสาขาตามนั้น เงื่อนไขนั้นกระจายไปทั่วและพังทันทีที่คุณเพิ่มชนิดของ node ตัวที่สาม
+
+Composite ขจัดคำถามนั้นออกไป interface ร่วม เช่น node ที่มี method `size()` ถูก implement โดยทั้งใบและตัวบรรจุ ใบคืนค่าของตัวเอง ส่วนตัวบรรจุ delegate ไปยังลูก ๆ และรวมผลลัพธ์ของพวกมัน วนซ้ำลึกลงไปเท่าที่ต้นไม้จะลึก client เรียก `size()` บน root แล้วได้ยอดรวม โดยไม่ต้องสนใจรูปร่างที่อยู่ข้างใต้เลย การเพิ่มชนิดของ node หมายถึงการ implement interface เดียวกัน ไม่ใช่การแก้ไขทุกการเดินสำรวจ
+
+## โครงสร้าง
+
+export const compositeUml = `classDiagram
+  class Node {
+    <<interface>>
+    +size() int
+    +name() string
+  }
+  class File {
+    -bytes: int
+    +size() int
+  }
+  class Folder {
+    -children: Node[]
+    +add(child)
+    +size() int
+  }
+  Node <|.. File
+  Node <|.. Folder
+  Folder o--> Node : contains children`;
+
+<Mermaid code={compositeUml} title="ใบและตัวบรรจุใช้ interface เดียวกัน ตัวบรรจุถือลูก ๆ ไว้" />
+
+- **Component** (`Node`) — interface ร่วมสำหรับทุกอย่างในต้นไม้ ประกาศการดำเนินการที่ client เรียกใช้
+- **Leaf** (`File`) — node ที่ไม่มีลูก มัน implement การดำเนินการโดยตรง
+- **Composite** (`Folder`) — node ที่ถือ component ลูก ๆ และ implement การดำเนินการด้วยการ delegate ไปยังและรวมลูก ๆ ของมัน
+- **Client** — ทำงานอิงกับ component interface และปฏิบัติต่อใบและ composite แบบเดียวกัน
+
+## ตัวอย่าง
+
+ต้นไม้ของระบบไฟล์ที่ทั้งไฟล์และโฟลเดอร์เปิดเผย `size()` ขนาดของโฟลเดอร์คือผลรวมของลูก ๆ ของมัน คำนวณแบบวนซ้ำ
+
+<Tabs syncKey="lang">
+  <TabItem label="TypeScript">
+    ```ts
+    interface Node {
+      size(): number;
+    }
+
+    class File implements Node {
+      constructor(private readonly bytes: number) {}
+      size = () => this.bytes;
+    }
+
+    class Folder implements Node {
+      private children: Node[] = [];
+      add(child: Node): this {
+        this.children.push(child);
+        return this;
+      }
+      size = () => this.children.reduce((sum, c) => sum + c.size(), 0);
+    }
+
+    const root = new Folder()
+      .add(new File(100))
+      .add(new Folder().add(new File(20)).add(new File(30)));
+
+    console.log(root.size()); // 150
+    ```
+  </TabItem>
+  <TabItem label="Python">
+    ```python
+    from abc import ABC, abstractmethod
+
+
+    class Node(ABC):
+        @abstractmethod
+        def size(self) -> int: ...
+
+
+    class File(Node):
+        def __init__(self, bytes_: int) -> None:
+            self._bytes = bytes_
+
+        def size(self) -> int:
+            return self._bytes
+
+
+    class Folder(Node):
+        def __init__(self) -> None:
+            self._children: list[Node] = []
+
+        def add(self, child: Node) -> "Folder":
+            self._children.append(child)
+            return self
+
+        def size(self) -> int:
+            return sum(child.size() for child in self._children)
+
+
+    root = Folder()
+    root.add(File(100)).add(Folder().add(File(20)).add(File(30)))
+    print(root.size())  # 150
+    ```
+  </TabItem>
+  <TabItem label="Go">
+    ```go
+    package main
+
+    import "fmt"
+
+    type Node interface {
+        Size() int
+    }
+
+    type File struct{ Bytes int }
+
+    func (f File) Size() int { return f.Bytes }
+
+    type Folder struct{ children []Node }
+
+    func (fo *Folder) Add(child Node) *Folder {
+        fo.children = append(fo.children, child)
+        return fo
+    }
+
+    func (fo *Folder) Size() int {
+        total := 0
+        for _, c := range fo.children {
+            total += c.Size()
+        }
+        return total
+    }
+
+    func main() {
+        inner := (&Folder{}).Add(File{20}).Add(File{30})
+        root := (&Folder{}).Add(File{100}).Add(inner)
+        fmt.Println(root.Size()) // 150
+    }
+    ```
+  </TabItem>
+  <TabItem label="Rust">
+    ```rust
+    trait Node {
+        fn size(&self) -> u64;
+    }
+
+    struct File {
+        bytes: u64,
+    }
+
+    impl Node for File {
+        fn size(&self) -> u64 {
+            self.bytes
+        }
+    }
+
+    struct Folder {
+        children: Vec<Box<dyn Node>>,
+    }
+
+    impl Folder {
+        fn new() -> Self {
+            Folder { children: Vec::new() }
+        }
+        fn add(mut self, child: Box<dyn Node>) -> Self {
+            self.children.push(child);
+            self
+        }
+    }
+
+    impl Node for Folder {
+        fn size(&self) -> u64 {
+            self.children.iter().map(|c| c.size()).sum()
+        }
+    }
+
+    fn main() {
+        let inner = Folder::new()
+            .add(Box::new(File { bytes: 20 }))
+            .add(Box::new(File { bytes: 30 }));
+        let root = Folder::new()
+            .add(Box::new(File { bytes: 100 }))
+            .add(Box::new(inner));
+        println!("{}", root.size()); // 150
+    }
+    ```
+  </TabItem>
+</Tabs>
+
+## เมื่อไรควรใช้ / ข้อแลกเปลี่ยน
+
+- **ข้อดี:** client ปฏิบัติต่อ object เดี่ยวและ subtree ทั้งกิ่งได้แบบเดียวกัน ขจัดเงื่อนไขการตรวจสอบ type
+- **ข้อดี:** การเพิ่มชนิด component ใหม่ปลายเปิด คือเพียง implement interface ร่วม
+- **ข้อดี:** การดำเนินการแบบวนซ้ำ เช่น การหายอดรวม การ render หรือการค้นหา เกิดขึ้นอย่างเป็นธรรมชาติจากโครงสร้าง
+- **ข้อเสีย:** component interface ที่ทั่วไปเกินไปอาจบังคับให้ใบต้อง implement การดำเนินการเกี่ยวกับลูกที่ไม่มีความหมายสำหรับมัน
+- **ข้อเสีย:** ความเป็นเอกภาพอาจซ่อนต้นทุนไว้ คือการเรียกเพียงครั้งเดียวที่ดูไร้พิษภัยอาจวนซ้ำไปทั่วต้นไม้ขนาดมหึมา
+
+## Pattern ที่เกี่ยวข้อง
+
+- [Decorator](/design-patterns-from-zero-to-hero/th/structural/decorator/) ก็พึ่งพา composition แบบวนซ้ำเช่นกัน แต่มันเพิ่มพฤติกรรมให้กับ object ที่ถูกห่อเพียงตัวเดียวแทนที่จะรวมลูกหลายตัว
+- [Builder](/design-patterns-from-zero-to-hero/th/creational/builder/) มีประโยชน์สำหรับการประกอบต้นไม้ composite ที่ซับซ้อนทีละขั้น
+
+<Callout title="จะวางการดำเนินการเกี่ยวกับลูกไว้ที่ไหน">
+ความตึงเครียดในการออกแบบแบบคลาสสิก คุณจะวาง `add` และ `remove` ไว้บน component interface ร่วม (เป็นเอกภาพ แต่ใบต้องปฏิเสธมัน) หรือไว้แค่บน composite (type-safe แต่ client ต้องแยกแยะ)? ตัวอย่างนี้วางไว้แค่บน `Folder` เพื่อความปลอดภัย เลือกตามว่า client ของคุณต้องการความเป็นเอกภาพอย่างแท้จริงหรือการกำหนด type ที่เข้มงวดกว่า
+</Callout>
+
+export const quiz = [
+  {
+    q: 'Composite pattern สร้างโครงสร้างแบบใด?',
+    options: [
+      'instance ที่ใช้ร่วมกันเพียงตัวเดียว',
+      'ต้นไม้แบบ part-whole ที่ปฏิบัติผ่าน interface ร่วมตัวเดียว',
+      'คิวของ request ที่รอดำเนินการ',
+      'ตารางค้นหาแบบแบน',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'composite (ตัวบรรจุ) implement การดำเนินการร่วมอย่างไร?',
+    options: [
+      'ด้วยการคืนค่าคงที่',
+      'ด้วยการ delegate ไปยังลูก ๆ ของมันและรวมผลลัพธ์ของพวกมัน',
+      'ด้วยการ throw exception',
+      'ด้วยการ clone ตัวเอง',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'การปฏิบัติต่อใบและ composite แบบเดียวกันให้ประโยชน์อะไรกับ client?',
+    options: [
+      'มันรับประกัน thread safety',
+      'มันขจัดความจำเป็นที่ต้องตรวจสอบว่า node เป็นใบหรือกิ่ง',
+      'มันลดหน่วยความจำด้วยการแบ่งปัน state',
+      'มันบังคับให้มี instance เดียว',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'ข้อเสียของ component interface ที่ทั่วไปมาก ๆ คืออะไร?',
+    options: [
+      'มันป้องกันการวนซ้ำโดยสิ้นเชิง',
+      'ใบอาจถูกบังคับให้ implement การดำเนินการเกี่ยวกับลูกที่ไม่มีความหมายสำหรับมัน',
+      'มันทำให้ไม่สามารถเดินสำรวจต้นไม้ได้',
+      'มันต้องการการ inheritance จาก singleton',
+    ],
+    answer: 1,
+  },
+];
+
+<Quiz client:visible id="structural/composite" questions={quiz} />
+
+<ProgressTracker client:visible id="structural/composite" />

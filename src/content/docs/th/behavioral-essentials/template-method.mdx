@@ -1,0 +1,262 @@
+---
+title: Template Method
+description: 'ตรึงโครงร่างของอัลกอริทึมไว้ในคลาสฐานในขณะที่ยอมให้คลาสลูก override ขั้นตอนแต่ละขั้นได้'
+sidebar:
+  order: 6
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+## Intent
+
+Template Method นิยามโครงสร้างโดยรวมของอัลกอริทึมไว้ที่เดียว คือ *template method* แล้วเลื่อนขั้นตอนที่เลือกไว้ให้คลาสลูก โครงร่าง รวมถึงลำดับขั้นตอนที่ตรึงไว้ อยู่ในคลาสฐาน ส่วนที่ผันแปรคือ hook ที่ override ได้ คลาสลูกเปลี่ยน *อะไร* ที่เกิดขึ้นในแต่ละขั้นโดยไม่เปลี่ยน *ลำดับ*
+
+## Problem
+
+งานหลายอย่างมีรูปร่างเดียวกันแต่ต่างกันที่รายละเอียด pipeline ประมวลผลข้อมูลมักจะอ่าน input แจงมัน แปลงเรคคอร์ด แล้วเขียนผลลัพธ์เสมอ แต่แหล่งข้อมูล CSV กับแหล่ง JSON แจงต่างกัน และรายงานหนึ่งอาจกรองแถวที่อีกรายงานเก็บไว้ การคัดลอก pipeline ทั้งชุดสำหรับแต่ละตัวแปรทำให้โครงนั่งร้านของการอ่าน-เขียนซ้ำซ้อน และชวนให้พวกมันแยกออกจากกันเมื่อเวลาผ่านไป
+
+ส่วนที่ตรึงไว้ในที่นี้คือ *ลำดับของขั้นตอน* ส่วนที่ผันแปรคือ *เนื้อหา* ของบางขั้น Template Method จับลำดับไว้ครั้งเดียวในเมธอดฐานที่เรียกขั้นตอนแต่ละขั้นตามลำดับ คลาสลูก override เพียงขั้นตอนที่ต่างกัน การควบคุมการไหลเป็นของคลาสฐาน ดังนั้นทุกตัวแปรจึงรันขั้นตอนในลำดับที่พิสูจน์แล้วเหมือนกัน เป็นตัวอย่างของการกลับด้านการควบคุม (inversion of control) แบบ "อย่าโทรหาเรา เราจะโทรหาคุณเอง"
+
+## Structure
+
+export const templateUml = `classDiagram
+  class Pipeline {
+    <<abstract>>
+    +run(raw) string
+    #parse(raw)* 
+    #transform(rows)
+    #format(rows)* 
+  }
+  class CsvPipeline {
+    #parse(raw)
+    #format(rows)
+  }
+  class JsonPipeline {
+    #parse(raw)
+    #format(rows)
+  }
+  Pipeline <|-- CsvPipeline
+  Pipeline <|-- JsonPipeline`;
+
+<Mermaid code={templateUml} title="Pipeline ฐานตรึง run() ไว้ คลาสลูก override ขั้นตอน parse และ format" />
+
+- **Abstract class** — นิยาม template method ที่เรียกขั้นตอนตามลำดับตายตัว บางขั้นตอนเป็น abstract (ต้อง override) บางขั้นตอนเป็นค่าดีฟอลต์ที่เป็นรูปธรรม (อาจ override ได้) และตัว template method เองมักไม่ถูก override
+- **Concrete class** — override ขั้นตอนที่ผันแปรได้เพื่อเจาะจงอัลกอริทึม
+- **Client** — เรียก template method แล้วได้อัลกอริทึมทั้งชุด ที่ถูกปรับแต่งโดยคลาสลูกที่มันใช้
+
+## Example
+
+pipeline ประมวลผลข้อมูลที่เมธอด `run` ตรึงลำดับ read-parse-transform-format ไว้ ในขณะที่คลาสลูกจัดหาขั้นตอน parse และ format ภาษาที่ไม่มีการสืบทอดแบบคลาสสิกแสดงแนวคิดเดียวกันด้วยการประกอบ (composition) หรือฟิลด์ฟังก์ชัน
+
+<Tabs syncKey="lang">
+  <TabItem label="TypeScript">
+    ```ts
+    abstract class Pipeline {
+      // The template method: a fixed sequence of steps.
+      run(raw: string): string {
+        const rows = this.parse(raw);
+        const kept = this.transform(rows);
+        return this.format(kept);
+      }
+
+      protected abstract parse(raw: string): string[];
+
+      // A default step subclasses may override.
+      protected transform(rows: string[]): string[] {
+        return rows.filter((r) => r.length > 0);
+      }
+
+      protected abstract format(rows: string[]): string;
+    }
+
+    class CsvPipeline extends Pipeline {
+      protected parse(raw: string): string[] {
+        return raw.split('\n');
+      }
+      protected format(rows: string[]): string {
+        return rows.join(',');
+      }
+    }
+
+    const csv = new CsvPipeline();
+    console.log(csv.run('a\nb\n\nc')); // "a,b,c"
+    ```
+  </TabItem>
+  <TabItem label="Python">
+    ```python
+    from abc import ABC, abstractmethod
+
+
+    class Pipeline(ABC):
+        def run(self, raw: str) -> str:
+            rows = self.parse(raw)
+            kept = self.transform(rows)
+            return self.format(kept)
+
+        @abstractmethod
+        def parse(self, raw: str) -> list[str]: ...
+
+        def transform(self, rows: list[str]) -> list[str]:
+            return [r for r in rows if r]
+
+        @abstractmethod
+        def format(self, rows: list[str]) -> str: ...
+
+
+    class CsvPipeline(Pipeline):
+        def parse(self, raw: str) -> list[str]:
+            return raw.split("\n")
+
+        def format(self, rows: list[str]) -> str:
+            return ",".join(rows)
+
+
+    csv = CsvPipeline()
+    print(csv.run("a\nb\n\nc"))  # "a,b,c"
+    ```
+  </TabItem>
+  <TabItem label="Go">
+    ```go
+    package main
+
+    import (
+        "fmt"
+        "strings"
+    )
+
+    // Go has no inheritance, so the varying steps are function fields and
+    // the fixed sequence lives in Run.
+    type Pipeline struct {
+        Parse  func(raw string) []string
+        Format func(rows []string) string
+    }
+
+    func (p Pipeline) transform(rows []string) []string {
+        kept := rows[:0]
+        for _, r := range rows {
+            if r != "" {
+                kept = append(kept, r)
+            }
+        }
+        return kept
+    }
+
+    func (p Pipeline) Run(raw string) string {
+        rows := p.Parse(raw)
+        kept := p.transform(rows)
+        return p.Format(kept)
+    }
+
+    func main() {
+        csv := Pipeline{
+            Parse:  func(raw string) []string { return strings.Split(raw, "\n") },
+            Format: func(rows []string) string { return strings.Join(rows, ",") },
+        }
+        fmt.Println(csv.Run("a\nb\n\nc")) // "a,b,c"
+    }
+    ```
+  </TabItem>
+  <TabItem label="Rust">
+    ```rust
+    // The trait holds the fixed run() as a default method that calls the
+    // overridable steps. Implementors supply only parse and format.
+    trait Pipeline {
+        fn parse(&self, raw: &str) -> Vec<String>;
+        fn format(&self, rows: &[String]) -> String;
+
+        fn transform(&self, rows: Vec<String>) -> Vec<String> {
+            rows.into_iter().filter(|r| !r.is_empty()).collect()
+        }
+
+        fn run(&self, raw: &str) -> String {
+            let rows = self.parse(raw);
+            let kept = self.transform(rows);
+            self.format(&kept)
+        }
+    }
+
+    struct CsvPipeline;
+    impl Pipeline for CsvPipeline {
+        fn parse(&self, raw: &str) -> Vec<String> {
+            raw.split('\n').map(str::to_string).collect()
+        }
+        fn format(&self, rows: &[String]) -> String {
+            rows.join(",")
+        }
+    }
+
+    fn main() {
+        let csv = CsvPipeline;
+        println!("{}", csv.run("a\nb\n\nc")); // "a,b,c"
+    }
+    ```
+  </TabItem>
+</Tabs>
+
+## When to use / trade-offs
+
+- **ข้อดี:** ขจัดความซ้ำซ้อนโดยเก็บโครงร่างร่วมไว้ที่เดียว
+- **ข้อดี:** คลาสฐานบังคับลำดับขั้นตอนที่ถูกต้อง คลาสลูกจึงไม่สามารถจัดลำดับใหม่โดยบังเอิญได้
+- **ข้อดี:** ตัวแปรใหม่ต้อง override เพียงขั้นตอนที่ต่างกันเท่านั้น
+- **ข้อเสีย:** มันพึ่งพาการสืบทอดซึ่งแข็งทื่อ คลาสลูกถูกล็อกไว้กับอัลกอริทึมฐานตัวเดียว
+- **ข้อเสีย:** hook มากเกินไปทำให้เมธอดฐานติดตามได้ยาก และการ override ขั้นตอนผิดอาจทำให้สัญญาเสียหายอย่างแนบเนียน
+
+## Related patterns
+
+- [Strategy](/design-patterns-from-zero-to-hero/th/behavioral-essentials/strategy/) บรรลุความผันแปรผ่านการประกอบ (composition) แทนการสืบทอด มันสลับอัลกอริทึมทั้งชุดได้ในขณะรัน ขณะที่ Template Method ทำให้ขั้นตอนที่ตรึงไว้ผันแปร ณ เวลาสร้างคลาสลูก
+- [Factory Method](/design-patterns-from-zero-to-hero/th/creational/factory-method/) มักเป็นขั้นตอน *ภายใน* template method โดยอัลกอริทึมฐานเรียกขั้นตอนการสร้างที่ override ได้
+
+<Callout title="การกลับด้านการควบคุม">
+ลักษณะเด่นของ Template Method คือคลาสฐานเป็นผู้คุมการไหลและเรียกลงไปยังขั้นตอนที่คุณ override ไม่ใช่กลับกัน หากคุณพบว่าตัวเองอยากสลับกระบวนการทั้งชุดในขณะรันแทนที่จะแค่หนึ่งหรือสองขั้นตอน คุณน่าจะต้องการ Strategy แทน
+</Callout>
+
+export const quiz = [
+  {
+    q: 'ตัว template method เองนิยามสิ่งใด?',
+    options: [
+      'instance ที่แชร์ร่วมกันเพียงตัวเดียว',
+      'โครงร่างและลำดับที่ตรึงไว้ของอัลกอริทึม โดยเรียกขั้นตอนที่ override ได้',
+      'วิธีท่องคอลเล็กชัน',
+      'รายการของ observer ที่จะแจ้งเตือน',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'คลาสลูกเปลี่ยนส่วนใด?',
+    options: [
+      'ลำดับที่ขั้นตอนทำงาน',
+      'เนื้อหาของขั้นตอนแต่ละขั้น ไม่ใช่ลำดับของพวกมัน',
+      'อัลกอริทึมทั้งชุดในขณะรัน',
+      'ไม่มีอะไรเลย คลาสฐานเป็น final ในทุกแง่มุม',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'Template Method แสดงการกลับด้านการควบคุมแบบใด?',
+    options: [
+      'คลาสลูกเรียกคลาสฐานสำหรับทุกขั้นตอน',
+      'คลาสฐานเป็นเจ้าของการไหลและเรียกลงไปยังขั้นตอนที่ถูก override',
+      'client จัดหาอัลกอริทึมทั้งชุด',
+      'ขั้นตอนทำงานในลำดับสุ่มทุกครั้ง',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'อะไรคือข้อจำกัดสำคัญเมื่อเทียบกับ Strategy?',
+    options: [
+      'มันไม่สามารถขจัดความซ้ำซ้อนได้',
+      'มันพึ่งพาการสืบทอด ล็อกคลาสลูกไว้กับอัลกอริทึมฐานตัวเดียว',
+      'มันไม่สามารถตรึงลำดับขั้นตอนได้',
+      'มันต้องการ singleton',
+    ],
+    answer: 1,
+  },
+];
+
+<Quiz client:visible id="behavioral-essentials/template-method" questions={quiz} />
+
+<ProgressTracker client:visible id="behavioral-essentials/template-method" />

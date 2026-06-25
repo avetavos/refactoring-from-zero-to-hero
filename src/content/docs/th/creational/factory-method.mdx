@@ -1,0 +1,301 @@
+---
+title: Factory Method
+description: 'ปล่อยให้คลาสฐานเลื่อนการเลือกว่าจะสร้าง concrete product ตัวไหนไปให้ subclass ตัดสินใจ'
+sidebar:
+  order: 3
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+## เจตนา
+
+Factory Method นิยาม interface สำหรับสร้างออบเจ็กต์ แต่ปล่อยให้แต่ละ subclass ตัดสินใจว่าจะสร้าง instance ของ concrete class ตัวไหน เพื่อให้ workflow โดยรอบยังคงเดิมในขณะที่ product เปลี่ยนแปลงไป
+
+## ปัญหา
+
+คุณมีกระบวนการที่เหมือนกันทุกประการไม่ว่าจะทำงานกับอะไร ยกเว้นรายละเอียดเดียว: ชนิดของออบเจ็กต์ที่มันทำงานด้วย นักวางแผนโลจิสติกส์จัดตารางการจัดส่งด้วยวิธีเดียวกันไม่ว่าสินค้าจะเดินทางโดยรถบรรทุกหรือเรือ แต่มันต้องผลิตยานพาหนะชนิดที่ถูกต้อง ถ้าคุณ hard-code `new Truck()` เข้าไปในตัววางแผน การรองรับเรือก็หมายถึงการต้องไปแก้ตัววางแผนและเสี่ยงต่อตรรกะที่แชร์กัน
+
+Factory Method ดึงขั้นตอนเดียวที่แปรผันนั้นออกมาเป็น method ที่ override ได้ คลาสฐานเขียน workflow ในรูปของ abstract product และเรียก factory method ของตัวเองเพื่อให้ได้ concrete object มา subclass override เฉพาะ factory method เท่านั้น workflow ถูกสืบทอดมาโดยไม่เปลี่ยนแปลง ส่วน product ถูกเลือกโดย subclass สิ่งนี้รักษาหลัก open/closed เอาไว้ครบถ้วน คุณเพิ่ม product ใหม่ด้วยการเพิ่ม subclass ไม่ใช่ด้วยการแก้โค้ดที่มีอยู่
+
+## โครงสร้าง
+
+export const factoryMethodUml = `classDiagram
+  class Product {
+    <<interface>>
+    +deliver() string
+  }
+  class Truck {
+    +deliver() string
+  }
+  class Ship {
+    +deliver() string
+  }
+  class Logistics {
+    +planDelivery() string
+    +createTransport()* Product
+  }
+  class RoadLogistics {
+    +createTransport() Product
+  }
+  class SeaLogistics {
+    +createTransport() Product
+  }
+  Product <|.. Truck
+  Product <|.. Ship
+  Logistics <|-- RoadLogistics
+  Logistics <|-- SeaLogistics
+  Logistics ..> Product : creates
+  RoadLogistics ..> Truck
+  SeaLogistics ..> Ship`;
+
+<Mermaid code={factoryMethodUml} title="Creator เรียก factory method ของตัวเอง ส่วน subclass เป็นผู้เลือก Product" />
+
+- **Product** — interface ที่ factory method คืนกลับมา workflow พึ่งพาเฉพาะ type นี้เท่านั้น
+- **Concrete Products** (`Truck`, `Ship`) — implementation เฉพาะที่ workflow ไม่รับรู้
+- **Creator** (`Logistics`) — ถือ workflow ที่แชร์กัน (`planDelivery`) และประกาศ abstract factory method (`createTransport`)
+- **Concrete Creators** (`RoadLogistics`, `SeaLogistics`) — override factory method เพื่อคืน product ตัวใดตัวหนึ่งโดยเฉพาะ
+
+## ตัวอย่าง
+
+นักวางแผน `Logistics` ที่ขั้นตอน `planDelivery` ถูกแชร์ ในขณะที่ subclass เป็นผู้เลือกยานพาหนะ
+
+<Tabs syncKey="lang">
+  <TabItem label="TypeScript">
+    ```ts
+    interface Transport {
+      deliver(): string;
+    }
+
+    class Truck implements Transport {
+      deliver(): string {
+        return 'Delivering by road in a truck.';
+      }
+    }
+
+    class Ship implements Transport {
+      deliver(): string {
+        return 'Delivering by sea in a ship.';
+      }
+    }
+
+    abstract class Logistics {
+      // Shared workflow, written against the Transport interface.
+      planDelivery(): string {
+        const transport = this.createTransport();
+        return `Planned. ${transport.deliver()}`;
+      }
+      // The factory method subclasses override.
+      protected abstract createTransport(): Transport;
+    }
+
+    class RoadLogistics extends Logistics {
+      protected createTransport(): Transport {
+        return new Truck();
+      }
+    }
+
+    class SeaLogistics extends Logistics {
+      protected createTransport(): Transport {
+        return new Ship();
+      }
+    }
+
+    console.log(new RoadLogistics().planDelivery());
+    console.log(new SeaLogistics().planDelivery());
+    ```
+  </TabItem>
+  <TabItem label="Python">
+    ```python
+    from abc import ABC, abstractmethod
+
+
+    class Transport(ABC):
+        @abstractmethod
+        def deliver(self) -> str: ...
+
+
+    class Truck(Transport):
+        def deliver(self) -> str:
+            return "Delivering by road in a truck."
+
+
+    class Ship(Transport):
+        def deliver(self) -> str:
+            return "Delivering by sea in a ship."
+
+
+    class Logistics(ABC):
+        def plan_delivery(self) -> str:
+            transport = self.create_transport()  # the factory method
+            return f"Planned. {transport.deliver()}"
+
+        @abstractmethod
+        def create_transport(self) -> Transport: ...
+
+
+    class RoadLogistics(Logistics):
+        def create_transport(self) -> Transport:
+            return Truck()
+
+
+    class SeaLogistics(Logistics):
+        def create_transport(self) -> Transport:
+            return Ship()
+
+
+    print(RoadLogistics().plan_delivery())
+    print(SeaLogistics().plan_delivery())
+    ```
+  </TabItem>
+  <TabItem label="Go">
+    ```go
+    package main
+
+    import "fmt"
+
+    type Transport interface {
+        Deliver() string
+    }
+
+    type Truck struct{}
+
+    func (Truck) Deliver() string { return "Delivering by road in a truck." }
+
+    type Ship struct{}
+
+    func (Ship) Deliver() string { return "Delivering by sea in a ship." }
+
+    // Go has no inheritance; the "factory method" is a function field that
+    // each concrete logistics provides, and a shared helper holds the workflow.
+    type Logistics struct {
+        createTransport func() Transport
+    }
+
+    func (l Logistics) PlanDelivery() string {
+        t := l.createTransport()
+        return "Planned. " + t.Deliver()
+    }
+
+    func NewRoadLogistics() Logistics {
+        return Logistics{createTransport: func() Transport { return Truck{} }}
+    }
+
+    func NewSeaLogistics() Logistics {
+        return Logistics{createTransport: func() Transport { return Ship{} }}
+    }
+
+    func main() {
+        fmt.Println(NewRoadLogistics().PlanDelivery())
+        fmt.Println(NewSeaLogistics().PlanDelivery())
+    }
+    ```
+  </TabItem>
+  <TabItem label="Rust">
+    ```rust
+    trait Transport {
+        fn deliver(&self) -> String;
+    }
+
+    struct Truck;
+    impl Transport for Truck {
+        fn deliver(&self) -> String {
+            "Delivering by road in a truck.".to_string()
+        }
+    }
+
+    struct Ship;
+    impl Transport for Ship {
+        fn deliver(&self) -> String {
+            "Delivering by sea in a ship.".to_string()
+        }
+    }
+
+    // The trait holds the shared workflow as a default method and declares
+    // the factory method that implementors must provide.
+    trait Logistics {
+        fn create_transport(&self) -> Box<dyn Transport>;
+
+        fn plan_delivery(&self) -> String {
+            let transport = self.create_transport();
+            format!("Planned. {}", transport.deliver())
+        }
+    }
+
+    struct RoadLogistics;
+    impl Logistics for RoadLogistics {
+        fn create_transport(&self) -> Box<dyn Transport> {
+            Box::new(Truck)
+        }
+    }
+
+    struct SeaLogistics;
+    impl Logistics for SeaLogistics {
+        fn create_transport(&self) -> Box<dyn Transport> {
+            Box::new(Ship)
+        }
+    }
+
+    fn main() {
+        println!("{}", RoadLogistics.plan_delivery());
+        println!("{}", SeaLogistics.plan_delivery());
+    }
+    ```
+  </TabItem>
+</Tabs>
+
+## เมื่อไรควรใช้ / ข้อแลกเปลี่ยน
+
+- **ข้อดี:** workflow ที่แชร์กันไม่เคยเอ่ยชื่อ concrete product การเพิ่ม product ใหม่จึงหมายถึงการเพิ่ม subclass ไม่ใช่การแก้ผู้เรียก
+- **ข้อดี:** การสร้าง product อยู่ใน method เดียวที่ override ได้ ค้นหาและแทนที่ได้ง่าย
+- **ข้อเสีย:** product variant ใหม่แต่ละตัวมักต้องการ creator subclass ใหม่ ซึ่งอาจทำให้คลาสเล็ก ๆ เพิ่มจำนวนขึ้น
+- **ข้อเสีย:** สำหรับ product ชนิดเดียวมันเกินความจำเป็น constructor หรือฟังก์ชันธรรมดาชัดเจนกว่า
+
+## Pattern ที่เกี่ยวข้อง
+
+- [Abstract Factory](/design-patterns-from-zero-to-hero/th/creational/abstract-factory/) มักใช้ factory method หลายตัวร่วมกันเพื่อสร้างตระกูล product
+- [Prototype](/design-patterns-from-zero-to-hero/th/creational/prototype/) เป็นทางเลือกเมื่อออบเจ็กต์ใหม่ควรคัดลอกจากของที่มีอยู่แทนที่จะสร้างใหม่หมด
+
+<Callout title="ขั้นตอนเดียวที่แปรผัน">
+หัวใจของ Factory Method คือการแยก *ขั้นตอนเดียว* ในการสร้างที่แปรผัน ในขณะที่รักษาอัลกอริทึมโดยรอบให้คงที่ ถ้าสิ่งที่แปรผันระหว่าง subclass มีมากกว่าชนิดของ product คุณน่าจะกำลังมองอีก pattern หนึ่งอยู่
+</Callout>
+
+export const quiz = [
+  {
+    q: 'ใน Factory Method ใครเป็นผู้ตัดสินใจว่าจะสร้าง instance ของ concrete class ตัวไหน?',
+    options: [
+      'client ที่เรียก workflow',
+      'subclass ที่ override factory method',
+      'global registry',
+      'ตัว product เอง',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'อะไรที่คงเดิมในทุก concrete creator?',
+    options: [
+      'workflow ที่แชร์กันซึ่งใช้ product ผ่าน interface ของมัน',
+      'คลาส product ที่คืนกลับมาแบบเป๊ะ ๆ',
+      'อาร์กิวเมนต์ของ constructor',
+      'ไม่มีอะไรเลย — ทุกอย่างถูก override',
+    ],
+    answer: 0,
+  },
+  {
+    q: 'ทำไม Factory Method จึงสนับสนุนหลัก open/closed?',
+    options: [
+      'มันทำให้ทุก field เป็น immutable',
+      'คุณเพิ่ม product ด้วยการเพิ่ม subclass แทนที่จะแก้โค้ดที่มีอยู่',
+      'มันขจัดความจำเป็นในการใช้ interface',
+      'มัน compile เร็วขึ้น',
+    ],
+    answer: 1,
+  },
+];
+
+<Quiz client:visible id="creational/factory-method" questions={quiz} />
+
+<ProgressTracker client:visible id="creational/factory-method" />

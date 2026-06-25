@@ -1,0 +1,348 @@
+---
+title: Builder
+description: 'Assemble a complex object step by step, separating construction from its final form.'
+sidebar:
+  order: 5
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+## Intent
+
+Builder separates the construction of a complex object from its representation, letting you assemble it through a sequence of clear steps and produce the finished product only at the end.
+
+## Problem
+
+Some objects have many optional parts. An HTTP request has a method, a URL, optional headers, an optional body, a timeout. Encoding every combination as a constructor leads to either a telescoping list of overloads or one giant constructor full of nulls and booleans whose meaning you cannot read at the call site. `new Request("GET", url, null, null, 30, true, false)` is a puzzle, not code.
+
+Builder replaces that with named, chainable steps. You start a builder, call only the steps you care about in any order, and finish with a single `build()` that returns the immutable, validated product. The call site reads like a description of what you want. Construction logic — defaults, validation, assembly — lives in the builder, away from the product's own responsibilities.
+
+## Structure
+
+export const builderUml = `classDiagram
+  class HttpRequest {
+    +method: string
+    +url: string
+    +headers: Map
+    +body: string
+    +summary() string
+  }
+  class RequestBuilder {
+    -method: string
+    -url: string
+    -headers: Map
+    -body: string
+    +setMethod(m) RequestBuilder
+    +addHeader(k, v) RequestBuilder
+    +setBody(b) RequestBuilder
+    +build() HttpRequest
+  }
+  RequestBuilder ..> HttpRequest : builds`;
+
+<Mermaid code={builderUml} title="A builder accumulates parts and emits the finished request" />
+
+- **Product** (`HttpRequest`) — the complex object being assembled. It is typically immutable once built.
+- **Builder** (`RequestBuilder`) — exposes one step per part, each returning the builder so calls chain, plus a terminal `build()` that validates and returns the product.
+- **Client** — calls the steps it needs in any order, then `build()`.
+
+A *Director* (a class that drives a fixed sequence of builder calls) is an optional extra; for fluent builders like this one the client itself plays that role.
+
+## Example
+
+A fluent `RequestBuilder` that produces an immutable `HttpRequest`.
+
+<Tabs syncKey="lang">
+  <TabItem label="TypeScript">
+    ```ts
+    class HttpRequest {
+      constructor(
+        readonly method: string,
+        readonly url: string,
+        readonly headers: Record<string, string>,
+        readonly body: string | null,
+      ) {}
+
+      summary(): string {
+        const headerCount = Object.keys(this.headers).length;
+        return `${this.method} ${this.url} (${headerCount} headers, body: ${this.body !== null})`;
+      }
+    }
+
+    class RequestBuilder {
+      private method = 'GET';
+      private headers: Record<string, string> = {};
+      private body: string | null = null;
+
+      constructor(private readonly url: string) {}
+
+      setMethod(method: string): this {
+        this.method = method;
+        return this;
+      }
+      addHeader(key: string, value: string): this {
+        this.headers[key] = value;
+        return this;
+      }
+      setBody(body: string): this {
+        this.body = body;
+        return this;
+      }
+      build(): HttpRequest {
+        return new HttpRequest(this.method, this.url, this.headers, this.body);
+      }
+    }
+
+    const request = new RequestBuilder('https://api.example.com/items')
+      .setMethod('POST')
+      .addHeader('Content-Type', 'application/json')
+      .setBody('{"name":"book"}')
+      .build();
+
+    console.log(request.summary());
+    ```
+  </TabItem>
+  <TabItem label="Python">
+    ```python
+    from dataclasses import dataclass, field
+
+
+    @dataclass(frozen=True)
+    class HttpRequest:
+        method: str
+        url: str
+        headers: dict[str, str]
+        body: str | None
+
+        def summary(self) -> str:
+            return (
+                f"{self.method} {self.url} "
+                f"({len(self.headers)} headers, body: {self.body is not None})"
+            )
+
+
+    class RequestBuilder:
+        def __init__(self, url: str) -> None:
+            self._url = url
+            self._method = "GET"
+            self._headers: dict[str, str] = {}
+            self._body: str | None = None
+
+        def set_method(self, method: str) -> "RequestBuilder":
+            self._method = method
+            return self
+
+        def add_header(self, key: str, value: str) -> "RequestBuilder":
+            self._headers[key] = value
+            return self
+
+        def set_body(self, body: str) -> "RequestBuilder":
+            self._body = body
+            return self
+
+        def build(self) -> HttpRequest:
+            return HttpRequest(self._method, self._url, dict(self._headers), self._body)
+
+
+    request = (
+        RequestBuilder("https://api.example.com/items")
+        .set_method("POST")
+        .add_header("Content-Type", "application/json")
+        .set_body('{"name":"book"}')
+        .build()
+    )
+
+    print(request.summary())
+    ```
+  </TabItem>
+  <TabItem label="Go">
+    ```go
+    package main
+
+    import "fmt"
+
+    type HttpRequest struct {
+        Method  string
+        URL     string
+        Headers map[string]string
+        Body    *string
+    }
+
+    func (r HttpRequest) Summary() string {
+        return fmt.Sprintf("%s %s (%d headers, body: %t)",
+            r.Method, r.URL, len(r.Headers), r.Body != nil)
+    }
+
+    type RequestBuilder struct {
+        method  string
+        url     string
+        headers map[string]string
+        body    *string
+    }
+
+    func NewRequestBuilder(url string) *RequestBuilder {
+        return &RequestBuilder{method: "GET", url: url, headers: map[string]string{}}
+    }
+
+    func (b *RequestBuilder) SetMethod(m string) *RequestBuilder {
+        b.method = m
+        return b
+    }
+
+    func (b *RequestBuilder) AddHeader(k, v string) *RequestBuilder {
+        b.headers[k] = v
+        return b
+    }
+
+    func (b *RequestBuilder) SetBody(body string) *RequestBuilder {
+        b.body = &body
+        return b
+    }
+
+    func (b *RequestBuilder) Build() HttpRequest {
+        return HttpRequest{Method: b.method, URL: b.url, Headers: b.headers, Body: b.body}
+    }
+
+    func main() {
+        request := NewRequestBuilder("https://api.example.com/items").
+            SetMethod("POST").
+            AddHeader("Content-Type", "application/json").
+            SetBody(`{"name":"book"}`).
+            Build()
+        fmt.Println(request.Summary())
+    }
+    ```
+  </TabItem>
+  <TabItem label="Rust">
+    ```rust
+    use std::collections::HashMap;
+
+    struct HttpRequest {
+        method: String,
+        url: String,
+        headers: HashMap<String, String>,
+        body: Option<String>,
+    }
+
+    impl HttpRequest {
+        fn summary(&self) -> String {
+            format!(
+                "{} {} ({} headers, body: {})",
+                self.method,
+                self.url,
+                self.headers.len(),
+                self.body.is_some()
+            )
+        }
+    }
+
+    struct RequestBuilder {
+        method: String,
+        url: String,
+        headers: HashMap<String, String>,
+        body: Option<String>,
+    }
+
+    impl RequestBuilder {
+        fn new(url: &str) -> Self {
+            RequestBuilder {
+                method: "GET".to_string(),
+                url: url.to_string(),
+                headers: HashMap::new(),
+                body: None,
+            }
+        }
+
+        fn method(mut self, method: &str) -> Self {
+            self.method = method.to_string();
+            self
+        }
+
+        fn header(mut self, key: &str, value: &str) -> Self {
+            self.headers.insert(key.to_string(), value.to_string());
+            self
+        }
+
+        fn body(mut self, body: &str) -> Self {
+            self.body = Some(body.to_string());
+            self
+        }
+
+        fn build(self) -> HttpRequest {
+            HttpRequest {
+                method: self.method,
+                url: self.url,
+                headers: self.headers,
+                body: self.body,
+            }
+        }
+    }
+
+    fn main() {
+        let request = RequestBuilder::new("https://api.example.com/items")
+            .method("POST")
+            .header("Content-Type", "application/json")
+            .body(r#"{"name":"book"}"#)
+            .build();
+        println!("{}", request.summary());
+    }
+    ```
+  </TabItem>
+</Tabs>
+
+## When to use / trade-offs
+
+- **Pro:** call sites read clearly — each step is named, so the meaning of every value is obvious.
+- **Pro:** handles many optional parts without a combinatorial explosion of constructors.
+- **Pro:** validation and defaults live in one place, and the finished product can be immutable.
+- **Con:** more code than a constructor; only pays off when the object is genuinely complex.
+- **Con:** a half-built builder is in an incomplete state, so `build()` should validate required fields.
+
+## Related patterns
+
+- [Abstract Factory](/design-patterns-from-zero-to-hero/en/creational/abstract-factory/) returns a product in one call, whereas Builder constructs it across several steps.
+- [Prototype](/design-patterns-from-zero-to-hero/en/creational/prototype/) is an alternative when a configured object already exists and you want a copy.
+
+<Callout title="Builder vs. a big constructor">
+If you find yourself passing a long list of positional arguments — especially booleans and nulls — that is the signal for Builder. Named steps turn an unreadable call into self-documenting code.
+</Callout>
+
+export const quiz = [
+  {
+    q: 'What problem does Builder mainly address?',
+    options: [
+      'Ensuring only one instance exists',
+      'Constructing a complex object with many optional parts without unreadable constructors',
+      'Choosing a product type by subclassing',
+      'Copying an existing object',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'Why do builder step methods usually return the builder itself?',
+    options: [
+      'To save memory',
+      'So calls can be chained fluently',
+      'Because they must be Singletons',
+      'To avoid using interfaces',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'What is the role of the terminal build() method?',
+    options: [
+      'It resets the builder',
+      'It validates and returns the finished product',
+      'It deletes the builder',
+      'It registers a Singleton',
+    ],
+    answer: 1,
+  },
+];
+
+<Quiz client:visible id="creational/builder" questions={quiz} />
+
+<ProgressTracker client:visible id="creational/builder" />

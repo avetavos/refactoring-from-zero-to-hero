@@ -1,0 +1,312 @@
+---
+title: Strategy
+description: 'รวบรวมตระกูลของอัลกอริทึมที่สับเปลี่ยนกันได้ไว้หลัง interface เดียว เพื่อให้การเลือกอัลกอริทึมผันแปรได้อย่างเป็นอิสระจากผู้เรียก'
+sidebar:
+  order: 2
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+## Intent
+
+Strategy นิยามตระกูลของอัลกอริทึม วางแต่ละตัวไว้หลัง interface ร่วมเดียวกัน และทำให้พวกมันสับเปลี่ยนกันได้ อ็อบเจ็กต์ที่ต้องการให้ทำงานจะมอบหมายให้ strategy ที่ถูกเลือกในขณะรัน ดังนั้นอัลกอริทึมจึงผันแปรได้โดยไม่ต้องแตะโค้ดที่ใช้มัน
+
+## Problem
+
+ลองนึกถึงหน้า checkout ที่คำนวณราคาสุดท้าย ตอนแรกมีกฎเพียงข้อเดียว จากนั้นฝ่ายการตลาดเพิ่มส่วนลดเป็นเปอร์เซ็นต์สำหรับสมาชิก คูปองลดราคาแบบคงที่ ข้อเสนอซื้อหนึ่งแถมหนึ่ง และโปรลดราคาตามฤดูกาล หากทั้งหมดนี้อยู่ในเมธอดเดียว มันจะเติบโตเป็นห่วงโซ่ของการแตกแขนงยาวเหยียดที่คุณต้องเปิดและทดสอบใหม่ทุกครั้งที่มีกฎใหม่ปรากฏขึ้น และตรรกะการตั้งราคาก็จะพันกันยุ่งกับโค้ดของออเดอร์ที่อยู่รอบ ๆ
+
+ความผันแปรในที่นี้คือ *ตัวอัลกอริทึมการตั้งราคาเอง* Strategy แยกแกนนั้นออกมา แต่ละกฎกลายเป็นอ็อบเจ็กต์เล็ก ๆ ของมันเองที่ implement interface ร่วมกัน และออเดอร์ถือ reference ไปยังตัวที่ใช้บังคับอยู่ การเพิ่มกฎหมายถึงการเพิ่มคลาส ไม่ใช่การแก้เงื่อนไข การสลับกฎในขณะรัน ระหว่างสมาชิกกับแขก หรือระหว่างช่วงลดราคากับช่วงปกติ ก็เป็นเพียงการกำหนด strategy คนละตัว
+
+## Structure
+
+export const strategyUml = `classDiagram
+  class Context {
+    -strategy: PricingStrategy
+    +setStrategy(s)
+    +priceFor(amount) number
+  }
+  class PricingStrategy {
+    <<interface>>
+    +apply(amount) number
+  }
+  class RegularPricing {
+    +apply(amount) number
+  }
+  class MemberPricing {
+    +apply(amount) number
+  }
+  class CouponPricing {
+    +apply(amount) number
+  }
+  Context o--> PricingStrategy
+  PricingStrategy <|.. RegularPricing
+  PricingStrategy <|.. MemberPricing
+  PricingStrategy <|.. CouponPricing`;
+
+<Mermaid code={strategyUml} title="Context มอบหมายงานให้หนึ่งในหลาย ๆ การ implement ของ PricingStrategy ที่สับเปลี่ยนกันได้" />
+
+- **Strategy** — interface ร่วมที่ทุกอัลกอริทึม implement context พึ่งพาเพียงตัวนี้เท่านั้น
+- **Concrete Strategy** — การ implement หนึ่งตัวของ interface ในที่นี้คือกฎการตั้งราคาแต่ละข้อ
+- **Context** — ถือ reference ไปยัง strategy แล้วมอบหมายงานให้มัน สามารถถูกตั้งค่าใหม่ด้วย strategy คนละตัวได้ในขณะรัน
+- **Client** — เลือก concrete strategy แล้วส่งให้ context
+
+## Example
+
+context การตั้งราคาที่คำนวณยอดสุดท้ายโดยมอบหมายให้ pricing strategy ที่สับเปลี่ยนกันได้ แต่ละภาษาแสดง strategy ด้วยสิ่งที่เป็นสำนวนเฉพาะของมัน ไม่ว่าจะเป็น interface, protocol, function type หรือ trait object
+
+<Tabs syncKey="lang">
+  <TabItem label="TypeScript">
+    ```ts
+    interface PricingStrategy {
+      apply(amount: number): number;
+    }
+
+    class RegularPricing implements PricingStrategy {
+      apply(amount: number): number {
+        return amount;
+      }
+    }
+
+    class MemberPricing implements PricingStrategy {
+      apply(amount: number): number {
+        return amount * 0.9; // 10% off
+      }
+    }
+
+    class CouponPricing implements PricingStrategy {
+      constructor(private readonly off: number) {}
+      apply(amount: number): number {
+        return Math.max(0, amount - this.off);
+      }
+    }
+
+    class Checkout {
+      constructor(private strategy: PricingStrategy) {}
+      setStrategy(strategy: PricingStrategy): void {
+        this.strategy = strategy;
+      }
+      priceFor(amount: number): number {
+        return this.strategy.apply(amount);
+      }
+    }
+
+    const checkout = new Checkout(new RegularPricing());
+    console.log(checkout.priceFor(100)); // 100
+    checkout.setStrategy(new MemberPricing());
+    console.log(checkout.priceFor(100)); // 90
+    checkout.setStrategy(new CouponPricing(15));
+    console.log(checkout.priceFor(100)); // 85
+    ```
+  </TabItem>
+  <TabItem label="Python">
+    ```python
+    from typing import Protocol
+
+
+    class PricingStrategy(Protocol):
+        def apply(self, amount: float) -> float: ...
+
+
+    class RegularPricing:
+        def apply(self, amount: float) -> float:
+            return amount
+
+
+    class MemberPricing:
+        def apply(self, amount: float) -> float:
+            return amount * 0.9  # 10% off
+
+
+    class CouponPricing:
+        def __init__(self, off: float) -> None:
+            self.off = off
+
+        def apply(self, amount: float) -> float:
+            return max(0.0, amount - self.off)
+
+
+    class Checkout:
+        def __init__(self, strategy: PricingStrategy) -> None:
+            self._strategy = strategy
+
+        def set_strategy(self, strategy: PricingStrategy) -> None:
+            self._strategy = strategy
+
+        def price_for(self, amount: float) -> float:
+            return self._strategy.apply(amount)
+
+
+    checkout = Checkout(RegularPricing())
+    print(checkout.price_for(100))  # 100
+    checkout.set_strategy(MemberPricing())
+    print(checkout.price_for(100))  # 90.0
+    checkout.set_strategy(CouponPricing(15))
+    print(checkout.price_for(100))  # 85
+    ```
+  </TabItem>
+  <TabItem label="Go">
+    ```go
+    package main
+
+    import "fmt"
+
+    // PricingStrategy is the common interface every rule implements.
+    type PricingStrategy interface {
+        Apply(amount float64) float64
+    }
+
+    type RegularPricing struct{}
+
+    func (RegularPricing) Apply(amount float64) float64 { return amount }
+
+    type MemberPricing struct{}
+
+    func (MemberPricing) Apply(amount float64) float64 { return amount * 0.9 }
+
+    type CouponPricing struct{ Off float64 }
+
+    func (c CouponPricing) Apply(amount float64) float64 {
+        if v := amount - c.Off; v > 0 {
+            return v
+        }
+        return 0
+    }
+
+    type Checkout struct{ strategy PricingStrategy }
+
+    func (c *Checkout) SetStrategy(s PricingStrategy) { c.strategy = s }
+
+    func (c *Checkout) PriceFor(amount float64) float64 {
+        return c.strategy.Apply(amount)
+    }
+
+    func main() {
+        checkout := &Checkout{strategy: RegularPricing{}}
+        fmt.Println(checkout.PriceFor(100)) // 100
+        checkout.SetStrategy(MemberPricing{})
+        fmt.Println(checkout.PriceFor(100)) // 90
+        checkout.SetStrategy(CouponPricing{Off: 15})
+        fmt.Println(checkout.PriceFor(100)) // 85
+    }
+    ```
+  </TabItem>
+  <TabItem label="Rust">
+    ```rust
+    trait PricingStrategy {
+        fn apply(&self, amount: f64) -> f64;
+    }
+
+    struct RegularPricing;
+    impl PricingStrategy for RegularPricing {
+        fn apply(&self, amount: f64) -> f64 {
+            amount
+        }
+    }
+
+    struct MemberPricing;
+    impl PricingStrategy for MemberPricing {
+        fn apply(&self, amount: f64) -> f64 {
+            amount * 0.9
+        }
+    }
+
+    struct CouponPricing {
+        off: f64,
+    }
+    impl PricingStrategy for CouponPricing {
+        fn apply(&self, amount: f64) -> f64 {
+            (amount - self.off).max(0.0)
+        }
+    }
+
+    struct Checkout {
+        strategy: Box<dyn PricingStrategy>,
+    }
+    impl Checkout {
+        fn set_strategy(&mut self, strategy: Box<dyn PricingStrategy>) {
+            self.strategy = strategy;
+        }
+        fn price_for(&self, amount: f64) -> f64 {
+            self.strategy.apply(amount)
+        }
+    }
+
+    fn main() {
+        let mut checkout = Checkout { strategy: Box::new(RegularPricing) };
+        println!("{}", checkout.price_for(100.0)); // 100
+        checkout.set_strategy(Box::new(MemberPricing));
+        println!("{}", checkout.price_for(100.0)); // 90
+        checkout.set_strategy(Box::new(CouponPricing { off: 15.0 }));
+        println!("{}", checkout.price_for(100.0)); // 85
+    }
+    ```
+  </TabItem>
+</Tabs>
+
+## When to use / trade-offs
+
+- **ข้อดี:** สลับอัลกอริทึมได้ในขณะรันและเพิ่มตัวใหม่ได้โดยไม่ต้องแก้ context หรือ strategy ที่มีอยู่
+- **ข้อดี:** แทนที่เงื่อนไขที่บานปลายด้วยหน่วยเล็ก ๆ ที่ทดสอบได้ทีละตัว
+- **ข้อดี:** แต่ละ strategy ทดสอบหน่วยได้อย่างโดดเดี่ยว ปลอดจาก context ที่ห้อมล้อม
+- **ข้อเสีย:** เพิ่มอ็อบเจ็กต์และ interface ขึ้นมา สำหรับการแตกแขนงเล็กน้อยสองทาง `if` ธรรมดาก็ง่ายกว่า
+- **ข้อเสีย:** client ต้องรู้มากพอที่จะเลือก strategy ที่ถูกต้อง ซึ่งเป็นการผลักการตัดสินใจออกไปข้างนอก
+
+## Related patterns
+
+- [State](/design-patterns-from-zero-to-hero/th/behavioral-essentials/state/) มีโครงสร้างเดียวกันแต่ intent ต่างกัน อ็อบเจ็กต์ของมันสลับ *ตัวเอง* เมื่อสถานะเปลี่ยน แทนที่จะถูก client เลือก
+- [Template Method](/design-patterns-from-zero-to-hero/th/behavioral-essentials/template-method/) ทำให้อัลกอริทึมผันแปรผ่านการสืบทอดและขั้นตอนที่ถูก override ขณะที่ Strategy ทำให้มันผันแปรผ่านการประกอบ (composition)
+
+<Callout title="composition เหนือ switch">
+หัวใจของ Strategy คือการแทนที่ "แตกแขนงตามรหัสชนิด" ด้วย "ถือ reference ไปยังพฤติกรรม" เมื่อใดที่คุณพบเงื่อนไขที่เติบโตขึ้นทุกครั้งที่มีตัวแปรใหม่ปรากฏ เงื่อนไขนั้นคือ strategy ที่รอให้ถูกแยกออกมา
+</Callout>
+
+export const quiz = [
+  {
+    q: 'Strategy pattern ทำให้สิ่งใดสับเปลี่ยนกันได้?',
+    options: [
+      'ฟิลด์ของคลาส',
+      'ตระกูลของอัลกอริทึมที่อยู่หลัง interface ร่วมกัน',
+      'จำนวน instance ของคลาส',
+      'ลำดับที่อ็อบเจ็กต์ถูกสร้างขึ้น',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'Context ใช้ Strategy อย่างไร?',
+    options: [
+      'มันสืบทอดจาก strategy',
+      'มันถือ reference ไปยัง strategy แล้วมอบหมายงานให้',
+      'มันคัดลอก strategy ลงในตัวแปร global',
+      'มันคอมไพล์ strategy ใหม่ทุกครั้งที่เรียก',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'ข้อได้เปรียบหลักเหนือเงื่อนไขขนาดใหญ่คืออะไร?',
+    options: [
+      'มันทำงานได้โดยไม่ต้องมีอ็อบเจ็กต์ใด ๆ',
+      'อัลกอริทึมใหม่ถูกเพิ่มเป็นคลาสโดยไม่ต้องแก้โค้ดที่มีอยู่',
+      'มันขจัดความจำเป็นในการมี interface',
+      'มันรับประกันว่ามี instance เพียงตัวเดียว',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'Strategy ต่างจาก State อย่างไร?',
+    options: [
+      'พวกมันมีโครงสร้างคลาสที่แตกต่างกันโดยสิ้นเชิง',
+      'Strategy ถูกเลือกโดย client ส่วน State สลับตัวเองเมื่อสถานะภายในเปลี่ยน',
+      'State ไม่สามารถเปลี่ยนพฤติกรรมในขณะรันได้',
+      'Strategy ถืออัลกอริทึมได้เพียงตัวเดียวตลอดไป',
+    ],
+    answer: 1,
+  },
+];
+
+<Quiz client:visible id="behavioral-essentials/strategy" questions={quiz} />
+
+<ProgressTracker client:visible id="behavioral-essentials/strategy" />

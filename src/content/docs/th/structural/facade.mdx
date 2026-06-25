@@ -1,0 +1,266 @@
+---
+title: Facade
+description: 'เสนอ interface ที่เรียบง่ายตัวเดียวครอบ subsystem ที่ซับซ้อนซึ่งมี class จำนวนมาก'
+sidebar:
+  order: 6
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+## เจตนา
+
+Facade ให้ interface เดียวที่รวมเป็นหนึ่งเดียวกับชุดของ interface ใน subsystem มอบจุดเข้าใช้งานที่ง่ายตัวเดียวให้ client แทนที่จะบังคับให้พวกเขาต้องจัดการ class ที่ทำงานร่วมกันจำนวนมากด้วยตัวเอง
+
+## ปัญหา
+
+subsystem ที่มีความสามารถมักมีชิ้นส่วนที่เคลื่อนไหวจำนวนมาก ในการแปลงไฟล์วิดีโอคุณอาจต้องใช้ decoder, audio mixer, ตัวเลือก codec, ตัวคำนวณ bitrate และตัว writer แต่ละตัวมีการตั้งค่า กฎการจัดลำดับ และความซับซ้อนเฉพาะของตัวเอง client ที่แค่ต้องการ "เปลี่ยนไฟล์นี้เป็น MP4" ไม่ควรต้องเรียนรู้ทั้งห้า class สร้าง instance ในลำดับที่ถูกต้อง และต่อ output ของพวกมันเข้าด้วยกัน ความรู้นั้นทำให้ภายในของ subsystem รั่วไหลไปยังผู้เรียกใช้ทุกราย และทำให้ subsystem แก้ไขยาก
+
+Facade คือ class ตัวเดียวที่รู้จักท่าเต้นนี้ มันเปิดเผย method ที่เน้นงานและเล็ก คือ `convert(file, format)` และภายในก็สร้างและประสานงาน object ของ subsystem ในลำดับที่ถูกต้อง client ขึ้นต่อ facade เพียงอย่างเดียว class ของ subsystem ยังใช้งานได้เต็มที่สำหรับผู้เรียกใช้ขั้นสูงที่ต้องการมันโดยตรง แต่กรณีทั่วไปกลายเป็นการเรียกครั้งเดียว เมื่อ refactor subsystem คุณก็แก้ที่ facade ตัวเดียว ไม่ใช่ที่จุดเรียกใช้นับร้อย
+
+## โครงสร้าง
+
+export const facadeUml = `classDiagram
+  class Client
+  class VideoConverter {
+    +convert(file, format) string
+  }
+  class Decoder {
+    +decode(file) string
+  }
+  class AudioMixer {
+    +mix(stream) string
+  }
+  class Encoder {
+    +encode(stream, format) string
+  }
+  Client --> VideoConverter : uses
+  VideoConverter --> Decoder
+  VideoConverter --> AudioMixer
+  VideoConverter --> Encoder`;
+
+<Mermaid code={facadeUml} title="facade วางอยู่หน้า class หลายตัวของ subsystem ไว้หลัง method เดียว" />
+
+- **Facade** (`VideoConverter`) — class เดียวที่ client คุยด้วย มันรู้วิธีประสานงาน subsystem
+- **Subsystem classes** (`Decoder`, `AudioMixer`, `Encoder`) — ตัวทำงานจริง พวกมันไม่รู้จัก facade เลยและยังสามารถถูกใช้โดยตรงได้
+- **Client** — เรียก facade และยังคงถูกแยกออกจากโครงสร้างของ subsystem
+
+## ตัวอย่าง
+
+facade `VideoConverter` เปลี่ยน request บรรทัดเดียวให้เป็นลำดับที่ถูกต้องของการเรียก decode, mix และ encode
+
+<Tabs syncKey="lang">
+  <TabItem label="TypeScript">
+    ```ts
+    class Decoder {
+      decode = (file: string) => `raw(${file})`;
+    }
+    class AudioMixer {
+      mix = (stream: string) => `mixed(${stream})`;
+    }
+    class Encoder {
+      encode = (stream: string, format: string) => `${stream}.${format}`;
+    }
+
+    // Facade: one method hides the subsystem choreography.
+    class VideoConverter {
+      private decoder = new Decoder();
+      private mixer = new AudioMixer();
+      private encoder = new Encoder();
+
+      convert(file: string, format: string): string {
+        const raw = this.decoder.decode(file);
+        const mixed = this.mixer.mix(raw);
+        return this.encoder.encode(mixed, format);
+      }
+    }
+
+    const converter = new VideoConverter();
+    console.log(converter.convert('clip.avi', 'mp4')); // mixed(raw(clip.avi)).mp4
+    ```
+  </TabItem>
+  <TabItem label="Python">
+    ```python
+    class Decoder:
+        def decode(self, file: str) -> str:
+            return f"raw({file})"
+
+
+    class AudioMixer:
+        def mix(self, stream: str) -> str:
+            return f"mixed({stream})"
+
+
+    class Encoder:
+        def encode(self, stream: str, fmt: str) -> str:
+            return f"{stream}.{fmt}"
+
+
+    class VideoConverter:
+        def __init__(self) -> None:
+            self._decoder = Decoder()
+            self._mixer = AudioMixer()
+            self._encoder = Encoder()
+
+        def convert(self, file: str, fmt: str) -> str:
+            raw = self._decoder.decode(file)
+            mixed = self._mixer.mix(raw)
+            return self._encoder.encode(mixed, fmt)
+
+
+    converter = VideoConverter()
+    print(converter.convert("clip.avi", "mp4"))  # mixed(raw(clip.avi)).mp4
+    ```
+  </TabItem>
+  <TabItem label="Go">
+    ```go
+    package main
+
+    import "fmt"
+
+    type decoder struct{}
+
+    func (decoder) decode(file string) string { return "raw(" + file + ")" }
+
+    type audioMixer struct{}
+
+    func (audioMixer) mix(stream string) string { return "mixed(" + stream + ")" }
+
+    type encoder struct{}
+
+    func (encoder) encode(stream, format string) string { return stream + "." + format }
+
+    // VideoConverter is the facade over the unexported subsystem.
+    type VideoConverter struct {
+        d decoder
+        m audioMixer
+        e encoder
+    }
+
+    func (vc VideoConverter) Convert(file, format string) string {
+        raw := vc.d.decode(file)
+        mixed := vc.m.mix(raw)
+        return vc.e.encode(mixed, format)
+    }
+
+    func main() {
+        vc := VideoConverter{}
+        fmt.Println(vc.Convert("clip.avi", "mp4")) // mixed(raw(clip.avi)).mp4
+    }
+    ```
+  </TabItem>
+  <TabItem label="Rust">
+    ```rust
+    struct Decoder;
+    impl Decoder {
+        fn decode(&self, file: &str) -> String {
+            format!("raw({file})")
+        }
+    }
+
+    struct AudioMixer;
+    impl AudioMixer {
+        fn mix(&self, stream: &str) -> String {
+            format!("mixed({stream})")
+        }
+    }
+
+    struct Encoder;
+    impl Encoder {
+        fn encode(&self, stream: &str, format: &str) -> String {
+            format!("{stream}.{format}")
+        }
+    }
+
+    // Facade: hides the subsystem behind one method.
+    struct VideoConverter {
+        decoder: Decoder,
+        mixer: AudioMixer,
+        encoder: Encoder,
+    }
+
+    impl VideoConverter {
+        fn new() -> Self {
+            VideoConverter { decoder: Decoder, mixer: AudioMixer, encoder: Encoder }
+        }
+        fn convert(&self, file: &str, format: &str) -> String {
+            let raw = self.decoder.decode(file);
+            let mixed = self.mixer.mix(&raw);
+            self.encoder.encode(&mixed, format)
+        }
+    }
+
+    fn main() {
+        let converter = VideoConverter::new();
+        println!("{}", converter.convert("clip.avi", "mp4")); // mixed(raw(clip.avi)).mp4
+    }
+    ```
+  </TabItem>
+</Tabs>
+
+## เมื่อไรควรใช้ / ข้อแลกเปลี่ยน
+
+- **ข้อดี:** ย่อ subsystem หลาย class ให้เหลือจุดเข้าใช้งานที่ง่ายตัวเดียวสำหรับกรณีทั่วไป
+- **ข้อดี:** แยก client ออกจากภายในของ subsystem ดังนั้น subsystem จึงสามารถ refactor ได้อย่างอิสระ
+- **ข้อดี:** ผู้เรียกใช้ขั้นสูงยังเข้าถึง subsystem โดยตรงได้ facade เป็นทางเลือก ไม่ใช่กำแพง
+- **ข้อเสีย:** facade อาจเลื่อนไหลไปเป็น god object ที่รู้มากเกินไปถ้าคุณเอาแต่กองฟีเจอร์ใส่มัน
+- **ข้อเสีย:** มันอาจซ่อนความยืดหยุ่นที่มีประโยชน์ ล่อใจให้ client ยอมรับเส้นทางที่ง่ายในขณะที่ต้องการเส้นทางที่ละเอียด
+
+## Pattern ที่เกี่ยวข้อง
+
+- [Adapter](/design-patterns-from-zero-to-hero/th/structural/adapter/) เปลี่ยน interface ของ object หนึ่งให้ตรงกับตัวที่คาดหวัง ส่วน Facade คิดค้น interface ที่เรียบง่ายตัวใหม่เอี่ยมครอบ object จำนวนมาก
+- [Abstract Factory](/design-patterns-from-zero-to-hero/th/creational/abstract-factory/) สามารถอยู่เบื้องหลัง facade เพื่อสร้าง object ของ subsystem ที่ facade ประสานงาน
+
+<Callout title="facade คือความสะดวก ไม่ใช่กรงขัง">
+facade ที่ดีทำให้เส้นทางทั่วไปเรียบง่ายขึ้นโดยไม่ปิดผนึก subsystem จงคง class ที่อยู่เบื้องล่างให้เข้าถึงได้เพื่อไม่ให้ผู้ใช้ระดับสูงถูกขวาง และต้านทานการปล่อยให้ facade ดูดซับความรับผิดชอบทุกอย่าง เมื่อมันโตจนเทอะทะ ให้แยกมันออกเป็น facade ที่โฟกัสหลายตัว
+</Callout>
+
+export const quiz = [
+  {
+    q: 'Facade ให้อะไร?',
+    options: [
+      'การรับประกัน instance ที่ใช้ร่วมกันเพียงตัวเดียว',
+      'interface ที่เรียบง่ายตัวเดียวครอบ subsystem ที่ซับซ้อนซึ่งมี class จำนวนมาก',
+      'วิธีเพิ่มพฤติกรรมด้วยการห่อ object',
+      'การ clone ของ object ที่มีอยู่',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'class ของ subsystem รู้จัก facade หรือไม่?',
+    options: [
+      'รู้ พวกมันต้อง inherit จากมัน',
+      'ไม่รู้ พวกมันทำงานอย่างอิสระและสามารถถูกใช้โดยตรงได้',
+      'รู้ พวกมันถือ reference ย้อนกลับไปยังมัน',
+      'มีเพียงตัวแรกที่ถูกสร้างเท่านั้นที่รู้',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'Facade แตกต่างจาก Adapter อย่างไร?',
+    options: [
+      'Facade คิดค้น interface ที่เรียบง่ายตัวใหม่ครอบ object จำนวนมาก ส่วน Adapter จับ object หนึ่งให้เข้ากับ interface ที่คาดหวัง',
+      'Facade เปลี่ยนพฤติกรรม ส่วน Adapter ไม่เคยเปลี่ยน',
+      'Facade ต้องใช้ inheritance ส่วน Adapter ห้ามใช้',
+      'ทั้งสองเป็น pattern เดียวกัน',
+    ],
+    answer: 0,
+  },
+  {
+    q: 'ความเสี่ยงของการใช้ Facade มากเกินไปคืออะไร?',
+    options: [
+      'มันบังคับให้ทุก object เป็น singleton',
+      'มันอาจกลายเป็น god object ที่รู้มากเกินไป',
+      'มันทำให้ไม่สามารถเรียก subsystem โดยตรงได้',
+      'มันทำให้โปรแกรมช้าลงเสมอ',
+    ],
+    answer: 1,
+  },
+];
+
+<Quiz client:visible id="structural/facade" questions={quiz} />
+
+<ProgressTracker client:visible id="structural/facade" />
