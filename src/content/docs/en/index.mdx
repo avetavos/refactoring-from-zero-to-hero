@@ -1,6 +1,60 @@
 ---
 title: Refactoring — From Zero to Hero
-description: Improve code without changing what it does — code smells and a catalog of refactorings, each with a before/after in TypeScript, Python, Go, and Rust.
+description: Improve code without changing what it does — recognize code smells and apply a catalog of refactorings, each as a before→after in TypeScript, Python, Go, and Rust.
 template: splash
+hero:
+  tagline: A standalone, beginner→advanced course on refactoring — improving the internal structure of code without changing what it does. Learn the discipline (small steps backed by tests), spot code smells, and apply a catalog of refactorings — each with a before→after in TypeScript, Python, Go, and Rust.
+  actions:
+    - text: Start here
+      link: /refactoring-from-zero-to-hero/en/intro-and-principles/
+      icon: right-arrow
+      variant: primary
+    - text: Jump to Composing Methods
+      link: /refactoring-from-zero-to-hero/en/composing-methods/
+      icon: open-book
 ---
-Coming soon.
+
+import { Card, CardGrid } from '@astrojs/starlight/components';
+
+## What you'll learn
+
+<CardGrid>
+  <Card title="Intro & Principles" icon="rocket">
+    What refactoring is, why and when, small steps backed by tests, and reading code smells. [Start →](/refactoring-from-zero-to-hero/en/intro-and-principles/)
+  </Card>
+  <Card title="Composing Methods" icon="seti:plan">
+    Extract & Inline Function, Extract Variable, Replace Temp with Query, Split Phase. [Compose →](/refactoring-from-zero-to-hero/en/composing-methods/)
+  </Card>
+  <Card title="Moving Features" icon="random">
+    Move Function & Field, Extract & Inline Class, Hide Delegate / Remove Middle Man. [Move →](/refactoring-from-zero-to-hero/en/moving-features/)
+  </Card>
+  <Card title="Organizing Data" icon="seti:db">
+    Encapsulate Variable & Collection, Replace Magic Literal, Replace Primitive with Object. [Organize →](/refactoring-from-zero-to-hero/en/organizing-data/)
+  </Card>
+  <Card title="Simplifying Conditionals" icon="puzzle">
+    Decompose & Consolidate, Guard Clauses, Replace Conditional with Polymorphism, Null Object. [Clarify →](/refactoring-from-zero-to-hero/en/simplifying-conditionals/)
+  </Card>
+  <Card title="Simplifying APIs" icon="seti:config">
+    Rename, Parameterize, Introduce Parameter Object, Remove Flag Argument, Factory. [Refine →](/refactoring-from-zero-to-hero/en/simplifying-apis/)
+  </Card>
+  <Card title="Generalization & Inheritance" icon="approve-check">
+    Pull Up / Push Down, Extract Superclass & Interface, Replace Inheritance with Delegation. [Generalize →](/refactoring-from-zero-to-hero/en/generalization-and-inheritance/)
+  </Card>
+</CardGrid>
+
+## How this course works
+
+<CardGrid>
+  <Card title="Before → After, four languages" icon="seti:default">
+    Every refactoring shows the messy code and its improved form in TypeScript, Python, Go, and Rust — synced tabs, so pick your language once.
+  </Card>
+  <Card title="Driven by smells" icon="puzzle">
+    Each refactoring starts from the code smell it cures, so you know exactly when to reach for it.
+  </Card>
+  <Card title="Safe, small steps" icon="approve-check">
+    The mechanics break each change into tiny, behavior-preserving steps you run tests between — refactoring without fear.
+  </Card>
+  <Card title="Bilingual + read mode" icon="translate">
+    English and ไทย, quizzes with saved progress, and a distraction-free read mode.
+  </Card>
+</CardGrid>
