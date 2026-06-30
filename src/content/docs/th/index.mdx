@@ -1,9 +1,9 @@
 ---
 title: Refactoring — From Zero to Hero
-description: ปรับปรุงโค้ดโดยไม่เปลี่ยนสิ่งที่มันทำ — รู้จัก code smell และใช้แคตตาล็อกของ refactoring แต่ละแบบเป็น before→after ในภาษา TypeScript, Python, Go และ Rust
+description: ปรับปรุง code โดยไม่เปลี่ยนสิ่งที่มันทำ — รู้จัก code smell และใช้แคตตาล็อกของ refactoring แต่ละแบบเป็น before→after ในภาษา TypeScript, Python, Go และ Rust
 template: splash
 hero:
-  tagline: คอร์ส refactoring แบบ standalone ตั้งแต่ผู้เริ่มต้นจนถึงขั้นสูง — ปรับโครงสร้างภายในของโค้ดโดยไม่เปลี่ยนพฤติกรรมภายนอก เรียนวินัย (ทำทีละขั้นเล็ก ๆ โดยมี test คุ้มกัน), มองออกว่ามี code smell ตรงไหน และใช้แคตตาล็อกของ refactoring แต่ละแบบมี before→after ในภาษา TypeScript, Python, Go และ Rust
+  tagline: คอร์ส refactoring แบบ standalone ตั้งแต่ผู้เริ่มต้นจนถึงขั้นสูง — ปรับโครงสร้างภายในของ code โดยไม่เปลี่ยน behavior ภายนอก เรียนวินัย (ทำทีละขั้นเล็ก ๆ โดยมี test คุ้มกัน), มองออกว่ามี code smell ตรงไหน และใช้แคตตาล็อกของ refactoring แต่ละแบบมี before→after ในภาษา TypeScript, Python, Go และ Rust
   actions:
     - text: เริ่มที่นี่
       link: /refactoring/th/intro-and-principles/
@@ -46,13 +46,13 @@ import { Card, CardGrid } from '@astrojs/starlight/components';
 
 <CardGrid>
   <Card title="Before → After สี่ภาษา" icon="seti:default">
-    ทุก refactoring แสดงโค้ดที่ยุ่งและรูปแบบที่ดีขึ้นในภาษา TypeScript, Python, Go และ Rust ผ่านแท็บที่ sync กัน เลือกภาษาครั้งเดียว
+    ทุก refactoring แสดง code ที่ยุ่งและรูปแบบที่ดีขึ้นในภาษา TypeScript, Python, Go และ Rust ผ่านแท็บที่ sync กัน เลือกภาษาครั้งเดียว
   </Card>
   <Card title="ขับเคลื่อนด้วย smell" icon="puzzle">
     ทุก refactoring เริ่มจาก code smell ที่มันแก้ คุณจึงรู้ว่าควรหยิบมาใช้เมื่อไร
   </Card>
   <Card title="ขั้นเล็ก ๆ ที่ปลอดภัย" icon="approve-check">
-    Mechanics แบ่งการเปลี่ยนแปลงเป็นขั้นเล็ก ๆ ที่รักษาพฤติกรรมและรัน test ระหว่างขั้น — refactor ได้โดยไม่กลัว
+    Mechanics แบ่งการเปลี่ยนแปลงเป็นขั้นเล็ก ๆ ที่รักษา behavior และรัน test ระหว่างขั้น — refactor ได้โดยไม่กลัว
   </Card>
   <Card title="สองภาษา + read mode" icon="translate">
     ภาษาอังกฤษและไทย, แบบทดสอบที่บันทึกความคืบหน้า และโหมดอ่านแบบไร้สิ่งรบกวน

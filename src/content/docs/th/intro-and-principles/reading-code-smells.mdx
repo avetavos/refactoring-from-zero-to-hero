@@ -29,9 +29,9 @@ export const smellDiagram = `flowchart LR
 
 | Smell | สิ่งที่คุณสังเกตเห็น | ที่ที่คอร์สนี้จัดการกับมัน |
 | --- | --- | --- |
-| **Long Function** | ฟังก์ชันที่ยาวเลื่อนพ้นหน้าจอและทำหลายสิ่ง | [Composing Methods](/refactoring/th/composing-methods/) — [Extract Function](/refactoring/th/composing-methods/extract-function/) |
+| **Long Function** | function ที่ยาวเลื่อนพ้นหน้าจอและทำหลายสิ่ง | [Composing Methods](/refactoring/th/composing-methods/) — [Extract Function](/refactoring/th/composing-methods/extract-function/) |
 | **Duplicated Code** | ชิ้นส่วนเดียวกันปรากฏในสองที่หรือมากกว่า | [Extract Function](/refactoring/th/composing-methods/extract-function/) และ [Moving Features](/refactoring/th/moving-features/) |
-| **Mysterious Name** | ตัวแปรหรือฟังก์ชันที่ชื่อของมันซ่อนจุดประสงค์ไว้ | [Extract Variable](/refactoring/th/composing-methods/extract-variable/) |
+| **Mysterious Name** | ตัวแปรหรือ function ที่ชื่อของมันซ่อนจุดประสงค์ไว้ | [Extract Variable](/refactoring/th/composing-methods/extract-variable/) |
 | **Large Class** | คลาสที่กักตุน field และความรับผิดชอบไว้มากเกินไป | [Moving Features](/refactoring/th/moving-features/) |
 | **Long Parameter List** | การเรียกที่มี argument มากมายจนคุณตามไม่ทัน | [Simplifying APIs](/refactoring/th/simplifying-apis/) |
 | **Feature Envy** | method ที่สนใจข้อมูลของอ็อบเจกต์อื่นมากกว่าของตัวเอง | [Moving Features](/refactoring/th/moving-features/) |
@@ -113,14 +113,25 @@ export const smellDiagram = `flowchart LR
 
 เวอร์ชันที่ถูกห่อไว้ทำให้เป็นไปไม่ได้ที่จะเผลอบวกเงินเข้ากับจำนวน — ตอนนี้ compiler หรือชนิดข้อมูลแบกความหมายที่ number เปล่า ๆ เคยปล่อยให้ขึ้นอยู่กับโชคชะตา
 
-## ที่เกี่ยวข้อง
+## Related
 
 - [ทำไมและเมื่อไหร่ควร refactor](/refactoring/th/intro-and-principles/why-and-when/)
 - [ก้าวเล็ก ๆ และ test](/refactoring/th/intro-and-principles/small-steps-and-tests/)
 - [Composing Methods](/refactoring/th/composing-methods/)
 
+| Refactor เมื่อ | หลีกเลี่ยงเมื่อ |
+|---|---|
+| เห็น Code Smell ที่ชัดเจนและตั้งชื่อได้ | ยังไม่มี test รองรับ |
+| ต้องการ add feature ในพื้นที่นั้น | deadline กำลังจะมาถึงและ feature ยังไม่พร้อม |
+| code ทำให้ review ยากและทีมถามซ้ำ ๆ | code นั้นจะถูกลบเร็ว ๆ นี้ |
+
+> ⚠️ ไม่ควร Refactor เมื่อ:
+> - ยังไม่รู้ว่า code นั้นทำอะไรจริง ๆ — อ่านให้เข้าใจก่อน
+> - ไม่มี test และ refactoring จะเปลี่ยน behavior โดยไม่รู้ตัว
+> - refactor เพราะความรู้สึก ไม่ใช่เพราะ smell จริง ๆ
+
 <Callout title="ตั้งชื่อ smell ก่อนหยิบท่ามาใช้">
-อย่า refactor บนความรู้สึกคลุมเครือ เมื่อโค้ดรบกวนใจคุณ จงตั้งชื่อ smell ก่อน — "นี่คือ Long Function" "นั่นคือ Duplicated Code" การตั้งชื่อมันบอกคุณว่า refactoring ไหนเหมาะ และทำให้คุณซื่อตรงต่อตัวเองว่าการเปลี่ยนแปลงนั้นคุ้มที่จะทำตอนนี้หรือไม่
+อย่า refactor บนความรู้สึกคลุมเครือ เมื่อ code รบกวนใจคุณ จงตั้งชื่อ smell ก่อน — "นี่คือ Long Function" "นั่นคือ Duplicated Code" การตั้งชื่อมันบอกคุณว่า refactoring ไหนเหมาะ และทำให้คุณซื่อตรงต่อตัวเองว่าการเปลี่ยนแปลงนั้นคุ้มที่จะทำตอนนี้หรือไม่
 </Callout>
 
 export const quizSmells = [

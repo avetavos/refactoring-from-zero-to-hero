@@ -34,7 +34,7 @@ export const flagDiagram = `flowchart LR
 
 ## Before → After
 
-ค้นหาในรายการเพื่อหาลูกค้าที่ติดหนี้ ก่อนหน้านี้ flag `found` ขับเคลื่อน `while` หลังจากนั้นฟังก์ชัน return ทันทีที่เจอ
+ค้นหาในรายการเพื่อหาลูกค้าที่ติดหนี้ ก่อนหน้านี้ flag `found` ขับเคลื่อน `while` หลังจากนั้น function return ทันทีที่เจอ
 
 <Tabs syncKey="lang">
   <TabItem label="TypeScript">
@@ -147,13 +147,24 @@ export const flagDiagram = `flowchart LR
 
 ใช้สิ่งนี้เมื่อใดก็ตามที่ boolean มีอยู่ล้วน ๆ เพื่อจบหรือข้าม loop ผลตอบแทนคือเงื่อนไขออกปรากฏตรงที่การตัดสินใจถูกทำพอดี ผู้อ่านจึงเห็น *ทำไม* loop จึงหยุดโดยไม่ต้องจำลองมันในหัว มันยังมักปลดล็อกการทำความสะอาดต่อ: เมื่อ flag หายไป body ของ loop มักเป็นตัวเลือกสำหรับ built-in อย่าง `any`, `find` หรือ `filter`
 
-ข้อควรระวังคือการใช้การกระโดดมากเกินไป การออกด้วย `break`/`return` ไม่กี่จุดอ่านชัดเจน แต่ loop ที่มี `continue` ห้าตัวและ `break` สามตัวฝังในเงื่อนไขซ้อนกันอาจตามยากกว่าตอนที่มี flag เสียอีก ถ้าการลบ flag จะทำให้การออกหลายจุดกระจายไปทั่วการซ้อนที่ลึก ให้ใช้ **Replace Nested Conditional with Guard Clauses** ก่อนเพื่อทำให้ body แบนลง หรือ extract loop เป็นฟังก์ชันของมันเองเพื่อให้การออกก่อนแต่ละจุดเป็นคำตอบที่สะอาด ทางกลับแทบไม่คุ้มที่จะทำ: การนำ flag กลับมาแทบไม่เคยทำให้อ่านง่ายขึ้น
+ข้อควรระวังคือการใช้การกระโดดมากเกินไป การออกด้วย `break`/`return` ไม่กี่จุดอ่านชัดเจน แต่ loop ที่มี `continue` ห้าตัวและ `break` สามตัวฝังในเงื่อนไขซ้อนกันอาจตามยากกว่าตอนที่มี flag เสียอีก ถ้าการลบ flag จะทำให้การออกหลายจุดกระจายไปทั่วการซ้อนที่ลึก ให้ใช้ **Replace Nested Conditional with Guard Clauses** ก่อนเพื่อทำให้ body แบนลง หรือ extract loop เป็น function ของมันเองเพื่อให้การออกก่อนแต่ละจุดเป็นคำตอบที่สะอาด ทางกลับแทบไม่คุ้มที่จะทำ: การนำ flag กลับมาแทบไม่เคยทำให้อ่านง่ายขึ้น
 
 ## Related
 
 - [Replace Nested Conditional with Guard Clauses](/refactoring/th/simplifying-conditionals/replace-nested-conditional-with-guard-clauses/)
 - [Decompose Conditional](/refactoring/th/simplifying-conditionals/decompose-conditional/)
 - [Consolidate Conditional Expression](/refactoring/th/simplifying-conditionals/consolidate-conditional/)
+
+| ใช้ Replace Control Flag with Break/Return เมื่อ | หลีกเลี่ยงเมื่อ |
+|---|---|
+| boolean มีไว้เพื่อควบคุม loop เท่านั้น | flag ยังถูกใช้หลัง loop เพื่อรายงานผล |
+| `while (!found)` อ่านยากกว่า `return true` ตรงจุด | การแทนที่ทำให้มี break/return หลายจุดในซ้อนที่ลึก |
+| loop สามารถเปลี่ยนเป็น built-in (`any`, `find`) ได้ | team มีนโยบาย single exit point ต่อ function |
+
+> ⚠️ ไม่ควร Replace Control Flag with Break/Return เมื่อ:
+> - flag ทำสองหน้าที่: หยุด loop และบันทึกผล — ต้องแยกออกก่อน
+> - การลบ flag ทำให้มี `break`/`return` กระจายในซ้อนที่ลึกมาก — ให้ flatten loop ด้วย guard clauses ก่อน
+> - ภาษา/style guide ของ team บังคับ single return point
 
 <Callout title="หนึ่ง flag หนึ่งงาน">
 control flag ที่ถูกอ่านหลัง loop ด้วยกำลังทำสองงานพร้อมกัน: จบ loop และรายงานผล แยกพวกมันออก ให้ loop ออกด้วย break หรือ return และคำนวณค่าที่รายงานจากผลของ loop — ไม่ใช่จากตัวแปรที่คุณคอย mutate ในที่
@@ -189,7 +200,7 @@ export const quizFlag = [
     q: 'บทเรียนแนะนำอะไรถ้าการลบ flag จะทำให้การออกหลายจุดกระจายไปทั่วการซ้อนที่ลึก?',
     options: [
       'คง flag ไว้ — มันชัดกว่าเสมอ',
-      'ทำให้ body แบนลงด้วย guard clauses ก่อน หรือ extract loop เป็นฟังก์ชันของมันเอง',
+      'ทำให้ body แบนลงด้วย guard clauses ก่อน หรือ extract loop เป็น function ของมันเอง',
       'แปลง loop เป็น recursion',
       'เพิ่ม comment ข้างการออกแต่ละจุด',
     ],

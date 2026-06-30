@@ -1,6 +1,6 @@
 ---
 title: Replace Type Code with State/Strategy
-description: เมื่อ type code ขับเคลื่อนพฤติกรรมที่แตกต่างและเปลี่ยนได้ตอน runtime ให้ถืออ็อบเจกต์ State หรือ Strategy ที่ host สลับได้ แทนที่จะอบ variant ลงในซับคลาสที่ตายตัว
+description: เมื่อ type code ขับเคลื่อน behavior ที่แตกต่างและเปลี่ยนได้ตอน runtime ให้ถืออ็อบเจกต์ State หรือ Strategy ที่ host สลับได้ แทนที่จะอบ variant ลงในซับคลาสที่ตายตัว
 sidebar:
   order: 11
 ---
@@ -30,11 +30,11 @@ export const stateDiagram = `flowchart TD
 
 ## Intent
 
-นำ type code ที่ทั้ง *ขับเคลื่อนพฤติกรรมที่แตกต่าง* และ *เปลี่ยนไปตลอดอายุของอ็อบเจกต์* — `status` ของ order, mode ของ connection — มาแทนที่ด้วยอ็อบเจกต์ State (หรือ Strategy) ที่ host ถือไว้และสลับได้ host มอบหมายพฤติกรรมที่แตกต่างให้อ็อบเจกต์นั้น การเปลี่ยนสถานะก็แค่กำหนด state ตัวใหม่ เพราะคลาสของ host ไม่เคยเปลี่ยน วิธีนี้จึงใช้ได้พอดีตรงที่ Replace Type Code with Subclasses ทำไม่ได้
+นำ type code ที่ทั้ง *ขับเคลื่อน behavior ที่แตกต่าง* และ *เปลี่ยนไปตลอดอายุของอ็อบเจกต์* — `status` ของ order, mode ของ connection — มาแทนที่ด้วยอ็อบเจกต์ State (หรือ Strategy) ที่ host ถือไว้และสลับได้ host มอบหมาย behavior ที่แตกต่างให้อ็อบเจกต์นั้น การเปลี่ยนสถานะก็แค่กำหนด state ตัวใหม่ เพราะคลาสของ host ไม่เคยเปลี่ยน วิธีนี้จึงใช้ได้พอดีตรงที่ Replace Type Code with Subclasses ทำไม่ได้
 
 ## The smell
 
-smell คือ `switch` ที่กระจัดกระจายบน type code แบบเดียวกับใน refactoring ของซับคลาส แต่มีคุณสมบัติเพิ่มมาหนึ่งอย่าง: **code เปลี่ยนได้ตอน runtime** order เลื่อน `pending → shipped → delivered`; document ไป `draft → published → archived` คุณไม่สามารถจำลอง identity ที่เปลี่ยนได้ด้วยการเปลี่ยนคลาสของอ็อบเจกต์ — ภาษาส่วนใหญ่ไม่ยอมให้อ็อบเจกต์กลายเป็นคลาสอื่นกลางอายุ ดังนั้นการแตกกิ่งจึงทวีคูณไปทั่ว method และทุกการเปลี่ยนสถานะคือการกำหนดค่า field ดิบโดยไม่มีหลักประกันว่าค่าใหม่นั้นถูกต้องด้วยซ้ำ
+smell คือ `switch` ที่กระจัดกระจายบน type code แบบเดียวกับใน refactoring ของซับคลาส แต่มี property เพิ่มมาหนึ่งอย่าง: **code เปลี่ยนได้ตอน runtime** order เลื่อน `pending → shipped → delivered`; document ไป `draft → published → archived` คุณไม่สามารถจำลอง identity ที่เปลี่ยนได้ด้วยการเปลี่ยนคลาสของอ็อบเจกต์ — ภาษาส่วนใหญ่ไม่ยอมให้อ็อบเจกต์กลายเป็นคลาสอื่นกลางอายุ ดังนั้นการแตกกิ่งจึงทวีคูณไปทั่ว method และทุกการเปลี่ยนสถานะคือการกำหนดค่า field ดิบโดยไม่มีหลักประกันว่าค่าใหม่นั้นถูกต้องด้วยซ้ำ
 
 ## Before → After
 
@@ -213,7 +213,7 @@ smell คือ `switch` ที่กระจัดกระจายบน typ
 3. สร้างคลาส state หนึ่งตัวต่อหนึ่งค่าของ type code ย้ายแต่ละกิ่งของ method ที่แตกต่างเข้าไปยัง state ที่สอดคล้องกัน
 4. ให้ host มี field ที่ถือ state ปัจจุบัน และให้ method ของมันมอบหมายไปยัง state นั้น **รันเทสต์ของคุณ** หลังต่อสาย method แต่ละตัว
 5. แทนที่การกำหนดค่า type code แต่ละครั้งด้วยการสลับอ็อบเจกต์ state — ในอุดมคติผ่าน method อย่าง `ship()` ที่ตั้งชื่อให้การเปลี่ยนสถานะและคอยกั้นว่าการเปลี่ยนแบบไหนถูกกฎ
-6. เมื่อไม่มีอะไรอ่านค่า code ดิบแล้ว ก็ลบมันทิ้ง ตอนนี้ host เปลี่ยนพฤติกรรมล้วน ๆ ด้วยว่ามันถือ state ตัวไหน
+6. เมื่อไม่มีอะไรอ่านค่า code ดิบแล้ว ก็ลบมันทิ้ง ตอนนี้ host เปลี่ยน behavior ล้วน ๆ ด้วยว่ามันถือ state ตัวไหน
 
 ## When to use / trade-offs
 
@@ -227,13 +227,24 @@ smell คือ `switch` ที่กระจัดกระจายบน typ
 - [Encapsulate Variable](/refactoring/th/organizing-data/encapsulate-variable/)
 - [Replace Primitive with Object](/refactoring/th/organizing-data/replace-primitive-with-object/)
 
+| ใช้ Replace Type Code with State/Strategy เมื่อ | หลีกเลี่ยงเมื่อ |
+|---|---|
+| behavior เปลี่ยนตาม type code และเปลี่ยนได้ใน runtime | type code คงที่ตลอด lifecycle ของ object |
+| type code ถูกใช้ใน switch ที่ซ้ำในหลายที่ | มีแค่ 2-3 type และไม่น่าจะเพิ่ม |
+| ต้องการเพิ่ม type ใหม่โดยไม่แก้ code เดิม | subclass เป็นตัวเลือกที่ง่ายกว่าและ type ไม่เปลี่ยน |
+
+> ⚠️ ไม่ควร Replace Type Code with State/Strategy เมื่อ:
+> - type code ไม่ส่งผลต่อ behavior — เป็นแค่ label
+> - ต้องการ simple serialization — object ซับซ้อนกว่า enum
+> - มีแค่ 2 state ที่ชัดเจน — boolean flag เพียงพอ
+
 <Callout title="type ตายตัว → ซับคลาส; type เปลี่ยน → State/Strategy">
-switch ที่กระจัดกระจายแบบเดียวกันแก้ได้สองทาง ถ้า variant ลงตัวตั้งแต่อ็อบเจกต์เกิด ให้ทำเป็นซับคลาส ถ้า variant เคลื่อนผ่าน lifecycle ให้ถืออ็อบเจกต์ State ที่ host สลับ — host คงเป็นคลาสเดียวขณะที่พฤติกรรมของมันเปลี่ยนอยู่ข้างใต้
+switch ที่กระจัดกระจายแบบเดียวกันแก้ได้สองทาง ถ้า variant ลงตัวตั้งแต่อ็อบเจกต์เกิด ให้ทำเป็นซับคลาส ถ้า variant เคลื่อนผ่าน lifecycle ให้ถืออ็อบเจกต์ State ที่ host สลับ — host คงเป็นคลาสเดียวขณะที่ behavior ของมันเปลี่ยนอยู่ข้างใต้
 </Callout>
 
 export const quizStateStrategy = [
   {
-    q: 'คุณสมบัติเพิ่มเติมใดที่ผลักคุณไปทาง State/Strategy แทนซับคลาส?',
+    q: 'property เพิ่มเติมใดที่ผลักคุณไปทาง State/Strategy แทนซับคลาส?',
     options: [
       'อ็อบเจกต์มีหลาย field',
       'type code เปลี่ยนได้ตอน runtime ตลอดอายุของอ็อบเจกต์',

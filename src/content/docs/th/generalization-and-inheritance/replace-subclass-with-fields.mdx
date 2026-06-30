@@ -28,11 +28,11 @@ export const fieldsDiagram = `classDiagram
     +code() string
   }`;
 
-## เจตนา
+## Intent
 
-**Replace Subclass with Fields** สลายลำดับชั้นเล็ก ๆ ที่ subclass ไม่มีพฤติกรรมใด ๆ — มีเพียง *ค่าคงที่ที่ต่างกัน* ที่ถูกคืนกลับจากเมท็อดที่ override เท่านั้น แต่ละเมท็อดแบบนั้นกลายเป็นฟิลด์บนคลาส concrete เดียว และค่าที่แยกความต่างของ subclass ก็ย้ายเข้าไปอยู่ใน constructor ของคลาสนั้น ลำดับชั้นหายไป ส่วนข้อมูลที่มันเข้ารหัสไว้ยังคงอยู่ในรูปฟิลด์ธรรมดา
+**Replace Subclass with Fields** สลายลำดับชั้นเล็ก ๆ ที่ subclass ไม่มี behavior ใด ๆ — มีเพียง *ค่าคงที่ที่ต่างกัน* ที่ถูกคืนกลับจากเมท็อดที่ override เท่านั้น แต่ละเมท็อดแบบนั้นกลายเป็นฟิลด์บนคลาส concrete เดียว และค่าที่แยกความต่างของ subclass ก็ย้ายเข้าไปอยู่ใน constructor ของคลาสนั้น ลำดับชั้นหายไป ส่วนข้อมูลที่มันเข้ารหัสไว้ยังคงอยู่ในรูปฟิลด์ธรรมดา
 
-## กลิ่นไม่ดี
+## Code Smell
 
 คุณเจอ subclass ที่ทุก override เป็นบรรทัดเดียวคืนค่า literal: `isMale() { return true; }`, `code() { return "M"; }` subclass นั้นไม่เพิ่มตรรกะใด ไม่ถือ state ต่อ instance และไม่เคยเปลี่ยนคำตอบ ทั้ง type — พร้อมไฟล์ของตัวเอง constructor ของตัวเอง ช่องของตัวเองในลำดับชั้น — มีอยู่เพียงเพื่อ hard-code ค่าคงที่สองค่า นั่นคือ **Lazy Class** ที่แต่งตัวเป็น subtype และมันทำให้ความแตกต่างระหว่าง variant มองเห็นได้ยากกว่าการเขียนฟิลด์เรียงกันเป็นแถว
 
@@ -172,7 +172,7 @@ export const fieldsDiagram = `classDiagram
 
 <Mermaid code={fieldsDiagram} title="subclass ที่มีแต่ข้อมูลสองตัวยุบรวมเป็นคลาสเดียวที่มีฟิลด์" />
 
-## กลไก
+## Mechanics
 
 1. ใช้ **Replace Constructor with Factory Function** กับ superclass เพื่อให้ผู้เรียกสร้าง instance ผ่านเมท็อด factory แทนการเรียก `new Subclass()` ตรง ๆ
 2. สำหรับแต่ละเมท็อดที่ subclass override เพื่อคืนค่าคงที่ ให้เพิ่มฟิลด์บน superclass ที่ถือค่านั้นไว้
@@ -181,19 +181,30 @@ export const fieldsDiagram = `classDiagram
 5. **รันเทสต์ของคุณ** ทุกจุดเรียกควรสร้าง instance ของ superclass ด้วยค่าฟิลด์ที่ถูกต้องแล้ว
 6. ลบ subclass ที่ว่างเปล่าทิ้งเมื่อไม่มีอะไรอ้างถึงมันแล้ว
 
-## เมื่อไรควรใช้ / ข้อแลกเปลี่ยน
+## When to use / trade-offs
 
-หยิบสิ่งนี้มาใช้เมื่อใดก็ตามที่งานเดียวของ subclass คือการ hard-code ค่าคืนกลับ — ไม่มีฟิลด์เพิ่ม ไม่มีพฤติกรรมจริง ไม่มีตรรกะต่อการเรียก การพับค่าเหล่านั้นเข้าไปเป็นฟิลด์จะลบ type หนึ่งออก ทำให้ลำดับชั้นแบนลง และจัดเรียง variant ให้ความแตกต่างของมันอ่านได้เป็นข้อมูลแทนที่จะเป็นนิยามคลาส
+หยิบสิ่งนี้มาใช้เมื่อใดก็ตามที่งานเดียวของ subclass คือการ hard-code ค่าคืนกลับ — ไม่มีฟิลด์เพิ่ม ไม่มี behavior จริง ไม่มีตรรกะต่อการเรียก การพับค่าเหล่านั้นเข้าไปเป็นฟิลด์จะลบ type หนึ่งออก ทำให้ลำดับชั้นแบนลง และจัดเรียง variant ให้ความแตกต่างของมันอ่านได้เป็นข้อมูลแทนที่จะเป็นนิยามคลาส
 
-*อย่า* นำมาใช้ถ้า subclass มีพฤติกรรมจริงที่แตกต่างกัน หรือถ้าคุณคาดว่ามันจะงอกพฤติกรรมขึ้นมา เพราะถ้าเป็นเช่นนั้น ลำดับชั้น (หรือ strategy) ก็ยังคุ้มค่าที่จะมีอยู่ สิ่งตรงข้ามคือ **Replace Fields with Subclass** — เลื่อนฟิลด์ที่แยกความต่างกลับขึ้นไปเป็น subtype เมื่อพฤติกรรม ไม่ใช่เพียงข้อมูล เริ่มแยกตัวออกตามฟิลด์นั้น
+*อย่า* นำมาใช้ถ้า subclass มี behavior จริงที่แตกต่างกัน หรือถ้าคุณคาดว่ามันจะงอก behavior ขึ้นมา เพราะถ้าเป็นเช่นนั้น ลำดับชั้น (หรือ strategy) ก็ยังคุ้มค่าที่จะมีอยู่ สิ่งตรงข้ามคือ **Replace Fields with Subclass** — เลื่อนฟิลด์ที่แยกความต่างกลับขึ้นไปเป็น subtype เมื่อ behavior ไม่ใช่เพียงข้อมูล เริ่มแยกตัวออกตามฟิลด์นั้น
 
-## ที่เกี่ยวข้อง
+## Related
 
 - [Collapse Hierarchy](/refactoring/th/generalization-and-inheritance/collapse-hierarchy/)
 - [Replace Subclass with Delegation](/refactoring/th/generalization-and-inheritance/replace-subclass-with-delegation/)
 - [Pull Up & Push Down](/refactoring/th/generalization-and-inheritance/pull-up-and-push-down/)
 
-<Callout title="subclass ควรเพิ่มพฤติกรรม ไม่ใช่เพียงค่าคงที่">
+| ใช้ Replace Subclass with Fields เมื่อ | หลีกเลี่ยงเมื่อ |
+|---|---|
+| subclass ต่างกันแค่ค่า constant ไม่มี behavior ต่างกัน | subclass มี behavior ที่แตกต่างกัน — ต้องการ subclass จริง ๆ |
+| hierarchy ที่ลึกสำหรับแค่ data variation | field เพิ่มแล้วจะทำให้ superclass มี conditional มากขึ้น |
+| ต้องการ simplify class ที่มี subclass แค่ override constant | client ต้อง instanceof check ซึ่ง defeat วัตถุประสงค์ |
+
+> ⚠️ ไม่ควร Replace Subclass with Fields เมื่อ:
+> - subclass มี method ที่ต่างกัน แม้แค่บางส่วน
+> - field เพิ่มแล้วทำให้ต้องมี switch statement แทน polymorphism
+> - จำนวน variant มีมากและน่าจะเพิ่มขึ้น
+
+<Callout title="subclass ควรเพิ่ม behavior ไม่ใช่เพียงค่าคงที่">
 ถ้าคุณอธิบายความแตกต่างระหว่าง subclass สองตัวได้ครบถ้วนว่า "ตัวนี้คืน M ตัวนั้นคืน F" แสดงว่าคุณกำลังใช้ระบบ type มาเก็บข้อมูล ข้อมูลควรอยู่ในฟิลด์ เก็บ subclass ไว้สำหรับกรณีที่ *สิ่งที่ออบเจกต์ทำ* แตกต่างกัน — ไม่ใช่เพียงแค่สิ่งที่มันตอบ
 </Callout>
 
@@ -201,7 +212,7 @@ export const quizReplaceFields = [
   {
     q: 'subclass แบบใดเป็นตัวเลือกสำหรับ Replace Subclass with Fields?',
     options: [
-      'subclass ที่มีพฤติกรรมซับซ้อนและแตกต่างกัน',
+      'subclass ที่มี behavior ซับซ้อนและแตกต่างกัน',
       'subclass ที่ override เพียงเพื่อคืนค่าคงที่ที่ต่างกัน',
       'subclass ที่ถือ state ที่เปลี่ยนแปลงได้จำนวนมาก',
       'subclass ใด ๆ ก็ได้',

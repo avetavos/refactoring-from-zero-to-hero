@@ -19,15 +19,15 @@ export const collapseDiagram = `classDiagram
   }
   note for Employee "Salesperson merged back in — one type now"`;
 
-## เจตนา
+## Intent
 
 **Collapse Hierarchy** รวม superclass กับ subclass ที่ไม่ต่างกันมากพอจะมีอยู่เป็นสอง type แยกกันอีกต่อไป สมาชิกของตัวหนึ่งถูกพับเข้าไปในอีกตัว คลาสที่ตอนนี้ซ้ำซ้อนถูกลบทิ้ง และผู้อ่านทุกคนก็รอดพ้นจากชั้นของการอ้อมที่ไม่ได้ให้อะไรพวกเขาเลย
 
-## กลิ่นไม่ดี
+## Code Smell
 
 ลำดับชั้นกร่อนได้ refactoring ดึงสมาชิกขึ้นและผลักลงจนกระทั่ง subclass แทบไม่ได้เพิ่มอะไร — อาจเป็นฟิลด์เล็กน้อยหนึ่งตัว อาจเป็น override ที่ตอนนี้ตรงกับพ่อแม่ นี่คือ **Lazy Class** ที่สวมชุด subclass: type พิเศษ ไฟล์พิเศษ การกระโดดพิเศษสำหรับผู้อ่านทุกคน ทั้งหมดเพื่อแสดงความแตกต่างที่หายไปเงียบ ๆ แล้ว เมื่อ subclass กับ superclass ของมันกลายเป็นฝาแฝดที่เกือบเหมือนกัน การเคลื่อนไหวที่ซื่อตรงคือทำให้มันเป็นหนึ่ง
 
-## ก่อน → หลัง
+## Before → After
 
 subclass `Salesperson` เคยต่อยอด `Employee` อย่างมีความหมาย แต่ refactoring ที่ต่อเนื่องกันทำให้มันเหลือถือเพียงฟิลด์เดียวที่ `Employee` ก็เป็นเจ้าของได้ดีพอ ๆ กัน เรารวมมัน
 
@@ -154,7 +154,7 @@ subclass `Salesperson` เคยต่อยอด `Employee` อย่างม
 
 <Mermaid code={collapseDiagram} title="สอง type ที่เกือบเหมือนกันกลายเป็น Employee เดียว" />
 
-## กลไก
+## Mechanics
 
 1. ตัดสินใจว่าคลาสไหนจะอยู่รอด โดยทั่วไป superclass จะดูดซับ subclass แต่ถ้าชื่อ subclass อ่านแล้วเข้ากับแนวคิดที่รวมแล้วดีกว่า ก็เก็บมันไว้แทน
 2. ใช้ **Pull Up** และ **Push Down** เพื่อย้ายฟิลด์และเมท็อดทั้งหมดเข้าไปในคลาสเดียวที่จะอยู่รอด เพื่อให้คลาสที่จะถูกกำจัดเหลือว่างเปล่า
@@ -162,17 +162,28 @@ subclass `Salesperson` เคยต่อยอด `Employee` อย่างม
 4. ลบคลาสที่ตอนนี้ว่างเปล่าทิ้ง (และเอา embedding/wrapper ออกใน Go และ Rust)
 5. **รันเทสต์** อีกครั้งเป็นครั้งสุดท้าย โปรแกรมควรทำงานเหมือนเดิมเป๊ะ ๆ โดยมี type ให้นำทางน้อยลงหนึ่งตัว
 
-## เมื่อไรควรใช้ / ข้อแลกเปลี่ยน
+## When to use / trade-offs
 
-ยุบลำดับชั้นเมื่อ subclass เพิ่มน้อยมากจน type พิเศษเป็นเพียงภาระล้วน ๆ — ไม่มีพฤติกรรมที่มีความหมาย ไม่มีความแตกต่างจริง มีแค่การอ้อม การเอามันออกทำให้โค้ดสั้นลงและแบนลง และผู้อ่านก็เลิกกระโดดไปมาระหว่างพ่อแม่และลูกเพื่อประกอบแนวคิดเดียว
+ยุบลำดับชั้นเมื่อ subclass เพิ่มน้อยมากจน type พิเศษเป็นเพียงภาระล้วน ๆ — ไม่มี behavior ที่มีความหมาย ไม่มีความแตกต่างจริง มีแค่การอ้อม การเอามันออกทำให้ code สั้นลงและแบนลง และผู้อ่านก็เลิกกระโดดไปมาระหว่างพ่อแม่และลูกเพื่อประกอบแนวคิดเดียว
 
 ข้อแลกเปลี่ยนคือการย้อนกลับได้: ถ้าความแตกต่างกลับมาในภายหลัง คุณก็จะ re-extract subclass (หรือ interface) ขึ้นมาใหม่ ซึ่งไม่เป็นไร — Collapse Hierarchy คือสิ่งตรงข้ามตามธรรมชาติของ **Extract Superclass** และการ refactoring ก็ตั้งใจให้ไหลได้ทั้งสองทางเมื่อความเข้าใจของคุณเปลี่ยน ใน Go และ Rust ไม่เคยมีลำดับชั้นของคลาสตั้งแต่แรก ดังนั้น "collapse" จึงเป็นเพียงการลบ wrapper struct ที่ไม่จำเป็นและฝังฟิลด์เดียวของมันเข้าไป
 
-## เกี่ยวข้อง
+## Related
 
 - [Extract Superclass & Interface](/refactoring/th/generalization-and-inheritance/extract-superclass-and-interface/)
 - [Pull Up & Push Down](/refactoring/th/generalization-and-inheritance/pull-up-and-push-down/)
 - [Replace Inheritance with Delegation](/refactoring/th/generalization-and-inheritance/replace-inheritance-with-delegation/)
+
+| ใช้ Collapse Hierarchy เมื่อ | หลีกเลี่ยงเมื่อ |
+|---|---|
+| subclass ไม่มี behavior ของตัวเองเลย — เหมือน parent ทั้งหมด | subclass มี behavior เฉพาะที่ยังใช้อยู่ |
+| subclass มีอยู่เพราะ refactoring เก่าที่ไม่ถูก clean up | การ collapse จะทำให้ class ที่เหลือใหญ่เกินไป |
+| inheritance tree ลึกเกินไปจน navigate ยาก | มี test ที่ test behavior ของ subclass โดยเฉพาะ |
+
+> ⚠️ ไม่ควร Collapse Hierarchy เมื่อ:
+> - subclass นั้นอาจถูก extend ในอนาคต — ลบไปจะต้องสร้างใหม่
+> - subclass มีชื่อที่สื่อ domain concept ชัดเจน แม้ body จะเล็ก
+> - ยังมี test ที่ test interface ของ subclass อยู่ — collapse จะ break test
 
 <Callout title="type ควรหารายได้ให้แก่การมีอยู่ของมันเอง">
 ทุกคลาส, struct, หรือ trait ที่ผู้อ่านพบเป็นภาษีเล็ก ๆ ต่อความสนใจของพวกเขา subclass ที่ไม่เพิ่มอะไรจริงคือภาษีที่ไม่ได้ผลตอบแทน ยุบมันทิ้ง — และถ้าความแตกต่างที่แท้จริงโผล่มาในภายหลัง ค่อย extract type ใหม่ตอนนั้น เมื่อมันแบกน้ำหนักได้จริง ๆ ใน Go และ Rust ซึ่ง "ลำดับชั้น" เป็นเพียง wrapper struct การยุบก็เป็นแค่การเอาชั้นที่ไม่เคยจำเป็นต้องมีอยู่ออกไป
@@ -182,10 +193,10 @@ export const quizCollapse = [
   {
     q: 'เมื่อไรคือจังหวะที่เหมาะจะทำ Collapse Hierarchy?',
     options: [
-      'เมื่อ subclass เพิ่มพฤติกรรมที่หลากหลายและชัดเจน',
+      'เมื่อ subclass เพิ่ม behavior ที่หลากหลายและชัดเจน',
       'เมื่อ subclass กับ superclass ของมันไม่ต่างกันมากพอจะมีอยู่เป็นสอง type อีกต่อไป',
       'เมื่อคุณต้องการ subclass มากขึ้น',
-      'เมื่อฟังก์ชันยาวเกินไป',
+      'เมื่อ function ยาวเกินไป',
     ],
     answer: 1,
   },
@@ -205,7 +216,7 @@ export const quizCollapse = [
       'การรวมสอง interface เป็นหนึ่ง',
       'การลบ wrapper/embedding struct ที่ไม่จำเป็นและฝังฟิลด์ของมันเข้าไปใน base',
       'การเอาเมท็อดทั้งหมดออก',
-      'การแปลง struct เป็นฟังก์ชัน',
+      'การแปลง struct เป็น function',
     ],
     answer: 1,
   },

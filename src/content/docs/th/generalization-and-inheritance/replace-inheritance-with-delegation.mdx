@@ -20,15 +20,15 @@ export const delegationDiagram = `classDiagram
   Stack --> List : holds & delegates
   note for Stack "Stack HAS-A List, not IS-A List"`;
 
-## เจตนา
+## Intent
 
 **Replace Inheritance with Delegation** ปลด subclass ออกจากพ่อแม่ของมัน แล้วให้มันมี *ฟิลด์* ที่ถือ instance ของพ่อแม่เดิมไว้แทน คลาสจะส่งต่อ (delegate) การเรียกที่มันต้องการจริง ๆ และเพิกเฉยส่วนที่เหลือ คุณทำสิ่งนี้เมื่อ subclass ใช้ interface ของ superclass เพียงเสี้ยวเดียว หรือเมื่อ inheritance นั้นจำลองความสัมพันธ์ "has-a" ที่แต่งตัวเป็น "is-a"
 
-## กลิ่นไม่ดี
+## Code Smell
 
 อาการคลาสสิกคือ **Refused Bequest**: `Stack extends List` แต่ stack ไม่ควรให้ caller `insertAt` ตรงกลางหรือ `remove` จากด้านล่าง การ inherit ทำให้ `Stack` เปิดเผย interface ทั้งหมดของ `List` และทำลาย invariant ของตัวเองอย่างเงียบ ๆ ความสัมพันธ์ผิด — stack *มี* list มันไม่ได้ *เป็น* list การแทน inheritance ด้วย delegation ทำให้ `Stack` เปิดเผยเพียง `push` และ `pop` โดยเก็บ list ไว้เป็น private
 
-## ก่อน → หลัง
+## Before → After
 
 `Stack` ที่สร้างขึ้นด้วยการ extend `List` รั่วทุก operation ของ list ออกไป หลัง refactoring มันจะ *ถือ* list และเปิดเผยเพียง operation ของ stack เท่านั้น
 
@@ -142,7 +142,7 @@ export const delegationDiagram = `classDiagram
 
 <Mermaid code={delegationDiagram} title="Stack เลิกเป็น List แล้วเริ่มถือ List ไว้แทน" />
 
-## กลไก
+## Mechanics
 
 1. สร้างฟิลด์ใน subclass เพื่อถือ instance ของ superclass (เดิม) ตั้งค่าเริ่มต้นให้มัน — ไม่ว่าจะด้วย instance ใหม่ หรือด้วยตัว object เองหากคุณกำลังแกะ self-reference ออก
 2. สำหรับแต่ละเมท็อดของ superclass ที่ subclass ใช้จริง ให้เพิ่มเมท็อดที่ delegate ซึ่งส่งต่อการเรียกไปยังฟิลด์นั้น
@@ -151,17 +151,28 @@ export const delegationDiagram = `classDiagram
 5. **รันเทสต์** หลังเดินสายเมท็อดที่ delegate แต่ละตัวเสร็จ
 6. เมื่อ delegation อยู่ที่แล้ว คุณก็มีอิสระที่จะแคบ interface ที่เปิดเผยและปกป้อง invariant ที่ inheritance เดิมละเมิด
 
-## เมื่อไรควรใช้ / ข้อแลกเปลี่ยน
+## When to use / trade-offs
 
 ใช้สิ่งนี้เมื่อ subclass ปฏิเสธมรดกส่วนใหญ่ของมัน เมื่อ inheritance รั่ว operation ที่ทำลายกฎของ subclass เอง หรือเมื่อ "is-a" ไม่เคยเป็นจริงจริง ๆ หลังการย้าย คุณควบคุมได้เป๊ะ ๆ ว่า operation ใดเป็น public ดังนั้น invariant จึงบังคับใช้ได้
 
 ต้นทุนคือ boilerplate ของการส่งต่อเล็กน้อย — หนึ่งเมท็อดสั้น ๆ ต่อหนึ่ง operation ที่ delegate นั่นเป็นราคาเล็ก ๆ และซื่อตรงสำหรับความสัมพันธ์ที่ถูกต้องแม่นยำ ใน Go นี่เป็นเพียงการเลือกฟิลด์ที่ถือไว้แทน embedding ส่วนใน Rust delegation คือเส้นทาง *เดียว* ดังนั้น refactoring นี้จึงเป็นแค่ "เขียน Rust แบบ idiomatic ตั้งแต่แรก"
 
-## เกี่ยวข้อง
+## Related
 
 - [Replace Subclass with Delegation](/refactoring/th/generalization-and-inheritance/replace-subclass-with-delegation/)
 - [Pull Up & Push Down](/refactoring/th/generalization-and-inheritance/pull-up-and-push-down/)
 - [Extract Superclass & Interface](/refactoring/th/generalization-and-inheritance/extract-superclass-and-interface/)
+
+| ใช้ Replace Inheritance with Delegation เมื่อ | หลีกเลี่ยงเมื่อ |
+|---|---|
+| subclass ใช้เพียงบางส่วนของ superclass interface | subclass เป็น "is-a" อย่างแท้จริง ไม่ใช่แค่ "has-a" |
+| inheritance ทำให้ subclass ผูกพันกับ superclass implementation | delegation จะเพิ่ม forwarding methods มากเกินไป |
+| ต้องการ swap implementation โดยไม่เปลี่ยน interface | client code ต้อง downcast ไปยัง superclass type |
+
+> ⚠️ ไม่ควร Replace Inheritance with Delegation เมื่อ:
+> - subclass ใช้ superclass interface ครบทุก method
+> - Liskov Substitution Principle ยังคงใช้ได้ — subclass คือ superclass จริง ๆ
+> - delegation จะสร้าง wrapper ที่ไม่เพิ่ม value
 
 <Callout title="เลือก composition มากกว่า inheritance">
 inheritance ผูกคุณเข้ากับ interface *ทั้งหมด* ของพ่อแม่และวิวัฒนาการของมัน ส่วน composition ให้คุณส่งต่อเฉพาะสิ่งที่คุณตั้งใจจะรองรับ เมื่อไม่แน่ใจ ให้ถือ collaborator ไว้เป็นฟิลด์แล้ว delegate Go และ Rust อบคำแนะนำนี้ไว้ในตัวภาษาแล้ว — มันไม่ให้ inheritance คุณไปใช้ผิด ๆ ดังนั้นคุณจึงหยิบ delegation มาใช้โดยปริยาย และความสัมพันธ์ของคุณก็ซื่อตรงอยู่เสมอ
@@ -171,7 +182,7 @@ export const quizReplaceInh = [
   {
     q: 'Replace Inheritance with Delegation แก้ปัญหาใด?',
     options: [
-      'ฟังก์ชันที่ยาวเกินไป',
+      'function ที่ยาวเกินไป',
       'subclass ที่ใช้พ่อแม่เพียงบางส่วน หรือจำลองความสัมพันธ์ "is-a" ที่ผิด',
       'ดัชนีฐานข้อมูลที่หายไป',
       'สองเมท็อดที่มีชื่อเดียวกัน',
@@ -181,7 +192,7 @@ export const quizReplaceInh = [
   {
     q: 'หลัง refactoring คลาสนำพ่อแม่เดิมมาใช้ซ้ำอย่างไร?',
     options: [
-      'มันคัดลอกโค้ดของพ่อแม่ทั้งหมดมาแบบ inline',
+      'มันคัดลอก code ของพ่อแม่ทั้งหมดมาแบบ inline',
       'มันถือพ่อแม่เดิมไว้เป็นฟิลด์แล้ว delegate การเรียกที่มันต้องการ',
       'มันลบพ่อแม่ทิ้งทั้งหมด',
       'มันทำให้พ่อแม่เป็น abstract',

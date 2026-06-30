@@ -143,6 +143,17 @@ smell ที่ว่า reference-ทั้งที่ควรเป็น-va
 - [Encapsulate Variable](/refactoring/th/organizing-data/encapsulate-variable/)
 - [Replace Magic Literal](/refactoring/th/organizing-data/replace-magic-literal/)
 
+| ใช้ Change Reference to Value เมื่อ | หลีกเลี่ยงเมื่อ |
+|---|---|
+| object เป็น immutable และไม่มี shared identity | object ต้องการ update ที่ทุก reference เห็นพร้อมกัน |
+| ต้องการ equality ตาม content ไม่ใช่ identity | object มี lifecycle ที่ต้องจัดการ (open/close) |
+| ต้องการใช้ใน map key หรือ set | หลาย component ต้อง observe การเปลี่ยนแปลงเดียวกัน |
+
+> ⚠️ ไม่ควร Change Reference to Value เมื่อ:
+> - หลายส่วนของระบบต้องเห็น mutation เดียวกันพร้อมกัน
+> - object มีขนาดใหญ่มาก — copying ทุกครั้งแพงเกินไป
+> - object เป็น entity ที่มี identity สำคัญ (เช่น user account, database record)
+
 <Callout title="ถามว่า: การเปลี่ยนแปลงควรถูกเห็นโดยทุกคนไหม?">
 คำถามเดียวนั้นตัดสินทิศทาง ถ้าการอัปเดตอ็อบเจกต์ต้องกระจายไปยังผู้ถือทุกคน มันคือ entity ที่แชร์กันหนึ่งเดียว — reference ถ้าเนื้อหาเท่ากันหมายถึงสิ่งเดียวกันและไม่มีใครควรเห็นการ mutate ให้ทำมันเป็น value ที่ไม่เปลี่ยนแปลงและเลิกแชร์
 </Callout>

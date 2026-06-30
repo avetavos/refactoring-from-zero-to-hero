@@ -26,11 +26,11 @@ export const ctorDiagram = `classDiagram
   Employee <|-- Manager : super(name, id)
   Employee <|-- Engineer : super(name, id)`;
 
-## เจตนา
+## Intent
 
-**Pull Up Constructor Body** คือ **Pull Up Method** ที่นำมาใช้กับเมท็อดเพียงตัวเดียวที่มีกฎพิเศษ: constructor เมื่อ subclass พี่น้องหลายตัวเริ่ม constructor ด้วยโค้ดตั้งค่าฟิลด์ที่เหมือนกัน การ initialize ที่ใช้ร่วมกันนั้นจะย้ายเข้าไปอยู่ใน constructor ของ superclass จากนั้น constructor ของแต่ละ subclass ก็ *เรียกขึ้นไป* หาพ่อแม่สำหรับส่วนที่เหมือนกัน และเก็บเฉพาะบรรทัดที่เป็นเอกลักษณ์ของตัวเองไว้
+**Pull Up Constructor Body** คือ **Pull Up Method** ที่นำมาใช้กับเมท็อดเพียงตัวเดียวที่มีกฎพิเศษ: constructor เมื่อ subclass พี่น้องหลายตัวเริ่ม constructor ด้วย code ตั้งค่าฟิลด์ที่เหมือนกัน การ initialize ที่ใช้ร่วมกันนั้นจะย้ายเข้าไปอยู่ใน constructor ของ superclass จากนั้น constructor ของแต่ละ subclass ก็ *เรียกขึ้นไป* หาพ่อแม่สำหรับส่วนที่เหมือนกัน และเก็บเฉพาะบรรทัดที่เป็นเอกลักษณ์ของตัวเองไว้
 
-## กลิ่นไม่ดี
+## Code Smell
 
 เปิด subclass พี่น้องสองตัวขึ้นมาแล้ว constructor ของพวกมันเริ่มต้นเหมือนกันเป๊ะ: `this.name = name; this.id = id; this.hiredAt = now();` ซ้ำคำต่อคำ บรรทัดต่อบรรทัด นั่นคือ **Duplicated Code** ในที่ที่รับน้ำหนักมากที่สุด — การตั้งค่าออบเจกต์ พรุ่งนี้เพิ่มฟิลด์ให้แนวคิดฐาน แล้วคุณก็ต้องจำที่จะเดินสายมันผ่าน constructor ของ *ทุก* subclass การตั้งค่าที่เหมือนกันเป็นของแนวคิดที่ใช้ร่วมกัน ดังนั้นมันจึงควรอยู่ใน constructor ที่ใช้ร่วมกัน
 
@@ -198,26 +198,37 @@ export const ctorDiagram = `classDiagram
 
 <Mermaid code={ctorDiagram} title="การตั้งค่าฟิลด์ที่เหมือนกันย้ายเข้าไปใน constructor ของ Employee; subclass เรียกขึ้นไปหามัน" />
 
-## กลไก
+## Mechanics
 
 1. เพิ่ม constructor บน superclass ถ้ามันยังไม่มี ให้พารามิเตอร์แก่มันสำหรับฟิลด์ที่ subclass ตั้งค่าเหมือนกัน
 2. ย้ายบรรทัดการ assign ที่ใช้ร่วมกันเข้าไปใน constructor ของ superclass นั้น
 3. ใน constructor ของแต่ละ subclass ให้แทนบรรทัดเหล่านั้นด้วยการเรียกขึ้นไปหาพ่อแม่ — `super(...)` ใน TypeScript/Python — โดยส่ง argument ที่ใช้ร่วมกันไป
 4. ตรวจให้แน่ใจว่าการเรียกขึ้นไปเกิด *ก่อน* ก่อนที่ subclass จะแตะฟิลด์ใด ๆ เพราะการตั้งค่าฟิลด์ขึ้นกับว่าฐานถูก initialize แล้ว
 5. **รันเทสต์ของคุณ** ออบเจกต์ที่ถูกสร้างต้องถือค่าฟิลด์เดียวกับก่อนหน้า
-6. ระวังอันตรายเรื่องลำดับ: ถ้า subclass รันโค้ดที่ใช้ร่วมกันใน *จุดที่ต่างกัน* เมื่อเทียบกับตรรกะของตัวเอง ให้ปรับให้สอดคล้องก่อนจะดึงขึ้น
+6. ระวังอันตรายเรื่องลำดับ: ถ้า subclass รัน code ที่ใช้ร่วมกันใน *จุดที่ต่างกัน* เมื่อเทียบกับตรรกะของตัวเอง ให้ปรับให้สอดคล้องก่อนจะดึงขึ้น
 
-## เมื่อไรควรใช้ / ข้อแลกเปลี่ยน
+## When to use / trade-offs
 
 หยิบสิ่งนี้มาใช้เมื่อใดก็ตามที่ constructor พี่น้องมีส่วนต้น (prefix) ของการ initialize ที่เหมือนกัน การรวมศูนย์มันหมายความว่าฟิลด์ใหม่ที่ใช้ร่วมกันจะถูกเดินสายในที่เดียวเป๊ะ ๆ และ constructor ของ subclass จะหดเหลือเพียงสิ่งที่ทำให้แต่ละ type ต่างกัน
 
 ข้อควรระวังคือกฎที่เข้มงวดของ constructor: การเรียกขึ้นไปหาพ่อแม่ต้องรันก่อนที่ subtype จะใช้ฟิลด์ที่ inherit มาใด ๆ และถ้าพี่น้องเอาการตั้งค่าที่เหมือนและที่เฉพาะมาสลับกันในลำดับต่างกัน คุณต้องแกะมันออกก่อน — บางครั้งเส้นทางที่ปลอดภัยกว่าคือ extract งานที่ใช้ร่วมกันออกเป็น helper ที่ constructor เรียก แทนที่จะเอาเข้าไปใน constructor เอง ใน Go และ Rust ไม่มี constructor ให้ดึงขึ้น: คุณแสดงเจตนาเดียวกันด้วยการมี constructor *function* ที่ใช้ร่วมกันบวกกับ embedding (Go) หรือ struct ฐานที่ถือไว้ (Rust) ดังนั้นการตั้งค่าที่เหมือนกันก็ยังอยู่ในที่เดียวเป๊ะ ๆ
 
-## ที่เกี่ยวข้อง
+## Related
 
 - [Pull Up & Push Down](/refactoring/th/generalization-and-inheritance/pull-up-and-push-down/)
 - [Extract Superclass & Interface](/refactoring/th/generalization-and-inheritance/extract-superclass-and-interface/)
 - [Replace Superclass with Delegation](/refactoring/th/generalization-and-inheritance/replace-superclass-with-delegation/)
+
+| ใช้ Pull Up Constructor Body เมื่อ | หลีกเลี่ยงเมื่อ |
+|---|---|
+| subclass constructor มี initialization logic เหมือนกัน | แต่ละ subclass ต้องการ init sequence ที่ต่างกัน |
+| ต้องการ enforce invariant ใน base class constructor | superclass constructor จะซับซ้อนเกินไปจาก variation |
+| จะ add validation ที่ทุก subclass ต้องผ่าน | subclass ต้องการ call `super()` ในลำดับที่ต่างกัน |
+
+> ⚠️ ไม่ควร Pull Up Constructor Body เมื่อ:
+> - initialization logic ต่างกันในแต่ละ subclass อย่างมีนัยสำคัญ
+> - การ pull up จะทำให้ base class constructor มี parameter มากเกินไป
+> - ภาษากำหนด constraint ที่ทำให้ constructor sharing ซับซ้อน
 
 <Callout title="constructor คือเมท็อดที่มีกฎเพิ่ม">
 การดึงเมท็อดธรรมดาขึ้นเป็นเรื่องปกติ การดึง constructor body ขึ้นเพิ่มข้อจำกัดหนึ่ง — พ่อแม่ต้องถูก initialize ก่อนที่ลูกจะรัน ทำให้การเรียกขึ้นไปเป็น statement แรกเสมอ และถ้า subclass เดิมทำงานที่ใช้ร่วมกันที่จุดต่าง ๆ กัน ให้แก้ลำดับนั้นก่อนจะดึงอะไรขึ้น ใน Go และ Rust วินัยเดียวกันนี้ปรากฏเป็น "สร้าง struct ที่ embed/ฐานก่อน"
@@ -227,8 +238,8 @@ export const quizPullUpCtor = [
   {
     q: 'เมื่อไรที่ Pull Up Constructor Body เป็นการเคลื่อนไหวที่ถูกต้อง?',
     options: [
-      'เมื่อ constructor ของ subclass พี่น้องมีโค้ด initialize ที่เหมือนกัน',
-      'เมื่อฟังก์ชันเดียวยาวเกินไป',
+      'เมื่อ constructor ของ subclass พี่น้องมี code initialize ที่เหมือนกัน',
+      'เมื่อ function เดียวยาวเกินไป',
       'เมื่อคลาสไม่มี constructor',
       'เมื่อสองคลาสไม่เกี่ยวข้องกันโดยสิ้นเชิง',
     ],
@@ -247,7 +258,7 @@ export const quizPullUpCtor = [
   {
     q: 'กฎเรื่องลำดับใดที่คุณต้องเคารพเมื่อดึง constructor body ขึ้น?',
     options: [
-      'โค้ดเฉพาะของ subclass ต้องรันก่อนการเรียกหาพ่อแม่',
+      'code เฉพาะของ subclass ต้องรันก่อนการเรียกหาพ่อแม่',
       'การเรียกขึ้นไปหาพ่อแม่ต้องมาก่อน ก่อนที่ subclass จะแตะฟิลด์ที่ inherit มา',
       'ลำดับไม่สำคัญสำหรับ constructor',
       'constructor ของพ่อแม่ต้องรันท้ายสุด',

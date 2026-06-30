@@ -23,13 +23,23 @@ export const overviewDiagram = `flowchart TD
   F --> H
   G --> H`;
 
-## เจตนา
+## Intent
 
-ตระกูล **การทำให้เงื่อนไขเรียบง่ายขึ้น (simplifying conditionals)** ว่าด้วยตรรกะการตัดสินใจ ได้แก่ branch, guard และ switch ที่ตัดสินว่า *โปรแกรมจะทำอะไรต่อไป* เงื่อนไขที่เริ่มต้นจากคำถามเดียวที่ชัดเจน ค่อย ๆ งอกเงื่อนไขเพิ่มเข้ามา ซ้อนอยู่ในเงื่อนไขอื่น และแตกสำเนากระจายไปทั่วโค้ดเบส การ refactor เหล่านี้คลายความรกรุงรังนั้นออก เพื่อให้ผู้อ่านมองเห็นได้ในพริบตาว่าเคสไหนพาไปทางไหน
+ตระกูล **การทำให้เงื่อนไขเรียบง่ายขึ้น (simplifying conditionals)** ว่าด้วยตรรกะการตัดสินใจ ได้แก่ branch, guard และ switch ที่ตัดสินว่า *โปรแกรมจะทำอะไรต่อไป* เงื่อนไขที่เริ่มต้นจากคำถามเดียวที่ชัดเจน ค่อย ๆ งอกเงื่อนไขเพิ่มเข้ามา ซ้อนอยู่ในเงื่อนไขอื่น และแตกสำเนากระจายไปทั่ว code เบส การ refactor เหล่านี้คลายความรกรุงรังนั้นออก เพื่อให้ผู้อ่านมองเห็นได้ในพริบตาว่าเคสไหนพาไปทางไหน
 
-## กลิ่นเหม็น
+## Code Smell
 
-ตรรกะเงื่อนไขที่ซับซ้อนเป็นหนึ่งในสัญญาณที่ดังที่สุดว่าฟังก์ชันนั้นดูแลรักษายาก สัญญาณเตือนก็คุ้นหน้าคุ้นตา ได้แก่ นิพจน์บูลีนที่ยาวจนต้องอ่านสองรอบ ลูกศรของบล็อก `if` ที่ซ้อนกันไล่ออกไปทางขอบขวาของจอ การ `switch` บนฟิลด์ "type" ที่ทำซ้ำในห้าฟังก์ชัน และ `if (x == null)` ที่กระจายอยู่ในทุกเมธอดที่แตะต้อง `x` แต่ละอย่างมีวิธีแก้ที่มีชื่อเฉพาะ และวิธีแก้แต่ละแบบทำให้พฤติกรรมเหมือนเดิมทุกประการในขณะที่ทำให้เจตนาชัดเจนขึ้น
+ตรรกะเงื่อนไขที่ซับซ้อนเป็นหนึ่งในสัญญาณที่ดังที่สุดว่า function นั้นดูแลรักษายาก สัญญาณเตือนก็คุ้นหน้าคุ้นตา ได้แก่ นิพจน์บูลีนที่ยาวจนต้องอ่านสองรอบ ลูกศรของบล็อก `if` ที่ซ้อนกันไล่ออกไปทางขอบขวาของจอ การ `switch` บนฟิลด์ "type" ที่ทำซ้ำในห้า function และ `if (x == null)` ที่กระจายอยู่ในทุก method ที่แตะต้อง `x` แต่ละอย่างมีวิธีแก้ที่มีชื่อเฉพาะ และวิธีแก้แต่ละแบบทำให้ behavior เหมือนเดิมทุกประการในขณะที่ทำให้เจตนาชัดเจนขึ้น
+
+| Code Smell | อาการที่บ่งชี้ | ท่าที่แนะนำ |
+|---|---|---|
+| Complex Conditional | นิพจน์บูลีนยาวที่ต้องอ่านสองรอบเพื่อถอดรหัส | Decompose Conditional |
+| Duplicated Conditional | การตรวจสอบหลายอันนำไปสู่ผลลัพธ์เดียวกัน | Consolidate Conditional Expression |
+| Nested Conditional | `if/else` ซ้อนลึกจนหา happy path ไม่เจอ | Replace Nested Conditional with Guard Clauses |
+| Switch Statement | type switch ตัวเดียวกันซ้ำใน function หลายตัว | Replace Conditional with Polymorphism |
+| Null Check | `if (x == null)` เดิมซ้ำในทุก method ที่แตะ `x` | Introduce Special Case |
+| Control Flag | boolean ที่มีไว้เพียงเพื่อบังคับ loop | Replace Control Flag with Break/Return |
+| Error Code | sentinel value สำหรับรายงานความล้มเหลว ถูกมองข้ามได้ง่าย | Replace Error Code with Exception |
 
 <Mermaid code={overviewDiagram} title="การเลือกท่า simplifying-conditionals ตามสิ่งที่ผิดปกติ" />
 
@@ -37,12 +47,12 @@ export const overviewDiagram = `flowchart TD
 
 การ refactor แปดแบบ แต่ละแบบเล็กและย้อนกลับได้:
 
-- **[Decompose Conditional](/refactoring/th/simplifying-conditionals/decompose-conditional/)** — แยกตัวทดสอบ, then-branch และ else-branch ออกเป็นฟังก์ชันที่ตั้งชื่อดี เพื่อให้โครงสร้างอ่านได้เหมือนประโยค: *ถ้าเป็นวันพีค ให้คิดเรตพีค ไม่อย่างนั้นคิดเรตปกติ*
+- **[Decompose Conditional](/refactoring/th/simplifying-conditionals/decompose-conditional/)** — แยกตัวทดสอบ, then-branch และ else-branch ออกเป็น function ที่ตั้งชื่อดี เพื่อให้โครงสร้างอ่านได้เหมือนประโยค: *ถ้าเป็นวันพีค ให้คิดเรตพีค ไม่อย่างนั้นคิดเรตปกติ*
 - **[Consolidate Conditional Expression](/refactoring/th/simplifying-conditionals/consolidate-conditional/)** — เมื่อการตรวจสอบแยกกันหลายอันนำไปสู่ผลลัพธ์เดียวกัน ให้รวมเข้าเป็นเงื่อนไขเดียวและตั้งชื่อให้ เพื่อให้ผู้อ่านได้รู้ *ทำไม* แทนที่จะรู้ว่า *มีกี่ทาง*
 - **[Replace Nested Conditional with Guard Clauses](/refactoring/th/simplifying-conditionals/replace-nested-conditional-with-guard-clauses/)** — ทำให้ `if/else` ที่ซ้อนลึกแบนราบลง ด้วยการ return ออกก่อนสำหรับเคสพิเศษ เหลือเส้นทางหลักไว้แบบไม่ย่อหน้าและเห็นได้ชัด
-- **[Replace Conditional with Polymorphism](/refactoring/th/simplifying-conditionals/replace-conditional-with-polymorphism/)** — เมื่อ `switch` หรือ `if` ที่อิงชนิดข้อมูลเกิดขึ้นซ้ำ ให้ดันแต่ละ branch ลงไปเป็นเมธอดของซับคลาส เพื่อให้ภาษาทำ dispatch ให้แทน
+- **[Replace Conditional with Polymorphism](/refactoring/th/simplifying-conditionals/replace-conditional-with-polymorphism/)** — เมื่อ `switch` หรือ `if` ที่อิงชนิดข้อมูลเกิดขึ้นซ้ำ ให้ดันแต่ละ branch ลงไปเป็น method ของซับคลาส เพื่อให้ภาษาทำ dispatch ให้แทน
 - **[Introduce Special Case](/refactoring/th/simplifying-conditionals/introduce-special-case/)** — แทนที่การตรวจ null-หรือพิเศษที่ทำซ้ำ ด้วยอ็อบเจกต์ที่ตอบสนองด้วยค่าดีฟอลต์ที่สมเหตุสมผล เพื่อให้ผู้เรียกเลิกถามว่า "มันหายไปไหม?"
-- **[Introduce Assertion](/refactoring/th/simplifying-conditionals/introduce-assertion/)** — ทำให้ข้อสมมติที่โค้ดส่วนหนึ่งพึ่งพาอยู่เงียบ ๆ ปรากฏชัด เพื่อให้ข้อสมมติที่ถูกละเมิดล้มเหลวอย่างดังที่ต้นตอ แทนที่จะทำให้ข้อมูลปลายน้ำเสียหาย
+- **[Introduce Assertion](/refactoring/th/simplifying-conditionals/introduce-assertion/)** — ทำให้ข้อสมมติที่ code ส่วนหนึ่งพึ่งพาอยู่เงียบ ๆ ปรากฏชัด เพื่อให้ข้อสมมติที่ถูกละเมิดล้มเหลวอย่างดังที่ต้นตอ แทนที่จะทำให้ข้อมูลปลายน้ำเสียหาย
 - **[Replace Control Flag with Break/Return](/refactoring/th/simplifying-conditionals/replace-control-flag-with-break/)** — ลบบูลีนที่มีอยู่เพียงเพื่อบังคับทิศทางลูป แล้วปล่อยให้ `break`, `return` หรือ `continue` แสดงจุดออกตรงที่มันเกิดขึ้นจริง
 - **[Replace Error Code with Exception](/refactoring/th/simplifying-conditionals/replace-error-code-with-exception/)** — เลิกรายงานความล้มเหลวด้วยค่า sentinel ที่ถูกมองข้ามได้ ให้โยน exception แทน หรือใน Go และ Rust ให้ return `error`/`Result` อย่างชัดเจน เพื่อไม่ให้ความล้มเหลวถูกเข้าใจผิดว่าเป็นความสำเร็จ
 
@@ -58,7 +68,7 @@ export const quizIndex = [
     options: [
       'ความเร็วในการประมวลผลดิบของ branch',
       'ความอ่านออกได้ของตรรกะการตัดสินใจ — เคสไหนพาไปทางไหน',
-      'ปริมาณหน่วยความจำที่ฟังก์ชันใช้',
+      'ปริมาณหน่วยความจำที่ function ใช้',
       'จำนวนเงื่อนไขในโปรแกรม',
     ],
     answer: 1,

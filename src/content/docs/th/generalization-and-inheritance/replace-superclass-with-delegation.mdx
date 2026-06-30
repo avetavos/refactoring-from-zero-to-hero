@@ -27,17 +27,17 @@ export const delegationDiagram = `classDiagram
   }
   StackAfter --> List : after (holds & delegates)`;
 
-## เจตนา
+## Intent
 
-**Replace Superclass with Delegation** เปลี่ยนสายสัมพันธ์ inheritance ให้เป็นสาย *has-a* แทนที่จะเป็น `Stack extends List` ตัว stack จะ *ถือ* list ไว้ในฟิลด์ private แล้วเรียกเข้าไปหามันสำหรับการดำเนินการไม่กี่อย่างที่มันต้องใช้จริง subclass ยังคงพฤติกรรมที่มันพึ่งพาไว้ แต่ไม่ถูกบังคับให้ inherit — และเปิดเผย — ทุกสมาชิกของพ่อแม่ที่มันไม่เคยอยากได้ครบทั้งหมด
+**Replace Superclass with Delegation** เปลี่ยนสายสัมพันธ์ inheritance ให้เป็นสาย *has-a* แทนที่จะเป็น `Stack extends List` ตัว stack จะ *ถือ* list ไว้ในฟิลด์ private แล้วเรียกเข้าไปหามันสำหรับการทำงานไม่กี่อย่างที่มันต้องใช้จริง subclass ยังคง behavior ที่มันพึ่งพาไว้ แต่ไม่ถูกบังคับให้ inherit — และเปิดเผย — ทุกสมาชิกของพ่อแม่ที่มันไม่เคยอยากได้ครบทั้งหมด
 
-## กลิ่นไม่ดี
+## Code Smell
 
 คลาสหนึ่ง extends อีกคลาสเพื่อนำเมท็อดไม่กี่ตัวมาใช้ซ้ำ แล้วลงเอยด้วยการลาก public interface ทั้งหมดติดมาด้วย `Stack extends List` inherit `add`, `remove`, `get(index)`, `clear` — ดังนั้นตอนนี้ผู้เรียกสามารถ `stack.remove(item)` จากตรงกลางได้ ละเมิด invariant ที่ stack มีอยู่เพื่อปกป้อง คำกล่าวอ้าง "is-a" เป็นเท็จ: stack ไม่ใช่ list ชนิดหนึ่ง มันแค่ *ใช้* list ตัวหนึ่ง interface ที่ inherit มานั้นเก้งก้าง รั่ว หรือใหญ่เกินจำเป็น — กรณีตัวอย่างของ **Refused Bequest** ที่ทายาทแอบทิ้งสิ่งที่ตนได้รับมาไปเสียมาก
 
 ## Before → After
 
-`Stack` ที่ extends `List` เพื่อเอาที่เก็บข้อมูลของมัน ทำให้การดำเนินการของ list รั่วออกมา หลังจากนั้นมันถือ `List` ไว้และเปิดเผยเพียง `push`/`pop`/`size`
+`Stack` ที่ extends `List` เพื่อเอาที่เก็บข้อมูลของมัน ทำให้การทำงานของ list รั่วออกมา หลังจากนั้นมันถือ `List` ไว้และเปิดเผยเพียง `push`/`pop`/`size`
 
 <Tabs syncKey="lang">
   <TabItem label="TypeScript">
@@ -205,25 +205,36 @@ export const delegationDiagram = `classDiagram
 
 <Mermaid code={delegationDiagram} title="Stack เลิก extends List แล้วถือมันไว้แทน โดย delegate เฉพาะสิ่งที่ต้องใช้" />
 
-## กลไก
+## Mechanics
 
 1. เพิ่มฟิลด์ใน subclass ที่ถือ instance ของ superclass เดิมไว้ แล้ว initialize มัน (มักด้วยการสร้างตัวใหม่ขึ้นมา หรือรับมันเข้ามาเป็น argument ของ constructor)
 2. สำหรับแต่ละสมาชิกที่ inherit มาและ subclass ใช้จริง ให้เพิ่มเมท็อด forwarding เล็ก ๆ ที่ delegate ไปยังฟิลด์
 3. อัปเดตเมท็อดของ subclass เองให้เรียกฟิลด์แทน `super`
 4. ลบสาย `extends` / inheritance ออก เพื่อให้ subclass ไม่เป็น subtype ของพ่อแม่อีกต่อไป **รันเทสต์ของคุณ** หลังจากย้ายแต่ละสมาชิก
-5. ตัดพื้นผิวที่ delegate ให้เหลือเฉพาะการดำเนินการที่คลาสควรเปิดเผยจริง — สมาชิกที่ inherit มาอย่างเก้งก้างก็จะหายไปจาก interface ของมันเอง
+5. ตัดพื้นผิวที่ delegate ให้เหลือเฉพาะการทำงานที่คลาสควรเปิดเผยจริง — สมาชิกที่ inherit มาอย่างเก้งก้างก็จะหายไปจาก interface ของมันเอง
 
-## เมื่อไรควรใช้ / ข้อแลกเปลี่ยน
+## When to use / trade-offs
 
-หยิบสิ่งนี้มาใช้เมื่อ subclass ใช้พ่อแม่เพียงเสี้ยวเดียว เมื่อการ inherit พ่อแม่ทำให้การดำเนินการรั่วออกมาจนทำลาย invariant ของ subclass หรือเมื่อความสัมพันธ์ "is-a" จริง ๆ แล้วเป็น "uses-a" delegation ให้คุณเปิดเผย interface ที่ถูกต้องเป๊ะ ๆ และทำให้สองคลาสนั้นมีอิสระที่จะวิวัฒน์แยกกัน
+หยิบสิ่งนี้มาใช้เมื่อ subclass ใช้พ่อแม่เพียงเสี้ยวเดียว เมื่อการ inherit พ่อแม่ทำให้การทำงานรั่วออกมาจนทำลาย invariant ของ subclass หรือเมื่อความสัมพันธ์ "is-a" จริง ๆ แล้วเป็น "uses-a" delegation ให้คุณเปิดเผย interface ที่ถูกต้องเป๊ะ ๆ และทำให้สองคลาสนั้นมีอิสระที่จะวิวัฒน์แยกกัน
 
 ต้นทุนคือเมท็อด forwarding ที่คุณต้องเขียนเองด้วยมือสำหรับสมาชิกที่คุณ *เก็บ* ไว้ — inheritance บริสุทธิ์จะให้สิ่งเหล่านั้นมาฟรี เมื่อ subclass *เป็น* พ่อแม่ของมันโดยชอบธรรมและต้องการ interface ทั้งหมด ก็ปล่อย inheritance ไว้อย่างนั้น สิ่งตรงข้ามคือ **Replace Delegation with Inheritance** ซึ่งคุ้มจะทำเฉพาะเมื่อคุณพบว่าตัวเองกำลัง forward *ทั้ง* interface ตรงตัว Go และ Rust ตัดสินใจแทนคุณ: เมื่อไม่มี inheritance คุณก็ถือฟิลด์แล้ว delegate ตั้งแต่ต้น — และ `struct embedding` ของ Go เป็นเครื่องมือทางกลางที่จงใจ ซึ่งคุณหยิบมาใช้เฉพาะเมื่อคุณ *ต้องการ* ให้ interface ทั้งหมดถูกเลื่อนขึ้นมา
 
-## ที่เกี่ยวข้อง
+## Related
 
 - [Replace Inheritance with Delegation](/refactoring/th/generalization-and-inheritance/replace-inheritance-with-delegation/)
 - [Replace Subclass with Delegation](/refactoring/th/generalization-and-inheritance/replace-subclass-with-delegation/)
 - [Extract Superclass & Interface](/refactoring/th/generalization-and-inheritance/extract-superclass-and-interface/)
+
+| ใช้ Replace Superclass with Delegation เมื่อ | หลีกเลี่ยงเมื่อ |
+|---|---|
+| subclass ใช้แค่บางส่วนของ superclass และต้องการซ่อนส่วนที่เหลือ | class นั้น IS-A superclass จริง ๆ ทุก method เหมาะสม |
+| subclass ต้องการ inherit จาก class อื่นด้วย (multiple inheritance) | ต้องการ polymorphism — caller ต้องการ treat เป็น superclass type |
+| IS-A relationship ไม่เป็นจริงในทุก context | delegation จะทำให้ต้อง forward ทุก method ที่ต้องการ |
+
+> ⚠️ ไม่ควร Replace Superclass with Delegation เมื่อ:
+> - relationship นั้น IS-A ที่ถูกต้องจริง ๆ — อย่า delegate โดยไม่จำเป็น
+> - caller ใช้ polymorphism กับ type นี้ — delegation ทำลาย type hierarchy
+> - delegation จะเพิ่ม boilerplate มากกว่า complexity ที่แก้ได้
 
 <Callout title="inherit ทั้ง interface หรือไม่เอาเลย">
 คำถามชี้ขาดนั้นเรียบง่าย: subclass ต้องการ *ทุกอย่าง* ที่พ่อแม่ให้หรือไม่? ถ้าใช่ inheritance ก็ซื่อสัตย์และราคาถูก ถ้ามันต้องการเพียงเสี้ยวเดียว — และอายกับส่วนที่เหลือ — ก็ถือพ่อแม่ไว้เป็นฟิลด์แล้ว forward เฉพาะเสี้ยวนั้น Go และ Rust ผนวกสิ่งนี้ไว้: ไม่มีทาง inherit เพียงเสี้ยวเดียว คุณจึงประกอบด้วย composition ซึ่งเป็นจุดที่ refactoring นี้นำไปพอดี
@@ -235,17 +246,17 @@ export const quizReplaceSuper = [
     options: [
       'subclass ที่ใช้ interface ทั้งหมดของพ่อแม่',
       'subclass ที่ใช้ superclass เพียงบางส่วน หรือ inherit interface ที่เก้งก้าง',
-      'ฟังก์ชันที่ยาวเกินไป',
+      'function ที่ยาวเกินไป',
       'สองคลาสที่ไม่มีความสัมพันธ์กันเลย',
     ],
     answer: 1,
   },
   {
-    q: 'หลังจาก refactoring แล้ว subclass เดิมเข้าถึงพฤติกรรมที่ต้องการอย่างไร?',
+    q: 'หลังจาก refactoring แล้ว subclass เดิมเข้าถึง behavior ที่ต้องการอย่างไร?',
     options: [
       'มันเรียก super บนพ่อแม่ที่ inherit มา',
       'มันถือ superclass เดิมไว้เป็นฟิลด์แล้ว delegate ไปหามัน',
-      'มันคัดลอกโค้ดของพ่อแม่มาวางตรง ๆ',
+      'มันคัดลอก code ของพ่อแม่มาวางตรง ๆ',
       'มันใช้ global registry',
     ],
     answer: 1,

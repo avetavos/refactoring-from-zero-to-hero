@@ -142,6 +142,17 @@ export const removeSetterDiagram = `flowchart LR
 - [Introduce Parameter Object](/refactoring/th/simplifying-apis/introduce-parameter-object/)
 - [Separate Query from Modifier](/refactoring/th/simplifying-apis/separate-query-from-modifier/)
 
+| ใช้ Remove Setting Method เมื่อ | หลีกเลี่ยงเมื่อ |
+|---|---|
+| field กำหนด identity ของ object และไม่ควรเปลี่ยน | field จำเป็นต้องเปลี่ยนได้ตามอายุ object |
+| setter ถูกเรียกครั้งเดียวทันทีหลัง construction | framework ต้องการ no-arg constructor + field injection |
+| ต้องการ value object ที่แชร์และ cache ได้ | การ mutate นั้นคือ business operation ที่ถูกต้อง |
+
+> ⚠️ ไม่ควร Remove Setting Method เมื่อ:
+> - field แทน state ที่เปลี่ยนได้ตามปกติ เช่น ยอดเงิน, สถานะออเดอร์
+> - framework ที่ใช้อยู่ต้องการ setter สำหรับ deserialization หรือ DI
+> - การลบ setter ทำให้ constructor มี parameter ยาวมากโดยไม่มี Parameter Object รองรับ
+
 <Callout title="ความไม่เปลี่ยนแปลงคือฟีเจอร์">
 ทุก setter ที่คุณลบคือคลาสของ bug ที่คุณเลิกกังวลได้ field ที่ไม่เปลี่ยนแปลงไม่ต้องมี defensive copy, ไม่ต้อง synchronisation และไม่ต้องตรวจสอบว่าใครอาจเปลี่ยนมัน ตั้ง identity ครั้งเดียวตอนสร้าง แล้วส่วนที่เหลือของโปรแกรมก็ไว้ใจมันได้ตลอดไป
 </Callout>

@@ -1,6 +1,6 @@
 ---
 title: Replace Temp with Query
-description: แทนที่ตัวแปรชั่วคราวที่เก็บค่าที่คำนวณไว้ด้วยฟังก์ชัน เพื่อให้ logic นำกลับมาใช้ซ้ำได้และการ extract ง่ายขึ้น
+description: แทนที่temporary variable ที่เก็บค่าที่คำนวณไว้ด้วย function เพื่อให้ logic นำกลับมาใช้ซ้ำได้และการ extract ง่ายขึ้น
 sidebar:
   order: 5
 ---
@@ -10,13 +10,13 @@ import Callout from '../../../../components/Callout.astro';
 import Quiz from '../../../../components/Quiz.tsx';
 import ProgressTracker from '../../../../components/ProgressTracker.tsx';
 
-## เจตนา
+## Intent
 
-นำตัวแปร local ที่ถูกกำหนดค่าด้วยผลของการคำนวณแล้วถูกอ่านอย่างเดียว มาแทนที่ด้วยฟังก์ชัน (เรียกว่า "query") ที่ทำการคำนวณนั้น ทุกที่ที่เคยใช้ temp ตอนนี้เรียก query แทน
+นำตัวแปร local ที่ถูกกำหนดค่าด้วยผลของการคำนวณแล้วถูกอ่านอย่างเดียว มาแทนที่ด้วย function (เรียกว่า "query") ที่ทำการคำนวณนั้น ทุกที่ที่เคยใช้ temp ตอนนี้เรียก query แทน
 
-## smell
+## Code Smell
 
-นี่คือวิธีรักษา **temp ที่ตรึง logic ไว้กับที่** ตัวแปรชั่วคราวผูกการคำนวณไว้กับฟังก์ชันเดียว: คุณนำผลลัพธ์ไปใช้ซ้ำที่อื่นไม่ได้ และคุณ Extract Function รอบโค้ดที่พึ่งพามันไม่ได้โดยไม่ลาก temp ไปด้วยในฐานะ parameter การเปลี่ยน temp ให้เป็น query ปลดปล่อยการคำนวณนั้น มันมีค่าที่สุดในฐานะขั้นตอน *เตรียมความพร้อม* — เมื่อค่ากลายเป็น method แล้ว การ extract ที่ใหญ่กว่าก็หลุดออกมาอย่างสะอาด
+นี่คือวิธีรักษา **temp ที่ตรึง logic ไว้กับที่** temporary variable ผูกการคำนวณไว้กับ function เดียว: คุณนำผลลัพธ์ไปใช้ซ้ำที่อื่นไม่ได้ และคุณ Extract Function รอบ code ที่พึ่งพามันไม่ได้โดยไม่ลาก temp ไปด้วยในฐานะ parameter การเปลี่ยน temp ให้เป็น query ปลดปล่อยการคำนวณนั้น มันมีค่าที่สุดในฐานะขั้นตอน *เตรียมความพร้อม* — เมื่อค่ากลายเป็น method แล้ว การ extract ที่ใหญ่กว่าก็หลุดออกมาอย่างสะอาด
 
 ## Before → After
 
@@ -159,31 +159,42 @@ import ProgressTracker from '../../../../components/ProgressTracker.tsx';
 
 1. ตรวจสอบว่า temp ถูกกำหนดค่าเพียงครั้งเดียวและไม่เคยถูก mutate หลังการกำหนดค่า ถ้ามันถูกกำหนดค่าใหม่ ให้แยกมันก่อน เพื่อให้แต่ละค่าถูกกำหนดในที่เดียว
 2. ยืนยันว่าการคำนวณฝั่งขวามือไม่มี side effect
-3. extract การคำนวณออกมาเป็นฟังก์ชัน query (เป็น method เมื่อข้อมูลอยู่บน object)
+3. extract การคำนวณออกมาเป็น function query (เป็น method เมื่อข้อมูลอยู่บน object)
 4. แทนที่การอ่าน temp แต่ละครั้งด้วยการเรียก query
 5. **รันเทสต์ของคุณ** หลังการแทนที่แต่ละครั้ง
 6. ลบการประกาศ temp ที่ตอนนี้ไม่ได้ใช้แล้วทิ้ง
 
-## เมื่อใดควรใช้ / ข้อแลกเปลี่ยน
+## When to use / trade-offs
 
 ใช้มันเมื่อ temp ขวาง Extract Function ที่คุณอยากทำ เมื่อการคำนวณเดียวกันจะมีประโยชน์จากมากกว่าหนึ่ง method หรือเพียงเพื่อลด local state ของ method ที่ยาว ข้อแลกเปลี่ยนหลักคือการคำนวณซ้ำ: query อาจคำนวณใหม่ในทุกการเรียก สำหรับ business logic ทั่วไปสิ่งนี้แทบไม่มีผล และความชัดเจนก็คุ้มค่า สำหรับ hot path ที่ร้อนจริง ๆ ให้วัดก่อนตัดสินใจ
 
 ทิศทางตรงข้ามคือ cache ค่ากลับเข้าไปใน local เมื่อการ profiling พิสูจน์ว่า query เป็นคอขวดจริง — แต่เอื้อมไปหาสิ่งนั้นเมื่อมีหลักฐานเท่านั้น
 
-## ที่เกี่ยวข้อง
+## Related
 
 - [Extract Function](/refactoring/th/composing-methods/extract-function/)
 - [Extract Variable](/refactoring/th/composing-methods/extract-variable/)
 - [Split Phase](/refactoring/th/composing-methods/split-phase/)
 
+| ใช้ Replace Temp with Query เมื่อ | หลีกเลี่ยงเมื่อ |
+|---|---|
+| temporary variable ถูกใช้หลายครั้งใน function | query นั้น expensive — เรียกซ้ำหลายครั้งทำให้ช้า |
+| ต้องการ extract function ที่ใช้ค่านั้น | temporary variable คือ accumulator ที่ค่าเปลี่ยนใน loop |
+| ค่านั้นต้องการใน subclass | function ที่ได้จะมีชื่อที่อธิบายแย่กว่า variable เดิม |
+
+> ⚠️ ไม่ควร Replace Temp with Query เมื่อ:
+> - calculation มี side effect — เรียกซ้ำจะทำงานหลายครั้ง
+> - ค่านั้นซับซ้อนและเรียกบ่อย — cache ไว้ใน variable ดีกว่า
+> - context object ไม่มีข้อมูลที่จำเป็นสำหรับ query
+
 <Callout title="query ปลดล็อก refactoring ที่ใหญ่กว่า">
-ผลตอบแทนที่แท้จริงไม่ใช่ temp ที่หายไป — แต่เป็นสิ่งที่เป็นไปได้หลังจากนั้น เมื่อการคำนวณอยู่ใน query ของตัวเอง โค้ดรอบ ๆ ก็หยุดพึ่งพา local และ Extract Function บนส่วนที่เหลือของ method ก็ทำงานได้ทันทีโดยไม่ต้องมี parameter ที่อึดอัด
+ผลตอบแทนที่แท้จริงไม่ใช่ temp ที่หายไป — แต่เป็นสิ่งที่เป็นไปได้หลังจากนั้น เมื่อการคำนวณอยู่ใน query ของตัวเอง code รอบ ๆ ก็หยุดพึ่งพา local และ Extract Function บนส่วนที่เหลือของ method ก็ทำงานได้ทันทีโดยไม่ต้องมี parameter ที่อึดอัด
 </Callout>
 
 export const quizTemp = [
   {
     q: 'Replace Temp with Query แทนที่ตัวแปร local ด้วยอะไร?',
-    options: ['ค่าคงที่ global', 'ฟังก์ชัน (query) ที่คำนวณค่า', 'field ของ class', 'comment'],
+    options: ['ค่าคงที่ global', 'function (query) ที่คำนวณค่า', 'field ของ class', 'comment'],
     answer: 1,
   },
   {
@@ -200,7 +211,7 @@ export const quizTemp = [
     q: 'ทำไม refactoring นี้จึงมักถูกใช้เป็นขั้นตอนเตรียมความพร้อม?',
     options: [
       'มันกำจัดความจำเป็นในการเทสต์',
-      'เมื่อค่ากลายเป็น query แล้ว โค้ดรอบ ๆ ก็ไม่พึ่งพา local อีกต่อไป ทำให้ Extract Function ง่ายขึ้น',
+      'เมื่อค่ากลายเป็น query แล้ว code รอบ ๆ ก็ไม่พึ่งพา local อีกต่อไป ทำให้ Extract Function ง่ายขึ้น',
       'มันทำให้โปรแกรมเร็วขึ้นเสมอ',
       'มันลบ class ที่ครอบอยู่',
     ],
