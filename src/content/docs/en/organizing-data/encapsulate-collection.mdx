@@ -180,9 +180,9 @@ The trade-off is the cost of copying on each read and the slightly larger interf
 
 ## Related
 
-- [Encapsulate Variable](/refactoring-from-zero-to-hero/en/organizing-data/encapsulate-variable/)
-- [Replace Primitive with Object](/refactoring-from-zero-to-hero/en/organizing-data/replace-primitive-with-object/)
-- [Replace Magic Literal](/refactoring-from-zero-to-hero/en/organizing-data/replace-magic-literal/)
+- [Encapsulate Variable](/refactoring/en/organizing-data/encapsulate-variable/)
+- [Replace Primitive with Object](/refactoring/en/organizing-data/replace-primitive-with-object/)
+- [Replace Magic Literal](/refactoring/en/organizing-data/replace-magic-literal/)
 
 <Callout title="A getter that returns the live list is a lie">
 If your getter hands back the real container, your add and remove methods are theatre — callers can simply ignore them and mutate the list directly. The encapsulation only holds once reads return a copy or read-only view, so that the methods are the *only* way to change the contents.

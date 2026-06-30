@@ -159,9 +159,9 @@ The cost is some duplication at the call sites — each caller now repeats the m
 
 ## Related
 
-- [Move Statements into Function](/refactoring-from-zero-to-hero/en/moving-features/move-statements-into-function/)
-- [Split Loop](/refactoring-from-zero-to-hero/en/moving-features/split-loop/)
-- [Extract Function](/refactoring-from-zero-to-hero/en/composing-methods/extract-function/)
+- [Move Statements into Function](/refactoring/en/moving-features/move-statements-into-function/)
+- [Split Loop](/refactoring/en/moving-features/split-loop/)
+- [Extract Function](/refactoring/en/composing-methods/extract-function/)
 
 <Callout title="Prefer this over a flag parameter">
 Whenever you are about to add a boolean like `includeFooter` to make one caller behave differently, pause. That flag is the function telling you it does two jobs. Move the differing statements to the callers and let each one ask for exactly what it needs.

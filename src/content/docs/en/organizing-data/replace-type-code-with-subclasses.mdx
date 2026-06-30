@@ -204,9 +204,9 @@ But subclasses are not always the right tool. If an object's type *changes durin
 
 ## Related
 
-- [Encapsulate Variable](/refactoring-from-zero-to-hero/en/organizing-data/encapsulate-variable/)
-- [Replace Magic Literal](/refactoring-from-zero-to-hero/en/organizing-data/replace-magic-literal/)
-- [Replace Primitive with Object](/refactoring-from-zero-to-hero/en/organizing-data/replace-primitive-with-object/)
+- [Encapsulate Variable](/refactoring/en/organizing-data/encapsulate-variable/)
+- [Replace Magic Literal](/refactoring/en/organizing-data/replace-magic-literal/)
+- [Replace Primitive with Object](/refactoring/en/organizing-data/replace-primitive-with-object/)
 
 <Callout title="Stable type → subclass; changing type → State">
 The deciding question is whether the type can change after the object is born. An employee's role is stable enough to be its class; an order's status flips again and again, so it must be data the object holds, not the class it *is*. Use subclasses for the former and the State pattern for the latter.

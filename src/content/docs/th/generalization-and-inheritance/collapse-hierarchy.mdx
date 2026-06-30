@@ -170,9 +170,9 @@ subclass `Salesperson` เคยต่อยอด `Employee` อย่างม
 
 ## เกี่ยวข้อง
 
-- [Extract Superclass & Interface](/refactoring-from-zero-to-hero/th/generalization-and-inheritance/extract-superclass-and-interface/)
-- [Pull Up & Push Down](/refactoring-from-zero-to-hero/th/generalization-and-inheritance/pull-up-and-push-down/)
-- [Replace Inheritance with Delegation](/refactoring-from-zero-to-hero/th/generalization-and-inheritance/replace-inheritance-with-delegation/)
+- [Extract Superclass & Interface](/refactoring/th/generalization-and-inheritance/extract-superclass-and-interface/)
+- [Pull Up & Push Down](/refactoring/th/generalization-and-inheritance/pull-up-and-push-down/)
+- [Replace Inheritance with Delegation](/refactoring/th/generalization-and-inheritance/replace-inheritance-with-delegation/)
 
 <Callout title="type ควรหารายได้ให้แก่การมีอยู่ของมันเอง">
 ทุกคลาส, struct, หรือ trait ที่ผู้อ่านพบเป็นภาษีเล็ก ๆ ต่อความสนใจของพวกเขา subclass ที่ไม่เพิ่มอะไรจริงคือภาษีที่ไม่ได้ผลตอบแทน ยุบมันทิ้ง — และถ้าความแตกต่างที่แท้จริงโผล่มาในภายหลัง ค่อย extract type ใหม่ตอนนั้น เมื่อมันแบกน้ำหนักได้จริง ๆ ใน Go และ Rust ซึ่ง "ลำดับชั้น" เป็นเพียง wrapper struct การยุบก็เป็นแค่การเอาชั้นที่ไม่เคยจำเป็นต้องมีอยู่ออกไป

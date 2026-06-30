@@ -47,9 +47,9 @@ Eight refactorings, each reversible:
 - **Replace Inheritance with Delegation** — when a subclass leans on only part of its parent, hold the former parent as a field and delegate to it.
 - **Replace Subclass with Delegation** — when subclasses vary along a single axis, replace the whole hierarchy with one class holding a strategy object.
 - **Collapse Hierarchy** — when a subclass and its superclass have drifted too close to justify two types, merge them into one.
-- **[Replace Subclass with Fields](/refactoring-from-zero-to-hero/en/generalization-and-inheritance/replace-subclass-with-fields/)** — when subclasses differ only by constant data returned from their methods, collapse them into one class whose fields hold that data.
-- **[Replace Superclass with Delegation](/refactoring-from-zero-to-hero/en/generalization-and-inheritance/replace-superclass-with-delegation/)** — when a subclass uses only part of its superclass or inherits an awkward interface, hold the former superclass as a field and delegate to it.
-- **[Pull Up Constructor Body](/refactoring-from-zero-to-hero/en/generalization-and-inheritance/pull-up-constructor-body/)** — when sibling constructors share the same initialization, move that common construction into the superclass constructor and call up to it.
+- **[Replace Subclass with Fields](/refactoring/en/generalization-and-inheritance/replace-subclass-with-fields/)** — when subclasses differ only by constant data returned from their methods, collapse them into one class whose fields hold that data.
+- **[Replace Superclass with Delegation](/refactoring/en/generalization-and-inheritance/replace-superclass-with-delegation/)** — when a subclass uses only part of its superclass or inherits an awkward interface, hold the former superclass as a field and delegate to it.
+- **[Pull Up Constructor Body](/refactoring/en/generalization-and-inheritance/pull-up-constructor-body/)** — when sibling constructors share the same initialization, move that common construction into the superclass constructor and call up to it.
 
 Each lesson shows the same before-and-after in TypeScript, Python, Go, and Rust. Note that **Go and Rust have no class inheritance**: Go composes behaviour through *struct embedding* and interfaces, and Rust through *traits* and held fields. So the examples in those languages model the same intent with composition — which, as you will see, is exactly where several of these refactorings are trying to lead you anyway.
 

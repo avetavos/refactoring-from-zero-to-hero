@@ -221,9 +221,9 @@ export const delegationDiagram = `classDiagram
 
 ## ที่เกี่ยวข้อง
 
-- [Replace Inheritance with Delegation](/refactoring-from-zero-to-hero/th/generalization-and-inheritance/replace-inheritance-with-delegation/)
-- [Replace Subclass with Delegation](/refactoring-from-zero-to-hero/th/generalization-and-inheritance/replace-subclass-with-delegation/)
-- [Extract Superclass & Interface](/refactoring-from-zero-to-hero/th/generalization-and-inheritance/extract-superclass-and-interface/)
+- [Replace Inheritance with Delegation](/refactoring/th/generalization-and-inheritance/replace-inheritance-with-delegation/)
+- [Replace Subclass with Delegation](/refactoring/th/generalization-and-inheritance/replace-subclass-with-delegation/)
+- [Extract Superclass & Interface](/refactoring/th/generalization-and-inheritance/extract-superclass-and-interface/)
 
 <Callout title="inherit ทั้ง interface หรือไม่เอาเลย">
 คำถามชี้ขาดนั้นเรียบง่าย: subclass ต้องการ *ทุกอย่าง* ที่พ่อแม่ให้หรือไม่? ถ้าใช่ inheritance ก็ซื่อสัตย์และราคาถูก ถ้ามันต้องการเพียงเสี้ยวเดียว — และอายกับส่วนที่เหลือ — ก็ถือพ่อแม่ไว้เป็นฟิลด์แล้ว forward เฉพาะเสี้ยวนั้น Go และ Rust ผนวกสิ่งนี้ไว้: ไม่มีทาง inherit เพียงเสี้ยวเดียว คุณจึงประกอบด้วย composition ซึ่งเป็นจุดที่ refactoring นี้นำไปพอดี

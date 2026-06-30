@@ -37,15 +37,15 @@ export const overviewDiagram = `flowchart TD
 
 การรีแฟกเตอร์เก้าแบบที่ทำให้อินเทอร์เฟซของฟังก์ชันและเมท็อดชัดเจนและเรียกใช้ง่ายขึ้น:
 
-- **[Rename Function/Variable](/refactoring-from-zero-to-hero/th/simplifying-apis/rename-function/)** — เมื่อชื่อชวนเข้าใจผิดหรืออธิบายได้ไม่พอ ให้เปลี่ยนชื่อมันและอัปเดตผู้เรียกใช้ทุกจุด ชื่อคือเอกสารที่ราคาถูกที่สุดที่คุณจะได้เขียน
-- **[Parameterize Function](/refactoring-from-zero-to-hero/th/simplifying-apis/parameterize-function/)** — เมื่อฟังก์ชันสองตัวที่เกือบเหมือนกันต่างกันแค่ค่า literal ให้รวมมันเป็นฟังก์ชันเดียวที่รับค่านั้นเป็นพารามิเตอร์
-- **[Introduce Parameter Object](/refactoring-from-zero-to-hero/th/simplifying-apis/introduce-parameter-object/)** — เมื่ออาร์กิวเมนต์กลุ่มหนึ่งเดินทางไปด้วยกันเสมอ ให้จัดมันเข้าเป็นออบเจกต์เดียวเพื่อให้ความสัมพันธ์ชัดเจน
-- **[Remove Flag Argument](/refactoring-from-zero-to-hero/th/simplifying-apis/remove-flag-argument/)** — เมื่ออาร์กิวเมนต์แบบ boolean สลับพฤติกรรม ให้แยกฟังก์ชันออกเป็นสองฟังก์ชันที่มีชื่อชัดเจน
-- **[Replace Constructor with Factory Function](/refactoring-from-zero-to-hero/th/simplifying-apis/replace-constructor-with-factory/)** — เมื่อ constructor จำกัดเกินไป ให้ห่อมันด้วยฟังก์ชัน factory ที่สามารถเลือก subtype ได้และมีชื่อที่สื่อความหมาย
-- **[Separate Query from Modifier](/refactoring-from-zero-to-hero/th/simplifying-apis/separate-query-from-modifier/)** — เมื่อฟังก์ชันทั้งคืนค่าและเปลี่ยนสถานะ ให้แยกมันออกเป็น query ที่บริสุทธิ์และ command แยกต่างหาก
-- **[Preserve Whole Object](/refactoring-from-zero-to-hero/th/simplifying-apis/preserve-whole-object/)** — เมื่อผู้เรียกใช้แกะหลายฟิลด์ออกจากออบเจกต์แค่เพื่อส่งต่อไป ให้ส่งทั้งออบเจกต์ไปแทน
-- **[Replace Parameter with Query](/refactoring-from-zero-to-hero/th/simplifying-apis/replace-parameter-with-query/)** — เมื่อพารามิเตอร์สามารถหาได้จากข้อมูลที่ฟังก์ชันมีอยู่แล้ว ให้ตัดมันทิ้งและคำนวณภายในเอง
-- **[Remove Setting Method](/refactoring-from-zero-to-hero/th/simplifying-apis/remove-setting-method/)** — เมื่อฟิลด์ควรถูกตรึงไว้ตั้งแต่ตอนสร้าง ให้ลบ setter ของมันเพื่อทำให้ออบเจกต์เปลี่ยนแปลงไม่ได้
+- **[Rename Function/Variable](/refactoring/th/simplifying-apis/rename-function/)** — เมื่อชื่อชวนเข้าใจผิดหรืออธิบายได้ไม่พอ ให้เปลี่ยนชื่อมันและอัปเดตผู้เรียกใช้ทุกจุด ชื่อคือเอกสารที่ราคาถูกที่สุดที่คุณจะได้เขียน
+- **[Parameterize Function](/refactoring/th/simplifying-apis/parameterize-function/)** — เมื่อฟังก์ชันสองตัวที่เกือบเหมือนกันต่างกันแค่ค่า literal ให้รวมมันเป็นฟังก์ชันเดียวที่รับค่านั้นเป็นพารามิเตอร์
+- **[Introduce Parameter Object](/refactoring/th/simplifying-apis/introduce-parameter-object/)** — เมื่ออาร์กิวเมนต์กลุ่มหนึ่งเดินทางไปด้วยกันเสมอ ให้จัดมันเข้าเป็นออบเจกต์เดียวเพื่อให้ความสัมพันธ์ชัดเจน
+- **[Remove Flag Argument](/refactoring/th/simplifying-apis/remove-flag-argument/)** — เมื่ออาร์กิวเมนต์แบบ boolean สลับพฤติกรรม ให้แยกฟังก์ชันออกเป็นสองฟังก์ชันที่มีชื่อชัดเจน
+- **[Replace Constructor with Factory Function](/refactoring/th/simplifying-apis/replace-constructor-with-factory/)** — เมื่อ constructor จำกัดเกินไป ให้ห่อมันด้วยฟังก์ชัน factory ที่สามารถเลือก subtype ได้และมีชื่อที่สื่อความหมาย
+- **[Separate Query from Modifier](/refactoring/th/simplifying-apis/separate-query-from-modifier/)** — เมื่อฟังก์ชันทั้งคืนค่าและเปลี่ยนสถานะ ให้แยกมันออกเป็น query ที่บริสุทธิ์และ command แยกต่างหาก
+- **[Preserve Whole Object](/refactoring/th/simplifying-apis/preserve-whole-object/)** — เมื่อผู้เรียกใช้แกะหลายฟิลด์ออกจากออบเจกต์แค่เพื่อส่งต่อไป ให้ส่งทั้งออบเจกต์ไปแทน
+- **[Replace Parameter with Query](/refactoring/th/simplifying-apis/replace-parameter-with-query/)** — เมื่อพารามิเตอร์สามารถหาได้จากข้อมูลที่ฟังก์ชันมีอยู่แล้ว ให้ตัดมันทิ้งและคำนวณภายในเอง
+- **[Remove Setting Method](/refactoring/th/simplifying-apis/remove-setting-method/)** — เมื่อฟิลด์ควรถูกตรึงไว้ตั้งแต่ตอนสร้าง ให้ลบ setter ของมันเพื่อทำให้ออบเจกต์เปลี่ยนแปลงไม่ได้
 
 แต่ละบทเรียนแสดงตัวอย่างก่อนและหลังแบบเดียวกันใน TypeScript, Python, Go และ Rust แล้วพาเดินผ่านกลไกที่ปลอดภัยและเรียงลำดับเป็นขั้นตอน — โดยรันเทสต์ระหว่างทุกขั้น
 

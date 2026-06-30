@@ -29,20 +29,20 @@ export const smellDiagram = `flowchart LR
 
 | Smell | สิ่งที่คุณสังเกตเห็น | ที่ที่คอร์สนี้จัดการกับมัน |
 | --- | --- | --- |
-| **Long Function** | ฟังก์ชันที่ยาวเลื่อนพ้นหน้าจอและทำหลายสิ่ง | [Composing Methods](/refactoring-from-zero-to-hero/th/composing-methods/) — [Extract Function](/refactoring-from-zero-to-hero/th/composing-methods/extract-function/) |
-| **Duplicated Code** | ชิ้นส่วนเดียวกันปรากฏในสองที่หรือมากกว่า | [Extract Function](/refactoring-from-zero-to-hero/th/composing-methods/extract-function/) และ [Moving Features](/refactoring-from-zero-to-hero/th/moving-features/) |
-| **Mysterious Name** | ตัวแปรหรือฟังก์ชันที่ชื่อของมันซ่อนจุดประสงค์ไว้ | [Extract Variable](/refactoring-from-zero-to-hero/th/composing-methods/extract-variable/) |
-| **Large Class** | คลาสที่กักตุน field และความรับผิดชอบไว้มากเกินไป | [Moving Features](/refactoring-from-zero-to-hero/th/moving-features/) |
-| **Long Parameter List** | การเรียกที่มี argument มากมายจนคุณตามไม่ทัน | [Simplifying APIs](/refactoring-from-zero-to-hero/th/simplifying-apis/) |
-| **Feature Envy** | method ที่สนใจข้อมูลของอ็อบเจกต์อื่นมากกว่าของตัวเอง | [Moving Features](/refactoring-from-zero-to-hero/th/moving-features/) |
-| **Primitive Obsession** | string และ number เปล่า ๆ ที่ถูกใช้แทนแนวคิดจริง | [Organizing Data](/refactoring-from-zero-to-hero/th/organizing-data/) |
-| **Shotgun Surgery** | การเปลี่ยนแปลงเล็ก ๆ หนึ่งครั้งบังคับให้ต้องแก้กระจัดกระจายไปทั่วหลายไฟล์ | [Moving Features](/refactoring-from-zero-to-hero/th/moving-features/) |
-| **Tangled Conditionals** | การแตกแขนงที่ซ้อนลึกหรือซ้ำกันจนซ่อนตรรกะไว้ | [Simplifying Conditionals](/refactoring-from-zero-to-hero/th/simplifying-conditionals/) |
-| **Temporary Field / Inheritance Misuse** | สถานะที่ถูกใช้เพียงบางครั้ง หรือลำดับชั้นที่ขัดขากับคุณ | [Generalization & Inheritance](/refactoring-from-zero-to-hero/th/generalization-and-inheritance/) |
+| **Long Function** | ฟังก์ชันที่ยาวเลื่อนพ้นหน้าจอและทำหลายสิ่ง | [Composing Methods](/refactoring/th/composing-methods/) — [Extract Function](/refactoring/th/composing-methods/extract-function/) |
+| **Duplicated Code** | ชิ้นส่วนเดียวกันปรากฏในสองที่หรือมากกว่า | [Extract Function](/refactoring/th/composing-methods/extract-function/) และ [Moving Features](/refactoring/th/moving-features/) |
+| **Mysterious Name** | ตัวแปรหรือฟังก์ชันที่ชื่อของมันซ่อนจุดประสงค์ไว้ | [Extract Variable](/refactoring/th/composing-methods/extract-variable/) |
+| **Large Class** | คลาสที่กักตุน field และความรับผิดชอบไว้มากเกินไป | [Moving Features](/refactoring/th/moving-features/) |
+| **Long Parameter List** | การเรียกที่มี argument มากมายจนคุณตามไม่ทัน | [Simplifying APIs](/refactoring/th/simplifying-apis/) |
+| **Feature Envy** | method ที่สนใจข้อมูลของอ็อบเจกต์อื่นมากกว่าของตัวเอง | [Moving Features](/refactoring/th/moving-features/) |
+| **Primitive Obsession** | string และ number เปล่า ๆ ที่ถูกใช้แทนแนวคิดจริง | [Organizing Data](/refactoring/th/organizing-data/) |
+| **Shotgun Surgery** | การเปลี่ยนแปลงเล็ก ๆ หนึ่งครั้งบังคับให้ต้องแก้กระจัดกระจายไปทั่วหลายไฟล์ | [Moving Features](/refactoring/th/moving-features/) |
+| **Tangled Conditionals** | การแตกแขนงที่ซ้อนลึกหรือซ้ำกันจนซ่อนตรรกะไว้ | [Simplifying Conditionals](/refactoring/th/simplifying-conditionals/) |
+| **Temporary Field / Inheritance Misuse** | สถานะที่ถูกใช้เพียงบางครั้ง หรือลำดับชั้นที่ขัดขากับคุณ | [Generalization & Inheritance](/refactoring/th/generalization-and-inheritance/) |
 
 ## ตัวอย่าง smell สั้น ๆ
 
-นี่คือ **Primitive Obsession**: number ดิบ ๆ ถูกส่งไปมาเพื่อหมายถึง "เงิน" แต่ไม่มีอะไรหยุดผู้เรียกจากการเอามันไปสับสนกับจำนวนหรืออุณหภูมิ smell คือ primitive เปล่า ๆ ที่ถูกใช้แทนแนวคิดในโดเมน วิธีรักษา — การห่อมันไว้ในชนิดข้อมูลเล็ก ๆ — อยู่ใน [Organizing Data](/refactoring-from-zero-to-hero/th/organizing-data/) แต่คุณควรเรียนรู้ที่จะ *ดมกลิ่น* มันตั้งแต่ตอนนี้
+นี่คือ **Primitive Obsession**: number ดิบ ๆ ถูกส่งไปมาเพื่อหมายถึง "เงิน" แต่ไม่มีอะไรหยุดผู้เรียกจากการเอามันไปสับสนกับจำนวนหรืออุณหภูมิ smell คือ primitive เปล่า ๆ ที่ถูกใช้แทนแนวคิดในโดเมน วิธีรักษา — การห่อมันไว้ในชนิดข้อมูลเล็ก ๆ — อยู่ใน [Organizing Data](/refactoring/th/organizing-data/) แต่คุณควรเรียนรู้ที่จะ *ดมกลิ่น* มันตั้งแต่ตอนนี้
 
 <Tabs syncKey="lang">
   <TabItem label="TypeScript">
@@ -115,9 +115,9 @@ export const smellDiagram = `flowchart LR
 
 ## ที่เกี่ยวข้อง
 
-- [ทำไมและเมื่อไหร่ควร refactor](/refactoring-from-zero-to-hero/th/intro-and-principles/why-and-when/)
-- [ก้าวเล็ก ๆ และ test](/refactoring-from-zero-to-hero/th/intro-and-principles/small-steps-and-tests/)
-- [Composing Methods](/refactoring-from-zero-to-hero/th/composing-methods/)
+- [ทำไมและเมื่อไหร่ควร refactor](/refactoring/th/intro-and-principles/why-and-when/)
+- [ก้าวเล็ก ๆ และ test](/refactoring/th/intro-and-principles/small-steps-and-tests/)
+- [Composing Methods](/refactoring/th/composing-methods/)
 
 <Callout title="ตั้งชื่อ smell ก่อนหยิบท่ามาใช้">
 อย่า refactor บนความรู้สึกคลุมเครือ เมื่อโค้ดรบกวนใจคุณ จงตั้งชื่อ smell ก่อน — "นี่คือ Long Function" "นั่นคือ Duplicated Code" การตั้งชื่อมันบอกคุณว่า refactoring ไหนเหมาะ และทำให้คุณซื่อตรงต่อตัวเองว่าการเปลี่ยนแปลงนั้นคุ้มที่จะทำตอนนี้หรือไม่

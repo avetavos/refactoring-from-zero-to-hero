@@ -197,9 +197,9 @@ The trade-off is one extra object and a layer of indirection: callers now wire u
 
 ## Related
 
-- [Replace Inheritance with Delegation](/refactoring-from-zero-to-hero/en/generalization-and-inheritance/replace-inheritance-with-delegation/)
-- [Collapse Hierarchy](/refactoring-from-zero-to-hero/en/generalization-and-inheritance/collapse-hierarchy/)
-- [Extract Superclass & Interface](/refactoring-from-zero-to-hero/en/generalization-and-inheritance/extract-superclass-and-interface/)
+- [Replace Inheritance with Delegation](/refactoring/en/generalization-and-inheritance/replace-inheritance-with-delegation/)
+- [Collapse Hierarchy](/refactoring/en/generalization-and-inheritance/collapse-hierarchy/)
+- [Extract Superclass & Interface](/refactoring/en/generalization-and-inheritance/extract-superclass-and-interface/)
 
 <Callout title="Inheritance is a fixed choice; a strategy can change">
 The deepest reason to prefer a delegate here is *time*: a subclass is decided at construction and frozen for the object's life. A strategy field can be reassigned, swapped, or even composed with a second strategy along an independent axis. When behaviour needs to vary dynamically — or along more than one dimension — composition wins decisively, which is why Go and Rust hand you only this shape.

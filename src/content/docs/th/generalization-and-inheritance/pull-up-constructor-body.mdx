@@ -215,9 +215,9 @@ export const ctorDiagram = `classDiagram
 
 ## ที่เกี่ยวข้อง
 
-- [Pull Up & Push Down](/refactoring-from-zero-to-hero/th/generalization-and-inheritance/pull-up-and-push-down/)
-- [Extract Superclass & Interface](/refactoring-from-zero-to-hero/th/generalization-and-inheritance/extract-superclass-and-interface/)
-- [Replace Superclass with Delegation](/refactoring-from-zero-to-hero/th/generalization-and-inheritance/replace-superclass-with-delegation/)
+- [Pull Up & Push Down](/refactoring/th/generalization-and-inheritance/pull-up-and-push-down/)
+- [Extract Superclass & Interface](/refactoring/th/generalization-and-inheritance/extract-superclass-and-interface/)
+- [Replace Superclass with Delegation](/refactoring/th/generalization-and-inheritance/replace-superclass-with-delegation/)
 
 <Callout title="constructor คือเมท็อดที่มีกฎเพิ่ม">
 การดึงเมท็อดธรรมดาขึ้นเป็นเรื่องปกติ การดึง constructor body ขึ้นเพิ่มข้อจำกัดหนึ่ง — พ่อแม่ต้องถูก initialize ก่อนที่ลูกจะรัน ทำให้การเรียกขึ้นไปเป็น statement แรกเสมอ และถ้า subclass เดิมทำงานที่ใช้ร่วมกันที่จุดต่าง ๆ กัน ให้แก้ลำดับนั้นก่อนจะดึงอะไรขึ้น ใน Go และ Rust วินัยเดียวกันนี้ปรากฏเป็น "สร้าง struct ที่ embed/ฐานก่อน"

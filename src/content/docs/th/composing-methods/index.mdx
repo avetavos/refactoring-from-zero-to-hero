@@ -37,15 +37,15 @@ export const overviewDiagram = `flowchart TD
 
 refactoring เก้าแบบ แต่ละแบบเล็กและย้อนกลับได้:
 
-- **[Extract Function](/refactoring-from-zero-to-hero/th/composing-methods/extract-function/)** — ยกชิ้นส่วนหนึ่งขึ้นไปเป็นฟังก์ชันของตัวเองที่มีชื่อดี เพื่อให้ผู้เรียกอ่านได้เหมือนรายการของเจตนา เป็นการเคลื่อนไหวพื้นฐานที่สุดในบรรดาทั้งหมด
-- **[Inline Function](/refactoring-from-zero-to-hero/th/composing-methods/inline-function/)** — สิ่งที่ตรงกันข้าม: เมื่อ body ของ helper เรียบง่ายพอ ๆ กับชื่อของมัน ก็พับมันกลับเข้าไป
-- **[Extract Variable](/refactoring-from-zero-to-hero/th/composing-methods/extract-variable/)** — ตั้งชื่อให้ sub-expression ที่ชวนสับสน เพื่อให้บรรทัดนั้นอธิบายตัวเองได้
-- **[Inline Variable](/refactoring-from-zero-to-hero/th/composing-methods/inline-variable/)** — สิ่งที่ตรงกันข้าม: ลบตัวแปรที่เป็นเพียงเสียงสะท้อนของ expression ของมันและไม่ได้เพิ่มความชัดเจนใด ๆ
-- **[Replace Temp with Query](/refactoring-from-zero-to-hero/th/composing-methods/replace-temp-with-query/)** — เปลี่ยนตัวแปร local ที่เก็บค่าที่คำนวณไว้ให้กลายเป็นฟังก์ชัน เพื่อให้การคำนวณนำกลับมาใช้ซ้ำได้และ extract ได้ง่าย
-- **[Slide Statements](/refactoring-from-zero-to-hero/th/composing-methods/slide-statements/)** — ย้าย statement ที่เกี่ยวข้องกันมาอยู่ด้วยกัน เพื่อให้ชิ้นส่วนที่สอดคล้องกันตั้งพร้อมให้อ่านหรือ extract
-- **[Split Phase](/refactoring-from-zero-to-hero/th/composing-methods/split-phase/)** — เมื่อบล็อกหนึ่งทำงานสองอย่างที่ต่างกัน ก็แยกมันออกเป็น phase ที่เรียงลำดับและเชื่อมกันด้วยค่ากลางที่ชัดเจน
-- **[Substitute Algorithm](/refactoring-from-zero-to-hero/th/composing-methods/substitute-algorithm/)** — แทนที่วิธีทำบางอย่างที่ซับซ้อนยุ่งเหยิงด้วยวิธีที่ชัดเจนกว่าซึ่งให้ผลลัพธ์เดียวกัน
-- **[Replace Loop with Pipeline](/refactoring-from-zero-to-hero/th/composing-methods/replace-loop-with-pipeline/)** — แปลงลูปแบบ imperative ให้เป็นโซ่ของขั้นตอนที่มีชื่อ — filter, map, reduce
+- **[Extract Function](/refactoring/th/composing-methods/extract-function/)** — ยกชิ้นส่วนหนึ่งขึ้นไปเป็นฟังก์ชันของตัวเองที่มีชื่อดี เพื่อให้ผู้เรียกอ่านได้เหมือนรายการของเจตนา เป็นการเคลื่อนไหวพื้นฐานที่สุดในบรรดาทั้งหมด
+- **[Inline Function](/refactoring/th/composing-methods/inline-function/)** — สิ่งที่ตรงกันข้าม: เมื่อ body ของ helper เรียบง่ายพอ ๆ กับชื่อของมัน ก็พับมันกลับเข้าไป
+- **[Extract Variable](/refactoring/th/composing-methods/extract-variable/)** — ตั้งชื่อให้ sub-expression ที่ชวนสับสน เพื่อให้บรรทัดนั้นอธิบายตัวเองได้
+- **[Inline Variable](/refactoring/th/composing-methods/inline-variable/)** — สิ่งที่ตรงกันข้าม: ลบตัวแปรที่เป็นเพียงเสียงสะท้อนของ expression ของมันและไม่ได้เพิ่มความชัดเจนใด ๆ
+- **[Replace Temp with Query](/refactoring/th/composing-methods/replace-temp-with-query/)** — เปลี่ยนตัวแปร local ที่เก็บค่าที่คำนวณไว้ให้กลายเป็นฟังก์ชัน เพื่อให้การคำนวณนำกลับมาใช้ซ้ำได้และ extract ได้ง่าย
+- **[Slide Statements](/refactoring/th/composing-methods/slide-statements/)** — ย้าย statement ที่เกี่ยวข้องกันมาอยู่ด้วยกัน เพื่อให้ชิ้นส่วนที่สอดคล้องกันตั้งพร้อมให้อ่านหรือ extract
+- **[Split Phase](/refactoring/th/composing-methods/split-phase/)** — เมื่อบล็อกหนึ่งทำงานสองอย่างที่ต่างกัน ก็แยกมันออกเป็น phase ที่เรียงลำดับและเชื่อมกันด้วยค่ากลางที่ชัดเจน
+- **[Substitute Algorithm](/refactoring/th/composing-methods/substitute-algorithm/)** — แทนที่วิธีทำบางอย่างที่ซับซ้อนยุ่งเหยิงด้วยวิธีที่ชัดเจนกว่าซึ่งให้ผลลัพธ์เดียวกัน
+- **[Replace Loop with Pipeline](/refactoring/th/composing-methods/replace-loop-with-pipeline/)** — แปลงลูปแบบ imperative ให้เป็นโซ่ของขั้นตอนที่มีชื่อ — filter, map, reduce
 
 แต่ละบทเรียนแสดงตัวอย่าง before-and-after เดียวกันในภาษา TypeScript, Python, Go และ Rust จากนั้นพาเดินผ่าน mechanics ที่ปลอดภัยและเรียงลำดับ — โดยรันเทสต์ของคุณระหว่างทุกขั้นตอน
 

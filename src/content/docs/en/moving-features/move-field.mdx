@@ -227,9 +227,9 @@ The cost is touching every caller that read the field directly — which is exac
 
 ## Related
 
-- [Move Function](/refactoring-from-zero-to-hero/en/moving-features/move-function/)
-- [Extract Class](/refactoring-from-zero-to-hero/en/moving-features/extract-class/)
-- [Inline Class](/refactoring-from-zero-to-hero/en/moving-features/inline-class/)
+- [Move Function](/refactoring/en/moving-features/move-function/)
+- [Extract Class](/refactoring/en/moving-features/extract-class/)
+- [Inline Class](/refactoring/en/moving-features/inline-class/)
 
 <Callout title="Encapsulate before you move">
 The painful part of moving a field is the direct readers scattered across the code. Wrap the field in a getter and setter first, point everyone at those, and the move itself becomes a single change inside one accessor.

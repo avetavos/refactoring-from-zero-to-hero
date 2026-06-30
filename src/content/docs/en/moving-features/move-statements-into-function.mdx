@@ -187,9 +187,9 @@ Do not use it when callers differ in whether or how they run the statement — f
 
 ## Related
 
-- [Move Statements to Callers](/refactoring-from-zero-to-hero/en/moving-features/move-statements-to-callers/)
-- [Move Function](/refactoring-from-zero-to-hero/en/moving-features/move-function/)
-- [Extract Function](/refactoring-from-zero-to-hero/en/composing-methods/extract-function/)
+- [Move Statements to Callers](/refactoring/en/moving-features/move-statements-to-callers/)
+- [Move Function](/refactoring/en/moving-features/move-function/)
+- [Extract Function](/refactoring/en/composing-methods/extract-function/)
 
 <Callout title="Move only what is truly shared">
 The test is simple: does *every* caller run this statement, identically, right next to the call? If yes, move it in. If you have to add a boolean to satisfy the exceptions, stop — the statement is not shared, and it belongs at the callers.

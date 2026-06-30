@@ -133,9 +133,9 @@ The trade-off is that a literal argument at the call site can be less self-docum
 
 ## Related
 
-- [Remove Flag Argument](/refactoring-from-zero-to-hero/en/simplifying-apis/remove-flag-argument/)
-- [Introduce Parameter Object](/refactoring-from-zero-to-hero/en/simplifying-apis/introduce-parameter-object/)
-- [Extract Function](/refactoring-from-zero-to-hero/en/composing-methods/extract-function/)
+- [Remove Flag Argument](/refactoring/en/simplifying-apis/remove-flag-argument/)
+- [Introduce Parameter Object](/refactoring/en/simplifying-apis/introduce-parameter-object/)
+- [Extract Function](/refactoring/en/composing-methods/extract-function/)
 
 <Callout title="Parameterize the value, not the behaviour">
 This move shines when the only difference is *data* — a rate, a limit, a label. When the difference is *behaviour* — one variant logs and the other emails — a single boolean parameter tends to fork the body in two, which is the Flag Argument smell. Keep parameters describing values, and split functions describe behaviour.

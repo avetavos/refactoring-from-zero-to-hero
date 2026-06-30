@@ -138,9 +138,9 @@ export const removeSetterDiagram = `flowchart LR
 
 ## Related
 
-- [Replace Constructor with Factory Function](/refactoring-from-zero-to-hero/th/simplifying-apis/replace-constructor-with-factory/)
-- [Introduce Parameter Object](/refactoring-from-zero-to-hero/th/simplifying-apis/introduce-parameter-object/)
-- [Separate Query from Modifier](/refactoring-from-zero-to-hero/th/simplifying-apis/separate-query-from-modifier/)
+- [Replace Constructor with Factory Function](/refactoring/th/simplifying-apis/replace-constructor-with-factory/)
+- [Introduce Parameter Object](/refactoring/th/simplifying-apis/introduce-parameter-object/)
+- [Separate Query from Modifier](/refactoring/th/simplifying-apis/separate-query-from-modifier/)
 
 <Callout title="ความไม่เปลี่ยนแปลงคือฟีเจอร์">
 ทุก setter ที่คุณลบคือคลาสของ bug ที่คุณเลิกกังวลได้ field ที่ไม่เปลี่ยนแปลงไม่ต้องมี defensive copy, ไม่ต้อง synchronisation และไม่ต้องตรวจสอบว่าใครอาจเปลี่ยนมัน ตั้ง identity ครั้งเดียวตอนสร้าง แล้วส่วนที่เหลือของโปรแกรมก็ไว้ใจมันได้ตลอดไป

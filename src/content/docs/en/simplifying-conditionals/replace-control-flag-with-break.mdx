@@ -151,9 +151,9 @@ The caution is overusing jumps. A handful of `break`/`return` exits read clearly
 
 ## Related
 
-- [Replace Nested Conditional with Guard Clauses](/refactoring-from-zero-to-hero/en/simplifying-conditionals/replace-nested-conditional-with-guard-clauses/)
-- [Decompose Conditional](/refactoring-from-zero-to-hero/en/simplifying-conditionals/decompose-conditional/)
-- [Consolidate Conditional Expression](/refactoring-from-zero-to-hero/en/simplifying-conditionals/consolidate-conditional/)
+- [Replace Nested Conditional with Guard Clauses](/refactoring/en/simplifying-conditionals/replace-nested-conditional-with-guard-clauses/)
+- [Decompose Conditional](/refactoring/en/simplifying-conditionals/decompose-conditional/)
+- [Consolidate Conditional Expression](/refactoring/en/simplifying-conditionals/consolidate-conditional/)
 
 <Callout title="One flag, one job">
 A control flag that is also read after the loop is doing two jobs at once: ending the loop and reporting a result. Split them. Let the loop exit with break or return, and compute the reported value from the loop's outcome — not from a variable you have been mutating in place.

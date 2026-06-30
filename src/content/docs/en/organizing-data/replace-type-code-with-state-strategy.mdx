@@ -219,13 +219,13 @@ An `Order` whose `status` string is checked by a `switch` in two methods. After,
 
 Choose State/Strategy when the variant **can change after construction**. Because the host keeps its class and merely swaps a held object, it models a lifecycle that subclasses cannot. **State** suits a small set of named conditions with transitions between them (order status); **Strategy** suits injecting one interchangeable algorithm (a pricing policy). Both also let you guard transitions and even add per-state data the host need not carry.
 
-Contrast this with **[Replace Type Code with Subclasses](/refactoring-from-zero-to-hero/en/organizing-data/replace-type-code-with-subclasses/)**: that move bakes the variant into the object's *type*, which is perfect when the type is **fixed for life** (an employee's role) but impossible when it must change. The cost of State/Strategy is one more object and a layer of delegation; you pay it to gain a runtime-swappable, guardable lifecycle. If the type never changes, subclasses are simpler.
+Contrast this with **[Replace Type Code with Subclasses](/refactoring/en/organizing-data/replace-type-code-with-subclasses/)**: that move bakes the variant into the object's *type*, which is perfect when the type is **fixed for life** (an employee's role) but impossible when it must change. The cost of State/Strategy is one more object and a layer of delegation; you pay it to gain a runtime-swappable, guardable lifecycle. If the type never changes, subclasses are simpler.
 
 ## Related
 
-- [Replace Type Code with Subclasses](/refactoring-from-zero-to-hero/en/organizing-data/replace-type-code-with-subclasses/)
-- [Encapsulate Variable](/refactoring-from-zero-to-hero/en/organizing-data/encapsulate-variable/)
-- [Replace Primitive with Object](/refactoring-from-zero-to-hero/en/organizing-data/replace-primitive-with-object/)
+- [Replace Type Code with Subclasses](/refactoring/en/organizing-data/replace-type-code-with-subclasses/)
+- [Encapsulate Variable](/refactoring/en/organizing-data/encapsulate-variable/)
+- [Replace Primitive with Object](/refactoring/en/organizing-data/replace-primitive-with-object/)
 
 <Callout title="Fixed type → subclass; changing type → State/Strategy">
 The same scattered switch can be cured two ways. If the variant is settled when the object is born, make it a subclass. If the variant moves through a lifecycle, hold a State object the host swaps — the host stays one class while its behaviour changes underneath it.

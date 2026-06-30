@@ -215,9 +215,9 @@ The catch is the constructor's strict rules: the call up to the parent must run 
 
 ## Related
 
-- [Pull Up & Push Down](/refactoring-from-zero-to-hero/en/generalization-and-inheritance/pull-up-and-push-down/)
-- [Extract Superclass & Interface](/refactoring-from-zero-to-hero/en/generalization-and-inheritance/extract-superclass-and-interface/)
-- [Replace Superclass with Delegation](/refactoring-from-zero-to-hero/en/generalization-and-inheritance/replace-superclass-with-delegation/)
+- [Pull Up & Push Down](/refactoring/en/generalization-and-inheritance/pull-up-and-push-down/)
+- [Extract Superclass & Interface](/refactoring/en/generalization-and-inheritance/extract-superclass-and-interface/)
+- [Replace Superclass with Delegation](/refactoring/en/generalization-and-inheritance/replace-superclass-with-delegation/)
 
 <Callout title="The constructor is a method with extra rules">
 Pulling up ordinary methods is routine; pulling up constructor bodies adds one constraint — the parent must be initialised before the child runs. Always make the call-up the first statement, and if the existing subclasses did their shared work at differing points, fix that ordering before you pull anything up. In Go and Rust the same discipline shows up as "build the embedded/base struct first".

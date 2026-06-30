@@ -238,9 +238,9 @@ The cost is real: you introduce a hierarchy, a factory, and more indirection. Fo
 
 ## Related
 
-- [Decompose Conditional](/refactoring-from-zero-to-hero/en/simplifying-conditionals/decompose-conditional/)
-- [Replace Nested Conditional with Guard Clauses](/refactoring-from-zero-to-hero/en/simplifying-conditionals/replace-nested-conditional-with-guard-clauses/)
-- [Introduce Special Case](/refactoring-from-zero-to-hero/en/simplifying-conditionals/introduce-special-case/)
+- [Decompose Conditional](/refactoring/en/simplifying-conditionals/decompose-conditional/)
+- [Replace Nested Conditional with Guard Clauses](/refactoring/en/simplifying-conditionals/replace-nested-conditional-with-guard-clauses/)
+- [Introduce Special Case](/refactoring/en/simplifying-conditionals/introduce-special-case/)
 
 <Callout title="Use sparingly — only when the conditional recurs">
 One switch in one function is fine; leave it alone. The trigger for polymorphism is the *same* type switch appearing across several functions, where every new type forces edits in many places. Introduce the hierarchy only when that repetition is real — not in anticipation of it.

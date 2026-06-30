@@ -239,9 +239,9 @@ The trade-off: a superclass couples its children together and is a one-shot in s
 
 ## Related
 
-- [Pull Up & Push Down](/refactoring-from-zero-to-hero/en/generalization-and-inheritance/pull-up-and-push-down/)
-- [Replace Inheritance with Delegation](/refactoring-from-zero-to-hero/en/generalization-and-inheritance/replace-inheritance-with-delegation/)
-- [Collapse Hierarchy](/refactoring-from-zero-to-hero/en/generalization-and-inheritance/collapse-hierarchy/)
+- [Pull Up & Push Down](/refactoring/en/generalization-and-inheritance/pull-up-and-push-down/)
+- [Replace Inheritance with Delegation](/refactoring/en/generalization-and-inheritance/replace-inheritance-with-delegation/)
+- [Collapse Hierarchy](/refactoring/en/generalization-and-inheritance/collapse-hierarchy/)
 
 <Callout title="Superclass for shared data, interface for shared shape">
 If the two classes share state and logic you would otherwise maintain twice, a superclass earns its keep. If they only need to be *used the same way* by callers, reach for an interface or trait — it captures the contract without committing you to a data hierarchy you may later regret. Go and Rust make the interface route the path of least resistance.

@@ -29,20 +29,20 @@ Here are the smells you will meet most often, each paired with the refactorings 
 
 | Smell | What you notice | Where this course addresses it |
 | --- | --- | --- |
-| **Long Function** | A function that scrolls off the screen and does many things | [Composing Methods](/refactoring-from-zero-to-hero/en/composing-methods/) — [Extract Function](/refactoring-from-zero-to-hero/en/composing-methods/extract-function/) |
-| **Duplicated Code** | The same fragment appears in two or more places | [Extract Function](/refactoring-from-zero-to-hero/en/composing-methods/extract-function/) and [Moving Features](/refactoring-from-zero-to-hero/en/moving-features/) |
-| **Mysterious Name** | A variable or function whose name hides its purpose | [Extract Variable](/refactoring-from-zero-to-hero/en/composing-methods/extract-variable/) |
-| **Large Class** | A class hoarding too many fields and responsibilities | [Moving Features](/refactoring-from-zero-to-hero/en/moving-features/) |
-| **Long Parameter List** | A call with so many arguments you lose track | [Simplifying APIs](/refactoring-from-zero-to-hero/en/simplifying-apis/) |
-| **Feature Envy** | A method more interested in another object's data than its own | [Moving Features](/refactoring-from-zero-to-hero/en/moving-features/) |
-| **Primitive Obsession** | Bare strings and numbers standing in for real concepts | [Organizing Data](/refactoring-from-zero-to-hero/en/organizing-data/) |
-| **Shotgun Surgery** | One small change forces edits scattered across many files | [Moving Features](/refactoring-from-zero-to-hero/en/moving-features/) |
-| **Tangled Conditionals** | Deeply nested or repeated branching that hides the logic | [Simplifying Conditionals](/refactoring-from-zero-to-hero/en/simplifying-conditionals/) |
-| **Temporary Field / Inheritance Misuse** | State used only sometimes, or hierarchies that fight you | [Generalization & Inheritance](/refactoring-from-zero-to-hero/en/generalization-and-inheritance/) |
+| **Long Function** | A function that scrolls off the screen and does many things | [Composing Methods](/refactoring/en/composing-methods/) — [Extract Function](/refactoring/en/composing-methods/extract-function/) |
+| **Duplicated Code** | The same fragment appears in two or more places | [Extract Function](/refactoring/en/composing-methods/extract-function/) and [Moving Features](/refactoring/en/moving-features/) |
+| **Mysterious Name** | A variable or function whose name hides its purpose | [Extract Variable](/refactoring/en/composing-methods/extract-variable/) |
+| **Large Class** | A class hoarding too many fields and responsibilities | [Moving Features](/refactoring/en/moving-features/) |
+| **Long Parameter List** | A call with so many arguments you lose track | [Simplifying APIs](/refactoring/en/simplifying-apis/) |
+| **Feature Envy** | A method more interested in another object's data than its own | [Moving Features](/refactoring/en/moving-features/) |
+| **Primitive Obsession** | Bare strings and numbers standing in for real concepts | [Organizing Data](/refactoring/en/organizing-data/) |
+| **Shotgun Surgery** | One small change forces edits scattered across many files | [Moving Features](/refactoring/en/moving-features/) |
+| **Tangled Conditionals** | Deeply nested or repeated branching that hides the logic | [Simplifying Conditionals](/refactoring/en/simplifying-conditionals/) |
+| **Temporary Field / Inheritance Misuse** | State used only sometimes, or hierarchies that fight you | [Generalization & Inheritance](/refactoring/en/generalization-and-inheritance/) |
 
 ## A short example smell
 
-Here is **Primitive Obsession**: a raw number is passed around to mean "money," but nothing stops a caller from mixing it up with a quantity or a temperature. The smell is the bare primitive standing in for a domain concept. The cure — wrapping it in a small type — lives in [Organizing Data](/refactoring-from-zero-to-hero/en/organizing-data/), but you should learn to *smell* it now.
+Here is **Primitive Obsession**: a raw number is passed around to mean "money," but nothing stops a caller from mixing it up with a quantity or a temperature. The smell is the bare primitive standing in for a domain concept. The cure — wrapping it in a small type — lives in [Organizing Data](/refactoring/en/organizing-data/), but you should learn to *smell* it now.
 
 <Tabs syncKey="lang">
   <TabItem label="TypeScript">
@@ -115,9 +115,9 @@ The wrapped version makes it impossible to accidentally add money to a quantity 
 
 ## Related
 
-- [Why and when to refactor](/refactoring-from-zero-to-hero/en/intro-and-principles/why-and-when/)
-- [Small steps and tests](/refactoring-from-zero-to-hero/en/intro-and-principles/small-steps-and-tests/)
-- [Composing Methods](/refactoring-from-zero-to-hero/en/composing-methods/)
+- [Why and when to refactor](/refactoring/en/intro-and-principles/why-and-when/)
+- [Small steps and tests](/refactoring/en/intro-and-principles/small-steps-and-tests/)
+- [Composing Methods](/refactoring/en/composing-methods/)
 
 <Callout title="Name the smell before reaching for a move">
 Do not refactor on a vague feeling. When code bothers you, name the smell first — "this is a Long Function," "that is Duplicated Code." Naming it tells you which refactoring fits and keeps you honest about whether the change is worth doing right now.

@@ -221,9 +221,9 @@ The cost is the forwarding methods you write by hand for the members you *do* ke
 
 ## Related
 
-- [Replace Inheritance with Delegation](/refactoring-from-zero-to-hero/en/generalization-and-inheritance/replace-inheritance-with-delegation/)
-- [Replace Subclass with Delegation](/refactoring-from-zero-to-hero/en/generalization-and-inheritance/replace-subclass-with-delegation/)
-- [Extract Superclass & Interface](/refactoring-from-zero-to-hero/en/generalization-and-inheritance/extract-superclass-and-interface/)
+- [Replace Inheritance with Delegation](/refactoring/en/generalization-and-inheritance/replace-inheritance-with-delegation/)
+- [Replace Subclass with Delegation](/refactoring/en/generalization-and-inheritance/replace-subclass-with-delegation/)
+- [Extract Superclass & Interface](/refactoring/en/generalization-and-inheritance/extract-superclass-and-interface/)
 
 <Callout title="Inherit the whole interface, or none of it">
 The deciding question is simple: does the subclass want *everything* the parent offers? If yes, inheritance is honest and cheap. If it wants only a slice — and is embarrassed by the rest — hold the parent as a field and forward the slice. Go and Rust bake this in: there is no way to inherit a fragment, so you compose, which is exactly where this refactoring leads.

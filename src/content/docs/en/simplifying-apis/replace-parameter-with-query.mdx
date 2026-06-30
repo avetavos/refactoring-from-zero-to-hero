@@ -151,9 +151,9 @@ The inverse is **Replace Query with Parameter**. Sometimes deriving a value *ins
 
 ## Related
 
-- [Separate Query from Modifier](/refactoring-from-zero-to-hero/en/simplifying-apis/separate-query-from-modifier/)
-- [Preserve Whole Object](/refactoring-from-zero-to-hero/en/simplifying-apis/preserve-whole-object/)
-- [Introduce Parameter Object](/refactoring-from-zero-to-hero/en/simplifying-apis/introduce-parameter-object/)
+- [Separate Query from Modifier](/refactoring/en/simplifying-apis/separate-query-from-modifier/)
+- [Preserve Whole Object](/refactoring/en/simplifying-apis/preserve-whole-object/)
+- [Introduce Parameter Object](/refactoring/en/simplifying-apis/introduce-parameter-object/)
 
 <Callout title="Two directions, one judgement call">
 Replace Parameter with Query shrinks the interface; Replace Query with Parameter exposes a dependency. Neither is always right. Prefer the query when the value is purely derived from data already on hand; prefer the parameter when the derivation reaches into shared or mutable state you would rather test through the front door.

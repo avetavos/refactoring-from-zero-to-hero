@@ -146,9 +146,9 @@ The trade-off is per language. Exceptions are right for *exceptional* conditions
 
 ## Related
 
-- [Introduce Special Case](/refactoring-from-zero-to-hero/en/simplifying-conditionals/introduce-special-case/)
-- [Introduce Assertion](/refactoring-from-zero-to-hero/en/simplifying-conditionals/introduce-assertion/)
-- [Replace Nested Conditional with Guard Clauses](/refactoring-from-zero-to-hero/en/simplifying-conditionals/replace-nested-conditional-with-guard-clauses/)
+- [Introduce Special Case](/refactoring/en/simplifying-conditionals/introduce-special-case/)
+- [Introduce Assertion](/refactoring/en/simplifying-conditionals/introduce-assertion/)
+- [Replace Nested Conditional with Guard Clauses](/refactoring/en/simplifying-conditionals/replace-nested-conditional-with-guard-clauses/)
 
 <Callout title="Exception in some languages, explicit error in others">
 "Replace Error Code with Exception" is named for languages that have exceptions. Go and Rust deliberately do not use exceptions for ordinary failures — there the same idea means returning an explicit error or Result, so failure lives in the type signature. The principle is constant: a sentinel that callers can silently ignore should be replaced by a failure channel they cannot.

@@ -219,13 +219,13 @@ smell คือ `switch` ที่กระจัดกระจายบน typ
 
 เลือก State/Strategy เมื่อ variant **เปลี่ยนได้หลังการสร้าง** เพราะ host คงคลาสของมันไว้และเพียงสลับอ็อบเจกต์ที่ถือ มันจึงจำลอง lifecycle ที่ซับคลาสทำไม่ได้ **State** เหมาะกับชุดของเงื่อนไขที่มีชื่อจำนวนน้อยพร้อมการเปลี่ยนระหว่างกัน (สถานะของ order); **Strategy** เหมาะกับการฉีด algorithm ที่ใช้แทนกันได้หนึ่งตัว (นโยบายการตั้งราคา) ทั้งคู่ยังให้คุณกั้นการเปลี่ยนสถานะและกระทั่งเพิ่มข้อมูลต่อ state ที่ host ไม่ต้องแบกไว้
 
-เปรียบเทียบกับ **[Replace Type Code with Subclasses](/refactoring-from-zero-to-hero/th/organizing-data/replace-type-code-with-subclasses/)**: การย้ายนั้นอบ variant ลงใน *type* ของอ็อบเจกต์ ซึ่งเหมาะที่สุดเมื่อ type **ตายตัวตลอดชีวิต** (บทบาทของพนักงาน) แต่เป็นไปไม่ได้เมื่อมันต้องเปลี่ยน ต้นทุนของ State/Strategy คืออ็อบเจกต์เพิ่มอีกหนึ่งและชั้นของการมอบหมาย คุณจ่ายมันเพื่อให้ได้ lifecycle ที่สลับได้ตอน runtime และกั้นได้ ถ้า type ไม่เคยเปลี่ยน ซับคลาสก็ง่ายกว่า
+เปรียบเทียบกับ **[Replace Type Code with Subclasses](/refactoring/th/organizing-data/replace-type-code-with-subclasses/)**: การย้ายนั้นอบ variant ลงใน *type* ของอ็อบเจกต์ ซึ่งเหมาะที่สุดเมื่อ type **ตายตัวตลอดชีวิต** (บทบาทของพนักงาน) แต่เป็นไปไม่ได้เมื่อมันต้องเปลี่ยน ต้นทุนของ State/Strategy คืออ็อบเจกต์เพิ่มอีกหนึ่งและชั้นของการมอบหมาย คุณจ่ายมันเพื่อให้ได้ lifecycle ที่สลับได้ตอน runtime และกั้นได้ ถ้า type ไม่เคยเปลี่ยน ซับคลาสก็ง่ายกว่า
 
 ## Related
 
-- [Replace Type Code with Subclasses](/refactoring-from-zero-to-hero/th/organizing-data/replace-type-code-with-subclasses/)
-- [Encapsulate Variable](/refactoring-from-zero-to-hero/th/organizing-data/encapsulate-variable/)
-- [Replace Primitive with Object](/refactoring-from-zero-to-hero/th/organizing-data/replace-primitive-with-object/)
+- [Replace Type Code with Subclasses](/refactoring/th/organizing-data/replace-type-code-with-subclasses/)
+- [Encapsulate Variable](/refactoring/th/organizing-data/encapsulate-variable/)
+- [Replace Primitive with Object](/refactoring/th/organizing-data/replace-primitive-with-object/)
 
 <Callout title="type ตายตัว → ซับคลาส; type เปลี่ยน → State/Strategy">
 switch ที่กระจัดกระจายแบบเดียวกันแก้ได้สองทาง ถ้า variant ลงตัวตั้งแต่อ็อบเจกต์เกิด ให้ทำเป็นซับคลาส ถ้า variant เคลื่อนผ่าน lifecycle ให้ถืออ็อบเจกต์ State ที่ host สลับ — host คงเป็นคลาสเดียวขณะที่พฤติกรรมของมันเปลี่ยนอยู่ข้างใต้

@@ -200,9 +200,9 @@ The trade-off is coupling: pulling up binds the subclasses to a shared definitio
 
 ## Related
 
-- [Extract Superclass & Interface](/refactoring-from-zero-to-hero/en/generalization-and-inheritance/extract-superclass-and-interface/)
-- [Collapse Hierarchy](/refactoring-from-zero-to-hero/en/generalization-and-inheritance/collapse-hierarchy/)
-- [Replace Inheritance with Delegation](/refactoring-from-zero-to-hero/en/generalization-and-inheritance/replace-inheritance-with-delegation/)
+- [Extract Superclass & Interface](/refactoring/en/generalization-and-inheritance/extract-superclass-and-interface/)
+- [Collapse Hierarchy](/refactoring/en/generalization-and-inheritance/collapse-hierarchy/)
+- [Replace Inheritance with Delegation](/refactoring/en/generalization-and-inheritance/replace-inheritance-with-delegation/)
 
 <Callout title="Pull up only what is truly shared">
 A tempting mistake is pulling a *nearly* identical method up and adding a flag to paper over the difference. That trades duplication for a conditional in the parent — usually a worse deal. Pull up only when the bodies match exactly; if they merely resemble each other, unify them honestly first, then lift.

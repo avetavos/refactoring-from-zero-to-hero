@@ -38,16 +38,16 @@ Tangled data shows up in small, recurring ways. The same literal appears in five
 
 Ten refactorings, each one tightening the relationship between data and the code that uses it:
 
-- **[Encapsulate Variable](/refactoring-from-zero-to-hero/en/organizing-data/encapsulate-variable/)** — wrap direct access to a piece of data behind accessor functions, so you have one place to validate, log, or later change the representation.
-- **[Replace Magic Literal](/refactoring-from-zero-to-hero/en/organizing-data/replace-magic-literal/)** — give an unexplained number or string a symbolic name, so the literal documents its own meaning and changes in one spot.
-- **[Encapsulate Collection](/refactoring-from-zero-to-hero/en/organizing-data/encapsulate-collection/)** — stop exposing a mutable list or map field; return a read-only view and offer explicit add and remove methods so the owner keeps control of its contents.
-- **[Replace Primitive with Object](/refactoring-from-zero-to-hero/en/organizing-data/replace-primitive-with-object/)** — when a primitive value starts attracting validation and formatting rules, promote it to a small value type that holds both the data and its behaviour.
-- **[Replace Type Code with Subclasses](/refactoring-from-zero-to-hero/en/organizing-data/replace-type-code-with-subclasses/)** — when a type-code field drives `switch`-style branching, replace the conditional logic with polymorphism across a small class hierarchy.
-- **[Self-Encapsulate Field](/refactoring-from-zero-to-hero/en/organizing-data/self-encapsulate-field/)** — route even a class's own reads and writes of a field through its getter and setter, giving subclasses and validation one seam to hook into.
-- **[Split Variable](/refactoring-from-zero-to-hero/en/organizing-data/split-variable/)** — when one variable is reassigned to mean two different things, give each purpose its own single-assignment variable.
-- **[Rename Field](/refactoring-from-zero-to-hero/en/organizing-data/rename-field/)** — when a record or struct field's name no longer fits its data, rename it and update every user so the name tells the truth again.
-- **[Change Reference to Value (and back)](/refactoring-from-zero-to-hero/en/organizing-data/change-reference-to-value/)** — make a small object an immutable value compared by content when sharing buys nothing, or reverse the move when many places must share one updatable instance.
-- **[Replace Type Code with State/Strategy](/refactoring-from-zero-to-hero/en/organizing-data/replace-type-code-with-state-strategy/)** — when a type code drives behaviour and changes at runtime, hold a swappable State or Strategy object instead of a fixed subclass.
+- **[Encapsulate Variable](/refactoring/en/organizing-data/encapsulate-variable/)** — wrap direct access to a piece of data behind accessor functions, so you have one place to validate, log, or later change the representation.
+- **[Replace Magic Literal](/refactoring/en/organizing-data/replace-magic-literal/)** — give an unexplained number or string a symbolic name, so the literal documents its own meaning and changes in one spot.
+- **[Encapsulate Collection](/refactoring/en/organizing-data/encapsulate-collection/)** — stop exposing a mutable list or map field; return a read-only view and offer explicit add and remove methods so the owner keeps control of its contents.
+- **[Replace Primitive with Object](/refactoring/en/organizing-data/replace-primitive-with-object/)** — when a primitive value starts attracting validation and formatting rules, promote it to a small value type that holds both the data and its behaviour.
+- **[Replace Type Code with Subclasses](/refactoring/en/organizing-data/replace-type-code-with-subclasses/)** — when a type-code field drives `switch`-style branching, replace the conditional logic with polymorphism across a small class hierarchy.
+- **[Self-Encapsulate Field](/refactoring/en/organizing-data/self-encapsulate-field/)** — route even a class's own reads and writes of a field through its getter and setter, giving subclasses and validation one seam to hook into.
+- **[Split Variable](/refactoring/en/organizing-data/split-variable/)** — when one variable is reassigned to mean two different things, give each purpose its own single-assignment variable.
+- **[Rename Field](/refactoring/en/organizing-data/rename-field/)** — when a record or struct field's name no longer fits its data, rename it and update every user so the name tells the truth again.
+- **[Change Reference to Value (and back)](/refactoring/en/organizing-data/change-reference-to-value/)** — make a small object an immutable value compared by content when sharing buys nothing, or reverse the move when many places must share one updatable instance.
+- **[Replace Type Code with State/Strategy](/refactoring/en/organizing-data/replace-type-code-with-state-strategy/)** — when a type code drives behaviour and changes at runtime, hold a swappable State or Strategy object instead of a fixed subclass.
 
 Each lesson shows the same before-and-after in TypeScript, Python, Go, and Rust, then walks the safe, ordered mechanics — running your tests between every step.
 

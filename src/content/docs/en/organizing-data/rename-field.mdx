@@ -128,9 +128,9 @@ The hazard is reach. A field can be referenced far beyond your file: in serialis
 
 ## Related
 
-- [Encapsulate Variable](/refactoring-from-zero-to-hero/en/organizing-data/encapsulate-variable/)
-- [Self-Encapsulate Field](/refactoring-from-zero-to-hero/en/organizing-data/self-encapsulate-field/)
-- [Replace Primitive with Object](/refactoring-from-zero-to-hero/en/organizing-data/replace-primitive-with-object/)
+- [Encapsulate Variable](/refactoring/en/organizing-data/encapsulate-variable/)
+- [Self-Encapsulate Field](/refactoring/en/organizing-data/self-encapsulate-field/)
+- [Replace Primitive with Object](/refactoring/en/organizing-data/replace-primitive-with-object/)
 
 <Callout title="Encapsulate first when the data escapes your module">
 A rename inside one file is trivial. A rename of a field that is serialised or shared across services is not — it can break consumers you never see. Put an accessor boundary around the field first, so you can change the internal name freely while keeping the external contract stable.

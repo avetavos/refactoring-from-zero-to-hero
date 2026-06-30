@@ -239,9 +239,9 @@ export const extractDiagram = `classDiagram
 
 ## เกี่ยวข้อง
 
-- [Pull Up & Push Down](/refactoring-from-zero-to-hero/th/generalization-and-inheritance/pull-up-and-push-down/)
-- [Replace Inheritance with Delegation](/refactoring-from-zero-to-hero/th/generalization-and-inheritance/replace-inheritance-with-delegation/)
-- [Collapse Hierarchy](/refactoring-from-zero-to-hero/th/generalization-and-inheritance/collapse-hierarchy/)
+- [Pull Up & Push Down](/refactoring/th/generalization-and-inheritance/pull-up-and-push-down/)
+- [Replace Inheritance with Delegation](/refactoring/th/generalization-and-inheritance/replace-inheritance-with-delegation/)
+- [Collapse Hierarchy](/refactoring/th/generalization-and-inheritance/collapse-hierarchy/)
 
 <Callout title="superclass สำหรับข้อมูลที่ใช้ร่วมกัน, interface สำหรับรูปร่างที่ใช้ร่วมกัน">
 ถ้าสองคลาสใช้ state และ logic ร่วมกันซึ่งมิฉะนั้นคุณจะต้องดูแลซ้ำสองรอบ superclass ก็คุ้มค่าที่จะมี ถ้าทั้งคู่เพียงต้องการ *ถูกใช้ในแบบเดียวกัน* โดย caller ให้หยิบ interface หรือ trait — มันจับ contract ไว้โดยไม่ผูกมัดคุณเข้ากับลำดับชั้นข้อมูลที่คุณอาจเสียใจในภายหลัง Go และ Rust ทำให้เส้นทาง interface เป็นทางที่มีแรงต้านน้อยที่สุด

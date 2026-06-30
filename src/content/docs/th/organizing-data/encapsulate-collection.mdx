@@ -180,9 +180,9 @@ export const collectionDiagram = `flowchart LR
 
 ## ที่เกี่ยวข้อง
 
-- [Encapsulate Variable](/refactoring-from-zero-to-hero/th/organizing-data/encapsulate-variable/)
-- [Replace Primitive with Object](/refactoring-from-zero-to-hero/th/organizing-data/replace-primitive-with-object/)
-- [Replace Magic Literal](/refactoring-from-zero-to-hero/th/organizing-data/replace-magic-literal/)
+- [Encapsulate Variable](/refactoring/th/organizing-data/encapsulate-variable/)
+- [Replace Primitive with Object](/refactoring/th/organizing-data/replace-primitive-with-object/)
+- [Replace Magic Literal](/refactoring/th/organizing-data/replace-magic-literal/)
 
 <Callout title="getter ที่คืนค่าลิสต์สดคือการโกหก">
 หาก getter ของคุณส่งคอนเทนเนอร์จริงคืนกลับมา เมท็อด add และ remove ของคุณก็เป็นแค่ละครฉาก — ผู้เรียกสามารถเพิกเฉยต่อพวกมันและเปลี่ยนแปลงลิสต์โดยตรงได้ง่าย ๆ การห่อหุ้มจะคงอยู่ได้ก็ต่อเมื่อการอ่านคืนค่าเป็นสำเนาหรือ view แบบอ่านอย่างเดียวเท่านั้น เพื่อให้เมท็อดเป็นวิธี *เดียว* ที่จะเปลี่ยนเนื้อหาได้
