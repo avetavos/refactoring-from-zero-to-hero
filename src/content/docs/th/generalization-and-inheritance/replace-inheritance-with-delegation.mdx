@@ -1,6 +1,6 @@
 ---
 title: Replace Inheritance with Delegation
-description: subclass ใช้พ่อแม่เพียงบางส่วน — หรือ "is-a" เป็นเรื่องโกหก ให้ถือพ่อแม่เดิมไว้เป็นฟิลด์แล้ว delegate ไปหามันแทน
+description: เมื่อ subclass ใช้ superclass แค่บางส่วน หรือความสัมพันธ์ "is-a" เป็นเรื่องโกหก ให้ถือ superclass เดิมไว้เป็น field แล้ว delegate เข้าไปแทน
 sidebar:
   order: 4
 ---
@@ -20,17 +20,17 @@ export const delegationDiagram = `classDiagram
   Stack --> List : holds & delegates
   note for Stack "Stack HAS-A List, not IS-A List"`;
 
-## Intent
+## จุดประสงค์
 
-**Replace Inheritance with Delegation** ปลด subclass ออกจากพ่อแม่ของมัน แล้วให้มันมี *ฟิลด์* ที่ถือ instance ของพ่อแม่เดิมไว้แทน คลาสจะส่งต่อ (delegate) การเรียกที่มันต้องการจริง ๆ และเพิกเฉยส่วนที่เหลือ คุณทำสิ่งนี้เมื่อ subclass ใช้ interface ของ superclass เพียงเสี้ยวเดียว หรือเมื่อ inheritance นั้นจำลองความสัมพันธ์ "has-a" ที่แต่งตัวเป็น "is-a"
+**Replace Inheritance with Delegation** ปลด subclass ออกจาก superclass แล้วให้ถือ *field* ที่เก็บ instance ของ superclass เดิมไว้แทน จากนั้น class จะ delegate เฉพาะการเรียกที่ต้องใช้จริง ส่วนที่เหลือก็ไม่ต้องสนใจ ใช้ท่านี้เมื่อ subclass ใช้ interface ของ superclass แค่เสี้ยวเดียว หรือเมื่อ inheritance ที่เขียนไว้จริง ๆ แล้วคือความสัมพันธ์ "has-a" ที่แต่งตัวมาเป็น "is-a"
 
 ## Code Smell
 
-อาการคลาสสิกคือ **Refused Bequest**: `Stack extends List` แต่ stack ไม่ควรให้ caller `insertAt` ตรงกลางหรือ `remove` จากด้านล่าง การ inherit ทำให้ `Stack` เปิดเผย interface ทั้งหมดของ `List` และทำลาย invariant ของตัวเองอย่างเงียบ ๆ ความสัมพันธ์ผิด — stack *มี* list มันไม่ได้ *เป็น* list การแทน inheritance ด้วย delegation ทำให้ `Stack` เปิดเผยเพียง `push` และ `pop` โดยเก็บ list ไว้เป็น private
+อาการคลาสสิกคือ **Refused Bequest** เช่น `Stack extends List` ทั้งที่ stack ไม่ควรเปิดให้ caller `insertAt` ตรงกลางหรือ `remove` จากก้นได้ การ inherit ทำให้ `Stack` เปิดเผย interface ทั้งชุดของ `List` แล้วทำลาย invariant ของตัวเองอย่างเงียบ ๆ ความสัมพันธ์ที่วางไว้จึงผิด เพราะ stack *มี* list ไม่ได้ *เป็น* list พอเปลี่ยนมาใช้ delegation แทน `Stack` ก็เปิดเผยแค่ `push` กับ `pop` และเก็บ list ไว้เป็น private
 
-## Before → After
+## ก่อน → หลัง
 
-`Stack` ที่สร้างขึ้นด้วยการ extend `List` รั่วทุก operation ของ list ออกไป หลัง refactoring มันจะ *ถือ* list และเปิดเผยเพียง operation ของ stack เท่านั้น
+`Stack` ที่สร้างด้วยการ extend `List` จะปล่อยให้ operation ของ list รั่วออกไปหมด หลัง refactor จะเปลี่ยนเป็น *ถือ* list ไว้ แล้วเปิดเผยเฉพาะ operation ของ stack
 
 <Tabs syncKey="lang">
   <TabItem label="TypeScript">
@@ -142,22 +142,22 @@ export const delegationDiagram = `classDiagram
 
 <Mermaid code={delegationDiagram} title="Stack เลิกเป็น List แล้วเริ่มถือ List ไว้แทน" />
 
-## Mechanics
+## กลไกการทำงาน
 
-1. สร้างฟิลด์ใน subclass เพื่อถือ instance ของ superclass (เดิม) ตั้งค่าเริ่มต้นให้มัน — ไม่ว่าจะด้วย instance ใหม่ หรือด้วยตัว object เองหากคุณกำลังแกะ self-reference ออก
-2. สำหรับแต่ละเมท็อดของ superclass ที่ subclass ใช้จริง ให้เพิ่มเมท็อดที่ delegate ซึ่งส่งต่อการเรียกไปยังฟิลด์นั้น
-3. ลบความสัมพันธ์ `extends` / embedding ออก เพื่อให้คลาสไม่ inherit interface ทั้งหมดของพ่อแม่อีกต่อไป
+1. สร้าง field ใน subclass สำหรับถือ instance ของ superclass เดิม แล้วกำหนดค่าเริ่มต้นให้ จะสร้าง instance ใหม่ หรือใช้ตัว object เองถ้ากำลังแกะ self-reference อยู่ก็ได้
+2. สำหรับแต่ละ method ของ superclass ที่ subclass ใช้จริง ให้เพิ่ม method ที่ delegate ซึ่งส่งต่อการเรียกไปยัง field นั้น
+3. ลบความสัมพันธ์ `extends` / embedding ออก เพื่อให้ class ไม่ inherit interface ทั้งหมดของพ่อแม่อีกต่อไป
 4. ปรับ caller ที่พึ่งพาสมาชิกที่ inherit มาซึ่งไม่ควรเข้าถึงได้ตั้งแต่แรก — นี่คือรอยรั่วที่คุณกำลังอุด
-5. **รันเทสต์** หลังเดินสายเมท็อดที่ delegate แต่ละตัวเสร็จ
+5. **รัน test** หลังเดินสาย method ที่ delegate แต่ละตัวเสร็จ
 6. เมื่อ delegation อยู่ที่แล้ว คุณก็มีอิสระที่จะแคบ interface ที่เปิดเผยและปกป้อง invariant ที่ inheritance เดิมละเมิด
 
-## When to use / trade-offs
+## ใช้เมื่อไหร่ / ข้อแลกเปลี่ยน
 
-ใช้สิ่งนี้เมื่อ subclass ปฏิเสธมรดกส่วนใหญ่ของมัน เมื่อ inheritance รั่ว operation ที่ทำลายกฎของ subclass เอง หรือเมื่อ "is-a" ไม่เคยเป็นจริงจริง ๆ หลังการย้าย คุณควบคุมได้เป๊ะ ๆ ว่า operation ใดเป็น public ดังนั้น invariant จึงบังคับใช้ได้
+ใช้ท่านี้เมื่อ subclass ปฏิเสธมรดกที่ได้รับเสียเป็นส่วนใหญ่ เมื่อ inheritance ปล่อย operation ที่ทำลายกฎของ subclass เองรั่วออกมา หรือเมื่อ "is-a" ไม่เคยเป็นจริงตั้งแต่แรก หลังย้ายเสร็จ คุณจะคุมได้เป๊ะ ๆ ว่า operation ไหนเป็น public จึงบังคับ invariant ได้จริง
 
-ต้นทุนคือ boilerplate ของการส่งต่อเล็กน้อย — หนึ่งเมท็อดสั้น ๆ ต่อหนึ่ง operation ที่ delegate นั่นเป็นราคาเล็ก ๆ และซื่อตรงสำหรับความสัมพันธ์ที่ถูกต้องแม่นยำ ใน Go นี่เป็นเพียงการเลือกฟิลด์ที่ถือไว้แทน embedding ส่วนใน Rust delegation คือเส้นทาง *เดียว* ดังนั้น refactoring นี้จึงเป็นแค่ "เขียน Rust แบบ idiomatic ตั้งแต่แรก"
+ต้นทุนคือ boilerplate ของการส่งต่อเล็กน้อย — หนึ่ง method สั้น ๆ ต่อหนึ่ง operation ที่ delegate นั่นเป็นราคาเล็ก ๆ และซื่อตรงสำหรับความสัมพันธ์ที่ถูกต้องแม่นยำ ใน Go นี่เป็นเพียงการเลือก field ที่ถือไว้แทน embedding ส่วนใน Rust delegation คือเส้นทาง *เดียว* ดังนั้น refactoring นี้จึงเป็นแค่ "เขียน Rust แบบ idiomatic ตั้งแต่แรก"
 
-## Related
+## เนื้อหาที่เกี่ยวข้อง
 
 - [Replace Subclass with Delegation](/refactoring/th/generalization-and-inheritance/replace-subclass-with-delegation/)
 - [Pull Up & Push Down](/refactoring/th/generalization-and-inheritance/pull-up-and-push-down/)
@@ -175,7 +175,7 @@ export const delegationDiagram = `classDiagram
 > - delegation จะสร้าง wrapper ที่ไม่เพิ่ม value
 
 <Callout title="เลือก composition มากกว่า inheritance">
-inheritance ผูกคุณเข้ากับ interface *ทั้งหมด* ของพ่อแม่และวิวัฒนาการของมัน ส่วน composition ให้คุณส่งต่อเฉพาะสิ่งที่คุณตั้งใจจะรองรับ เมื่อไม่แน่ใจ ให้ถือ collaborator ไว้เป็นฟิลด์แล้ว delegate Go และ Rust อบคำแนะนำนี้ไว้ในตัวภาษาแล้ว — มันไม่ให้ inheritance คุณไปใช้ผิด ๆ ดังนั้นคุณจึงหยิบ delegation มาใช้โดยปริยาย และความสัมพันธ์ของคุณก็ซื่อตรงอยู่เสมอ
+inheritance มัดคุณไว้กับ interface *ทั้งชุด* ของ superclass รวมถึงทุกการเปลี่ยนแปลงในอนาคต ส่วน composition ให้คุณส่งต่อเฉพาะสิ่งที่ตั้งใจจะรองรับ ถ้าไม่แน่ใจ ให้ถือ collaborator ไว้เป็น field แล้ว delegate เอา Go กับ Rust อบคำแนะนำนี้ไว้ในตัวภาษาแล้ว เพราะไม่มี inheritance ให้ใช้ผิด คุณจึงหยิบ delegation มาใช้โดยปริยาย และความสัมพันธ์ก็ซื่อตรงเสมอ
 </Callout>
 
 export const quizReplaceInh = [
@@ -185,17 +185,17 @@ export const quizReplaceInh = [
       'function ที่ยาวเกินไป',
       'subclass ที่ใช้พ่อแม่เพียงบางส่วน หรือจำลองความสัมพันธ์ "is-a" ที่ผิด',
       'ดัชนีฐานข้อมูลที่หายไป',
-      'สองเมท็อดที่มีชื่อเดียวกัน',
+      'สอง method ที่มีชื่อเดียวกัน',
     ],
     answer: 1,
   },
   {
-    q: 'หลัง refactoring คลาสนำพ่อแม่เดิมมาใช้ซ้ำอย่างไร?',
+    q: 'หลัง refactoring class นำพ่อแม่เดิมมาใช้ซ้ำอย่างไร?',
     options: [
-      'มันคัดลอก code ของพ่อแม่ทั้งหมดมาแบบ inline',
-      'มันถือพ่อแม่เดิมไว้เป็นฟิลด์แล้ว delegate การเรียกที่มันต้องการ',
-      'มันลบพ่อแม่ทิ้งทั้งหมด',
-      'มันทำให้พ่อแม่เป็น abstract',
+      'คัดลอก code ของ superclass ทั้งหมดมา inline ไว้',
+      'ถือ superclass เดิมไว้เป็น field แล้ว delegate เฉพาะการเรียกที่ต้องใช้',
+      'ลบ superclass ทิ้งทั้งหมด',
+      'เปลี่ยน superclass ให้เป็น abstract',
     ],
     answer: 1,
   },
@@ -212,10 +212,10 @@ export const quizReplaceInh = [
   {
     q: 'อะไรคือต้นทุนหลักของการเลือก delegation แทน inheritance?',
     options: [
-      'มันทำงานช้ากว่าเสมอ',
-      'boilerplate ของการส่งต่อเล็กน้อย — หนึ่งเมท็อดสั้น ๆ ต่อหนึ่ง operation ที่ delegate',
-      'คุณเสียความสามารถในการเขียนเทสต์',
-      'คลาสไม่สามารถถือฟิลด์ได้อีกต่อไป',
+      'ทำงานช้ากว่าเสมอ',
+      'boilerplate ของการส่งต่อเล็กน้อย — หนึ่ง method สั้น ๆ ต่อหนึ่ง operation ที่ delegate',
+      'คุณเสียความสามารถในการเขียน test',
+      'class ไม่สามารถถือ field ได้อีกต่อไป',
     ],
     answer: 1,
   },

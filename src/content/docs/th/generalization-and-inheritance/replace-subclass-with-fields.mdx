@@ -1,6 +1,6 @@
 ---
 title: Replace Subclass with Fields
-description: เมื่อ subclass ต่างกันเพียงข้อมูลคงที่ที่ถูกคืนกลับจากเมท็อดที่ override ให้ยุบมันเป็นคลาสเดียวที่มีฟิลด์ถือข้อมูลนั้นไว้
+description: เมื่อ subclass ต่างกันแค่ข้อมูลคงที่ที่ method override คืนออกมา ให้ยุบเหลือ class เดียวที่เก็บข้อมูลนั้นไว้เป็น field
 sidebar:
   order: 7
 ---
@@ -28,17 +28,17 @@ export const fieldsDiagram = `classDiagram
     +code() string
   }`;
 
-## Intent
+## จุดประสงค์
 
-**Replace Subclass with Fields** สลายลำดับชั้นเล็ก ๆ ที่ subclass ไม่มี behavior ใด ๆ — มีเพียง *ค่าคงที่ที่ต่างกัน* ที่ถูกคืนกลับจากเมท็อดที่ override เท่านั้น แต่ละเมท็อดแบบนั้นกลายเป็นฟิลด์บนคลาส concrete เดียว และค่าที่แยกความต่างของ subclass ก็ย้ายเข้าไปอยู่ใน constructor ของคลาสนั้น ลำดับชั้นหายไป ส่วนข้อมูลที่มันเข้ารหัสไว้ยังคงอยู่ในรูปฟิลด์ธรรมดา
+**Replace Subclass with Fields** สลายลำดับชั้นเล็ก ๆ ที่ subclass ไม่มี behavior ใด ๆ — มีเพียง *ค่าคงที่ที่ต่างกัน* ที่ถูกคืนกลับจาก method ที่ override เท่านั้น แต่ละ method แบบนั้นกลายเป็น field บน class concrete เดียว และค่าที่แยกความต่างของ subclass ก็ย้ายเข้าไปอยู่ใน constructor ของ class นั้น ลำดับชั้นหายไป ส่วนข้อมูลที่เข้ารหัสไว้ยังคงอยู่ในรูป field ธรรมดา
 
 ## Code Smell
 
-คุณเจอ subclass ที่ทุก override เป็นบรรทัดเดียวคืนค่า literal: `isMale() { return true; }`, `code() { return "M"; }` subclass นั้นไม่เพิ่มตรรกะใด ไม่ถือ state ต่อ instance และไม่เคยเปลี่ยนคำตอบ ทั้ง type — พร้อมไฟล์ของตัวเอง constructor ของตัวเอง ช่องของตัวเองในลำดับชั้น — มีอยู่เพียงเพื่อ hard-code ค่าคงที่สองค่า นั่นคือ **Lazy Class** ที่แต่งตัวเป็น subtype และมันทำให้ความแตกต่างระหว่าง variant มองเห็นได้ยากกว่าการเขียนฟิลด์เรียงกันเป็นแถว
+คุณเจอ subclass ที่ทุก override เป็นบรรทัดเดียวคืนค่า literal: `isMale() { return true; }`, `code() { return "M"; }` subclass นั้นไม่เพิ่ม logic ใด ไม่ถือ state ต่อ instance และไม่เคยเปลี่ยนคำตอบ ทั้ง type — พร้อมไฟล์ของตัวเอง constructor ของตัวเอง ช่องของตัวเองในลำดับชั้น — มีอยู่เพียงเพื่อ hard-code ค่าคงที่สองค่า นั่นคือ **Lazy Class** ที่แต่งตัวเป็น subtype และทำให้ความแตกต่างระหว่าง variant มองเห็นได้ยากกว่าการเขียน field เรียงกันเป็นแถว
 
-## Before → After
+## ก่อน → หลัง
 
-`Person` ถูกแยกเป็น subclass `Male` กับ `Female` แต่ละตัว override เมท็อดเพื่อคืนค่าคงที่ตายตัว หลังจากนั้น `Person` เดียวถือค่าคงที่เหล่านั้นไว้เป็นฟิลด์ที่ factory ตั้งให้
+`Person` ถูกแยกเป็น subclass `Male` กับ `Female` แต่ละตัว override method เพื่อคืนค่าคงที่ตายตัว หลังจากนั้น `Person` เดียวถือค่าคงที่เหล่านั้นไว้เป็น field ที่ factory ตั้งให้
 
 <Tabs syncKey="lang">
   <TabItem label="TypeScript">
@@ -170,24 +170,24 @@ export const fieldsDiagram = `classDiagram
   </TabItem>
 </Tabs>
 
-<Mermaid code={fieldsDiagram} title="subclass ที่มีแต่ข้อมูลสองตัวยุบรวมเป็นคลาสเดียวที่มีฟิลด์" />
+<Mermaid code={fieldsDiagram} title="subclass ที่มีแต่ข้อมูลสองตัวยุบรวมเป็น class เดียวที่มี field" />
 
-## Mechanics
+## กลไกการทำงาน
 
-1. ใช้ **Replace Constructor with Factory Function** กับ superclass เพื่อให้ผู้เรียกสร้าง instance ผ่านเมท็อด factory แทนการเรียก `new Subclass()` ตรง ๆ
-2. สำหรับแต่ละเมท็อดที่ subclass override เพื่อคืนค่าคงที่ ให้เพิ่มฟิลด์บน superclass ที่ถือค่านั้นไว้
-3. ทำให้แต่ละเมท็อด factory ส่งค่าคงที่ที่เหมาะสมตอนสร้าง instance ของ superclass
-4. เปลี่ยนเมท็อดของ superclass ให้คืนค่าฟิลด์ใหม่แทนการเป็น abstract
-5. **รันเทสต์ของคุณ** ทุกจุดเรียกควรสร้าง instance ของ superclass ด้วยค่าฟิลด์ที่ถูกต้องแล้ว
-6. ลบ subclass ที่ว่างเปล่าทิ้งเมื่อไม่มีอะไรอ้างถึงมันแล้ว
+1. ใช้ **Replace Constructor with Factory Function** กับ superclass เพื่อให้ caller สร้าง instance ผ่าน method factory แทนการเรียก `new Subclass()` ตรง ๆ
+2. สำหรับแต่ละ method ที่ subclass override เพื่อคืนค่าคงที่ ให้เพิ่ม field บน superclass ที่ถือค่านั้นไว้
+3. ทำให้แต่ละ method factory ส่งค่าคงที่ที่เหมาะสมตอนสร้าง instance ของ superclass
+4. เปลี่ยน method ของ superclass ให้คืนค่า field ใหม่แทนการเป็น abstract
+5. **รัน test** ทุกจุดเรียกควรสร้าง instance ของ superclass ด้วยค่า field ที่ถูกต้องแล้ว
+6. ลบ subclass ที่ว่างเปล่าทิ้ง เมื่อไม่เหลืออะไรอ้างถึงแล้ว
 
-## When to use / trade-offs
+## ใช้เมื่อไหร่ / ข้อแลกเปลี่ยน
 
-หยิบสิ่งนี้มาใช้เมื่อใดก็ตามที่งานเดียวของ subclass คือการ hard-code ค่าคืนกลับ — ไม่มีฟิลด์เพิ่ม ไม่มี behavior จริง ไม่มีตรรกะต่อการเรียก การพับค่าเหล่านั้นเข้าไปเป็นฟิลด์จะลบ type หนึ่งออก ทำให้ลำดับชั้นแบนลง และจัดเรียง variant ให้ความแตกต่างของมันอ่านได้เป็นข้อมูลแทนที่จะเป็นนิยามคลาส
+หยิบสิ่งนี้มาใช้เมื่อใดก็ตามที่งานเดียวของ subclass คือการ hard-code ค่าคืนกลับ — ไม่มี field เพิ่ม ไม่มี behavior จริง ไม่มี logic ต่อการเรียก การพับค่าเหล่านั้นเข้าไปเป็น field จะลบ type หนึ่งออก ทำให้ลำดับชั้นแบนลง และจัดเรียง variant ให้ความแตกต่างอ่านได้เป็นข้อมูลแทนที่จะเป็นนิยาม class
 
-*อย่า* นำมาใช้ถ้า subclass มี behavior จริงที่แตกต่างกัน หรือถ้าคุณคาดว่ามันจะงอก behavior ขึ้นมา เพราะถ้าเป็นเช่นนั้น ลำดับชั้น (หรือ strategy) ก็ยังคุ้มค่าที่จะมีอยู่ สิ่งตรงข้ามคือ **Replace Fields with Subclass** — เลื่อนฟิลด์ที่แยกความต่างกลับขึ้นไปเป็น subtype เมื่อ behavior ไม่ใช่เพียงข้อมูล เริ่มแยกตัวออกตามฟิลด์นั้น
+*อย่า* นำมาใช้ถ้า subclass มี behavior จริงที่แตกต่างกัน หรือถ้าคุณคาดว่าจะงอก behavior ขึ้นมา เพราะถ้าเป็นเช่นนั้น ลำดับชั้น (หรือ strategy) ก็ยังคุ้มค่าที่จะมีอยู่ ท่ากลับกันคือ **Replace Fields with Subclass** — เลื่อน field ที่แยกความต่างกลับขึ้นไปเป็น subtype เมื่อ behavior ไม่ใช่เพียงข้อมูล เริ่มแยกตัวออกตาม field นั้น
 
-## Related
+## เนื้อหาที่เกี่ยวข้อง
 
 - [Collapse Hierarchy](/refactoring/th/generalization-and-inheritance/collapse-hierarchy/)
 - [Replace Subclass with Delegation](/refactoring/th/generalization-and-inheritance/replace-subclass-with-delegation/)
@@ -205,7 +205,7 @@ export const fieldsDiagram = `classDiagram
 > - จำนวน variant มีมากและน่าจะเพิ่มขึ้น
 
 <Callout title="subclass ควรเพิ่ม behavior ไม่ใช่เพียงค่าคงที่">
-ถ้าคุณอธิบายความแตกต่างระหว่าง subclass สองตัวได้ครบถ้วนว่า "ตัวนี้คืน M ตัวนั้นคืน F" แสดงว่าคุณกำลังใช้ระบบ type มาเก็บข้อมูล ข้อมูลควรอยู่ในฟิลด์ เก็บ subclass ไว้สำหรับกรณีที่ *สิ่งที่ออบเจกต์ทำ* แตกต่างกัน — ไม่ใช่เพียงแค่สิ่งที่มันตอบ
+ถ้าคุณอธิบายความแตกต่างระหว่าง subclass สองตัวได้ครบถ้วนว่า "ตัวนี้คืน M ตัวนั้นคืน F" แสดงว่าคุณกำลังใช้ระบบ type มาเก็บข้อมูล ข้อมูลควรอยู่ใน field เก็บ subclass ไว้สำหรับกรณีที่ *สิ่งที่ object ทำ* แตกต่างกัน — ไม่ใช่เพียงแค่สิ่งที่ตอบ
 </Callout>
 
 export const quizReplaceFields = [
@@ -220,12 +220,12 @@ export const quizReplaceFields = [
     answer: 1,
   },
   {
-    q: 'อะไรเข้ามาแทนที่แต่ละเมท็อดที่ override เพื่อคืนค่าคงที่หลังจาก refactoring?',
-    options: ['ตัวแปร global', 'ฟิลด์บนคลาสเดียวที่เหลืออยู่', 'subclass อีกตัว', 'static method บน helper'],
+    q: 'อะไรเข้ามาแทนที่แต่ละ method ที่ override เพื่อคืนค่าคงที่หลังจาก refactoring?',
+    options: ['ตัวแปร global', 'field บน class เดียวที่เหลืออยู่', 'subclass อีกตัว', 'static method บน helper'],
     answer: 1,
   },
   {
-    q: 'ขั้นแรกตามปกติที่ทำให้ผู้เรียกเลิกใช้ new Subclass() ตรง ๆ คืออะไร?',
+    q: 'ขั้นแรกตามปกติที่ทำให้ caller เลิกใช้ new Subclass() ตรง ๆ คืออะไร?',
     options: [
       'Replace Constructor with Factory Function',
       'Inline Function',
@@ -238,7 +238,7 @@ export const quizReplaceFields = [
     q: 'Go และ Rust สัมพันธ์กับ refactoring นี้อย่างไร?',
     options: [
       'ใช้ class inheritance ดังนั้น before/after จึงเหมือนกับ TypeScript ทุกประการ',
-      'ไม่มี inheritance ดังนั้น struct ที่ถือฟิลด์พร้อม constructor function จึงเป็นรูปแบบ idiomatic อยู่แล้ว',
+      'ไม่มี inheritance ดังนั้น struct ที่ถือ field พร้อม constructor function จึงเป็นรูปแบบ idiomatic อยู่แล้ว',
       'ไม่สามารถแสดงเจตนาได้เลย',
       'ห้ามใช้ constructor function',
     ],

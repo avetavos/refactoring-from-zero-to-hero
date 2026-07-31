@@ -1,6 +1,6 @@
 ---
 title: Remove Setting Method
-description: ทิ้ง setter ของ field ที่ควรถูกกำหนดตายตัวตอนสร้าง เพื่อให้ค่าถูกตั้งครั้งเดียวและอ็อบเจกต์กลายเป็นไม่เปลี่ยนแปลง
+description: ทิ้ง setter ของ field ที่ควรถูกกำหนดตายตัวตอนสร้าง เพื่อให้ค่าถูกตั้งครั้งเดียวและ object กลายเป็นไม่เปลี่ยนแปลง
 sidebar:
   order: 10
 ---
@@ -20,15 +20,15 @@ export const removeSetterDiagram = `flowchart LR
   end
   Before -.->|"Remove Setting Method"| After`;
 
-## Intent
+## จุดประสงค์
 
-บาง field เป็นส่วนหนึ่งของ identity ของอ็อบเจกต์: เลขบัญชี, timestamp การสร้าง, สกุลเงิน พวกมันควรถูกเลือกตอนอ็อบเจกต์เกิดและไม่ถูกแตะอีกเลย ถ้า field แบบนั้นมี setter ใครก็ตามสามารถ mutate มันเงียบ ๆ ภายหลังได้ ย้ายการกำหนดค่าเข้าไปใน constructor และ **ลบ setter ทิ้ง** เพื่อให้ field ถูกตั้งเพียงครั้งเดียวและอ็อบเจกต์ไม่เปลี่ยนแปลงในแง่นั้น
+บาง field เป็นส่วนหนึ่งของ identity ของ object เช่น เลขบัญชี timestamp ตอนสร้าง หรือสกุลเงิน ค่าพวกนี้ควรถูกกำหนดตอน object เกิดแล้วไม่แตะอีกเลย ถ้า field แบบนั้นมี setter ใครก็ตามก็ mutate ทีหลังได้แบบเงียบ ๆ ให้ย้ายการกำหนดค่าเข้าไปใน constructor แล้ว **ลบ setter ทิ้ง** field จะได้ถูกตั้งครั้งเดียว และ object ก็ immutable ในแง่นั้น
 
-## The smell
+## อาการของปัญหา
 
-คุณสร้างอ็อบเจกต์ แล้วเรียก setter ทันทีเพื่อให้ค่าที่จะไม่มีวันเปลี่ยนอย่างถูกต้อง — `new Account(); account.setId(42)` การเกิดสองขั้นชวนให้บุคคลที่สามเรียก setter อีกครั้ง ห่างไกลจากการสร้าง และทำลาย identity ของอ็อบเจกต์ setter ที่มีอยู่เพียงเพื่อให้ถูกเรียกครั้งเดียวตอนเริ่มคือ setter ที่ไม่ควรมีอยู่
+คุณสร้าง object แล้วเรียก setter ทันทีเพื่อให้ค่าที่จะไม่มีวันเปลี่ยนอย่างถูกต้อง — `new Account(); account.setId(42)` การเกิดสองขั้นชวนให้บุคคลที่สามเรียก setter อีกครั้ง ห่างไกลจากการสร้าง และทำลาย identity ของ object setter ที่มีอยู่เพียงเพื่อให้ถูกเรียกครั้งเดียวตอนเริ่มคือ setter ที่ไม่ควรมีอยู่
 
-## Before → After
+## ก่อน → หลัง
 
 `Account` เปิดเผย `id` ที่ตั้งค่าได้ เรารับ id ใน constructor และลบ `setId` ทำให้ identity ถาวร ใน Go และ Rust ไม่มี setter ตั้งแต่แรก — ประเด็นคือกำหนดค่าตอนสร้างและไม่เปิดเผยตัว mutate
 
@@ -122,21 +122,21 @@ export const removeSetterDiagram = `flowchart LR
 
 <Mermaid code={removeSetterDiagram} title="การสร้างสองขั้นที่มี setter กลายเป็นการสร้างครั้งเดียวที่ไม่เปลี่ยนแปลง" />
 
-## Mechanics
+## กลไกการทำงาน
 
-1. ถ้า constructor ยังรับ field ไม่ได้ ให้เพิ่มมันเป็น parameter และกำหนดค่ามันข้างใน constructor
-2. อัปเดตผู้เรียกทุกรายที่สร้างอ็อบเจกต์ให้ส่งค่าผ่าน constructor แทนที่จะผ่าน setter **รันเทสต์ของคุณ** หลังแต่ละราย
-3. ค้นหาการเรียก setter ที่ยังเหลืออยู่ ถ้าผู้เรียกยัง mutate field หลังการสร้าง ให้ตัดสินว่านั่นเป็นความต้องการจริงไหม — ถ้าใช่ field นี้ไม่ใช่ตัวเลือก; ถ้าไม่ ให้นำมันผ่าน constructor
-4. เมื่อไม่มีผู้เรียกใช้ setter แล้ว ก็ลบมันทิ้ง
+1. ถ้า constructor ยังไม่รับ field นั้น ให้เพิ่มเป็น parameter แล้วกำหนดค่าข้างใน constructor
+2. อัปเดต caller ทุกรายที่สร้าง object ให้ส่งค่าผ่าน constructor แทนที่จะผ่าน setter **รัน test** หลังแต่ละราย
+3. ไล่หาการเรียก setter ที่ยังเหลือ ถ้า caller ยัง mutate field หลังสร้าง object ให้ตัดสินว่านั่นเป็นความต้องการจริงหรือไม่ ถ้าใช่ field นี้ก็ไม่เข้าข่ายท่านี้ ถ้าไม่ใช่ ก็ส่งค่าผ่าน constructor แทน
+4. เมื่อไม่เหลือ caller ที่เรียก setter แล้ว ก็ลบ setter ทิ้งได้
 5. ที่ภาษาอนุญาต ให้ทำเครื่องหมาย field เป็น `readonly`/`final`/private-ที่ไม่มีตัว mutate เพื่อให้ compiler บังคับความไม่เปลี่ยนแปลง
 
-## When to use / trade-offs
+## ใช้เมื่อไหร่ / ข้อแลกเปลี่ยน
 
-ใช้สิ่งนี้กับ field ที่นิยาม identity หรือตายตัวตลอดอายุของอ็อบเจกต์ และกับ value object ที่คุณต้องการปฏิบัติว่าไม่เปลี่ยนแปลง เพื่อให้แชร์และ cache ได้อย่างอิสระ การลบ setter หดพื้นที่ผิวสำหรับ bug: ค่าที่เปลี่ยนไม่ได้ก็เปลี่ยนในเวลาที่ผิดไม่ได้
+ใช้สิ่งนี้กับ field ที่นิยาม identity หรือตายตัวตลอดอายุของ object และกับ value object ที่คุณต้องการปฏิบัติว่าไม่เปลี่ยนแปลง เพื่อให้แชร์และ cache ได้อย่างอิสระ การลบ setter หดพื้นที่ผิวสำหรับ bug: ค่าที่เปลี่ยนไม่ได้ก็เปลี่ยนในเวลาที่ผิดไม่ได้
 
 ข้อแลกเปลี่ยนคือแรงกดดันที่ constructor ถ้ามี field แบบนี้หลายตัว รายการ parameter ของ constructor อาจยาวขึ้น — นั่นเป็นสัญญาณให้ทำ **Introduce Parameter Object** หรือ builder ไม่ใช่เหตุผลที่จะคง setter ไว้ และ state ที่เปลี่ยนได้จริง ๆ — ยอดเงิน, สถานะ — ยังต้องมีวิธีเปลี่ยนที่ควบคุมได้; อย่าถอด setter ที่จำลองการเปลี่ยนแปลงจริงที่ดำเนินอยู่ เฟรมเวิร์กที่ต้องการ constructor ไม่มี argument และ field injection ก็อาจบังคับให้ต้องประนีประนอมตรงนี้
 
-## Related
+## เนื้อหาที่เกี่ยวข้อง
 
 - [Replace Constructor with Factory Function](/refactoring/th/simplifying-apis/replace-constructor-with-factory/)
 - [Introduce Parameter Object](/refactoring/th/simplifying-apis/introduce-parameter-object/)
@@ -154,16 +154,16 @@ export const removeSetterDiagram = `flowchart LR
 > - การลบ setter ทำให้ constructor มี parameter ยาวมากโดยไม่มี Parameter Object รองรับ
 
 <Callout title="ความไม่เปลี่ยนแปลงคือฟีเจอร์">
-ทุก setter ที่คุณลบคือคลาสของ bug ที่คุณเลิกกังวลได้ field ที่ไม่เปลี่ยนแปลงไม่ต้องมี defensive copy, ไม่ต้อง synchronisation และไม่ต้องตรวจสอบว่าใครอาจเปลี่ยนมัน ตั้ง identity ครั้งเดียวตอนสร้าง แล้วส่วนที่เหลือของโปรแกรมก็ไว้ใจมันได้ตลอดไป
+setter ทุกตัวที่คุณลบ คือบั๊กทั้งตระกูลที่คุณเลิกต้องกังวล field ที่ immutable ไม่ต้องมี defensive copy ไม่ต้อง synchronisation และไม่ต้องคอยเช็คว่าใครจะมาเปลี่ยนค่า กำหนด identity ครั้งเดียวตอนสร้าง แล้วส่วนที่เหลือของโปรแกรมก็เชื่อค่านั้นได้ตลอดไป
 </Callout>
 
 export const quizRemoveSetter = [
   {
     q: 'field แบบใดเป็นเป้าหมายที่ถูกต้องสำหรับ Remove Setting Method?',
     options: [
-      'field ที่เปลี่ยนตลอดเวลาในชีวิตของอ็อบเจกต์',
+      'field ที่เปลี่ยนตลอดเวลาในชีวิตของ object',
       'field ที่ควรถูกตั้งครั้งเดียวตอนสร้างและไม่เปลี่ยน',
-      'field ที่ใช้เฉพาะในเทสต์',
+      'field ที่ใช้เฉพาะใน test',
       'field ที่ private ใด ๆ',
     ],
     answer: 1,

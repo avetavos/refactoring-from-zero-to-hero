@@ -19,30 +19,30 @@ export const smellDiagram = `flowchart LR
 
 ## Smell คือตัวกระตุ้น ไม่ใช่กฎหมาย
 
-ตอนนี้คุณรู้ *วิธี* refactor อย่างปลอดภัยแล้ว ชิ้นส่วนที่ขาดไปคือการรู้ว่า *จะ refactor อะไร* และ *เมื่อไหร่* คำตอบคือ **code smell**: สัญญาณบนพื้นผิวที่บ่งบอกว่าบางอย่างเบื้องล่างอาจมีโครงสร้างที่ไม่ดี คำว่า *smell* (กลิ่น) ถูกเลือกใช้อย่างตั้งใจ — กลิ่นคือคำใบ้ที่ชวนให้มองใกล้ ๆ ไม่ใช่กฎที่เรียกร้องให้ลงมือทำ บางครั้งกลิ่นนั้นก็โอเคในบริบทของมัน ทักษะคือการเรียนรู้ที่จะสังเกตกลิ่นแล้วจึงตัดสินใจ
+ตอนนี้คุณรู้ *วิธี* refactor อย่างปลอดภัยแล้ว ชิ้นส่วนที่ขาดไปคือการรู้ว่า *จะ refactor อะไร* และ *เมื่อไหร่* คำตอบคือ **code smell**: สัญญาณบนพื้นผิวที่บ่งบอกว่าบางอย่างเบื้องล่างอาจมีโครงสร้างที่ไม่ดี คำว่า *smell* (กลิ่น) ถูกเลือกใช้อย่างตั้งใจ — กลิ่นคือคำใบ้ที่ชวนให้มองใกล้ ๆ ไม่ใช่กฎที่เรียกร้องให้ลงมือทำ บางครั้งกลิ่นนั้นก็โอเคในบริบท ทักษะคือการเรียนรู้ที่จะสังเกตกลิ่นแล้วจึงตัดสินใจ
 
-<Mermaid code={smellDiagram} title="กลิ่นคือคำใบ้: สังเกตมัน ตัดสินว่าคุ้มที่จะแก้ตอนนี้ไหม แล้วก้าวทีละก้าวเล็ก ๆ" />
+<Mermaid code={smellDiagram} title="smell คือคำใบ้ — สังเกตให้เห็น ตัดสินว่าคุ้มจะแก้ตอนนี้ไหม แล้วค่อยก้าวทีละนิด" />
 
 ## ภาพรวมแคตตาล็อก
 
-นี่คือ smell ที่คุณจะพบบ่อยที่สุด แต่ละอันจับคู่กับ refactoring ที่คอร์สนี้สอนเพื่อจัดการกับมัน จงใช้สิ่งนี้เป็นแผนที่ของคุณ เมื่อรู้สึกว่ามีอะไรผิดปกติ ให้ตั้งชื่อ smell แล้วเปิดดูท่าที่ใช้
+นี่คือ smell ที่คุณจะเจอบ่อยที่สุด แต่ละตัวจับคู่กับ refactoring ที่คอร์สนี้สอนไว้แก้ ใช้ตารางนี้เป็นแผนที่ พอรู้สึกว่ามีอะไรผิดปกติ ให้ตั้งชื่อ smell ให้ได้ก่อน แล้วค่อยเปิดดูท่าที่ใช้แก้
 
-| Smell | สิ่งที่คุณสังเกตเห็น | ที่ที่คอร์สนี้จัดการกับมัน |
+| Smell | สิ่งที่คุณสังเกตเห็น | คอร์สนี้แก้ไว้ที่ไหน |
 | --- | --- | --- |
 | **Long Function** | function ที่ยาวเลื่อนพ้นหน้าจอและทำหลายสิ่ง | [Composing Methods](/refactoring/th/composing-methods/) — [Extract Function](/refactoring/th/composing-methods/extract-function/) |
 | **Duplicated Code** | ชิ้นส่วนเดียวกันปรากฏในสองที่หรือมากกว่า | [Extract Function](/refactoring/th/composing-methods/extract-function/) และ [Moving Features](/refactoring/th/moving-features/) |
-| **Mysterious Name** | ตัวแปรหรือ function ที่ชื่อของมันซ่อนจุดประสงค์ไว้ | [Extract Variable](/refactoring/th/composing-methods/extract-variable/) |
-| **Large Class** | คลาสที่กักตุน field และความรับผิดชอบไว้มากเกินไป | [Moving Features](/refactoring/th/moving-features/) |
+| **Mysterious Name** | ตัวแปรหรือ function ที่ชื่อซ่อนจุดประสงค์ไว้ | [Extract Variable](/refactoring/th/composing-methods/extract-variable/) |
+| **Large Class** | class ที่กักตุน field และความรับผิดชอบไว้มากเกินไป | [Moving Features](/refactoring/th/moving-features/) |
 | **Long Parameter List** | การเรียกที่มี argument มากมายจนคุณตามไม่ทัน | [Simplifying APIs](/refactoring/th/simplifying-apis/) |
-| **Feature Envy** | method ที่สนใจข้อมูลของอ็อบเจกต์อื่นมากกว่าของตัวเอง | [Moving Features](/refactoring/th/moving-features/) |
+| **Feature Envy** | method ที่สนใจข้อมูลของ object อื่นมากกว่าของตัวเอง | [Moving Features](/refactoring/th/moving-features/) |
 | **Primitive Obsession** | string และ number เปล่า ๆ ที่ถูกใช้แทนแนวคิดจริง | [Organizing Data](/refactoring/th/organizing-data/) |
 | **Shotgun Surgery** | การเปลี่ยนแปลงเล็ก ๆ หนึ่งครั้งบังคับให้ต้องแก้กระจัดกระจายไปทั่วหลายไฟล์ | [Moving Features](/refactoring/th/moving-features/) |
-| **Tangled Conditionals** | การแตกแขนงที่ซ้อนลึกหรือซ้ำกันจนซ่อนตรรกะไว้ | [Simplifying Conditionals](/refactoring/th/simplifying-conditionals/) |
+| **Tangled Conditionals** | การแตกแขนงที่ซ้อนลึกหรือซ้ำกันจนซ่อน logic ไว้ | [Simplifying Conditionals](/refactoring/th/simplifying-conditionals/) |
 | **Temporary Field / Inheritance Misuse** | สถานะที่ถูกใช้เพียงบางครั้ง หรือลำดับชั้นที่ขัดขากับคุณ | [Generalization & Inheritance](/refactoring/th/generalization-and-inheritance/) |
 
 ## ตัวอย่าง smell สั้น ๆ
 
-นี่คือ **Primitive Obsession**: number ดิบ ๆ ถูกส่งไปมาเพื่อหมายถึง "เงิน" แต่ไม่มีอะไรหยุดผู้เรียกจากการเอามันไปสับสนกับจำนวนหรืออุณหภูมิ smell คือ primitive เปล่า ๆ ที่ถูกใช้แทนแนวคิดในโดเมน วิธีรักษา — การห่อมันไว้ในชนิดข้อมูลเล็ก ๆ — อยู่ใน [Organizing Data](/refactoring/th/organizing-data/) แต่คุณควรเรียนรู้ที่จะ *ดมกลิ่น* มันตั้งแต่ตอนนี้
+นี่คือ **Primitive Obsession** คือใช้ number ดิบ ๆ ส่งไปมาเพื่อแทน "เงิน" ทั้งที่ไม่มีอะไรกันไม่ให้ caller เอาไปปนกับจำนวนชิ้นหรืออุณหภูมิ smell ตรงนี้คือการใช้ primitive เปล่า ๆ แทนแนวคิดในโดเมน วิธีรักษาคือห่อไว้ใน type เล็ก ๆ ซึ่งอยู่ใน [Organizing Data](/refactoring/th/organizing-data/) แต่คุณควรฝึก *ดมกลิ่น* ให้ออกตั้งแต่ตอนนี้
 
 <Tabs syncKey="lang">
   <TabItem label="TypeScript">
@@ -113,7 +113,7 @@ export const smellDiagram = `flowchart LR
 
 เวอร์ชันที่ถูกห่อไว้ทำให้เป็นไปไม่ได้ที่จะเผลอบวกเงินเข้ากับจำนวน — ตอนนี้ compiler หรือชนิดข้อมูลแบกความหมายที่ number เปล่า ๆ เคยปล่อยให้ขึ้นอยู่กับโชคชะตา
 
-## Related
+## เนื้อหาที่เกี่ยวข้อง
 
 - [ทำไมและเมื่อไหร่ควร refactor](/refactoring/th/intro-and-principles/why-and-when/)
 - [ก้าวเล็ก ๆ และ test](/refactoring/th/intro-and-principles/small-steps-and-tests/)
@@ -123,7 +123,7 @@ export const smellDiagram = `flowchart LR
 |---|---|
 | เห็น Code Smell ที่ชัดเจนและตั้งชื่อได้ | ยังไม่มี test รองรับ |
 | ต้องการ add feature ในพื้นที่นั้น | deadline กำลังจะมาถึงและ feature ยังไม่พร้อม |
-| code ทำให้ review ยากและทีมถามซ้ำ ๆ | code นั้นจะถูกลบเร็ว ๆ นี้ |
+| code ทำให้ review ยากและทีมถามซ้ำ ๆ | code นั้นยังไงก็กำลังจะลบทิ้ง |
 
 > ⚠️ ไม่ควร Refactor เมื่อ:
 > - ยังไม่รู้ว่า code นั้นทำอะไรจริง ๆ — อ่านให้เข้าใจก่อน
@@ -131,7 +131,7 @@ export const smellDiagram = `flowchart LR
 > - refactor เพราะความรู้สึก ไม่ใช่เพราะ smell จริง ๆ
 
 <Callout title="ตั้งชื่อ smell ก่อนหยิบท่ามาใช้">
-อย่า refactor บนความรู้สึกคลุมเครือ เมื่อ code รบกวนใจคุณ จงตั้งชื่อ smell ก่อน — "นี่คือ Long Function" "นั่นคือ Duplicated Code" การตั้งชื่อมันบอกคุณว่า refactoring ไหนเหมาะ และทำให้คุณซื่อตรงต่อตัวเองว่าการเปลี่ยนแปลงนั้นคุ้มที่จะทำตอนนี้หรือไม่
+อย่า refactor เพราะความรู้สึกลอย ๆ พอ code เริ่มกวนใจ ให้ตั้งชื่อ smell ก่อน เช่น "อันนี้ Long Function" หรือ "นั่น Duplicated Code" การตั้งชื่อจะบอกเองว่า refactoring ไหนเหมาะ และบังคับให้คุณซื่อสัตย์กับตัวเองว่าการแก้ครั้งนี้คุ้มจะทำตอนนี้หรือเปล่า
 </Callout>
 
 export const quizSmells = [
@@ -164,7 +164,7 @@ export const quizSmells = [
     q: 'ทำไมจึงควรตั้งชื่อ smell ก่อนเลือก refactoring?',
     options: [
       'เพราะ compiler ต้องการชื่อ',
-      'การตั้งชื่อมันบอกคุณว่าท่าไหนเหมาะและคุ้มที่จะทำตอนนี้หรือไม่',
+      'การตั้งชื่อบอกได้ว่าท่าไหนเหมาะ และคุ้มจะทำตอนนี้หรือไม่',
       'เพราะทุก smell มีวิธีแก้เพียงหนึ่งเดียวเป๊ะ',
       'เพื่อทำให้ diff ใหญ่ขึ้น',
     ],

@@ -1,6 +1,6 @@
 ---
 title: Composing Methods
-description: ปรับโครงสร้างภายในของ function เพื่อกำจัดความซ้ำซ้อนและเผยให้เห็นเจตนา — Extract, Inline และการเคลื่อนไหวที่ทำให้ code อ่านได้เหมือนเรื่องเล่า
+description: ปรับโครงสร้างภายในของ function เพื่อกำจัดความซ้ำซ้อนและเผยเจตนาออกมา — Extract, Inline และท่าอื่น ๆ ที่ทำให้ code อ่านได้เหมือนเรื่องเล่า
 sidebar:
   order: 1
 ---
@@ -23,13 +23,13 @@ export const overviewDiagram = `flowchart TD
   F --> H
   G --> H`;
 
-## Intent
+## จุดประสงค์
 
-กลุ่ม **composing methods** เป็นเรื่องของ *ภายใน* ของ function: statement ต่าง ๆ ถูกจัดกลุ่ม ตั้งชื่อ และเรียงลำดับอย่างไร refactoring เหล่านี้ไม่เปลี่ยน behavior แต่เปลี่ยนว่ามนุษย์จะติดตามสิ่งที่ function พยายามจะสื่อได้ง่ายเพียงใด
+กลุ่ม **composing methods** ว่าด้วยเรื่อง *ภายใน* ของ function ล้วน ๆ คือ statement ถูกจัดกลุ่ม ตั้งชื่อ และเรียงลำดับกันอย่างไร refactoring กลุ่มนี้ไม่แตะ behavior แต่เปลี่ยนว่าคนอ่านจะตามสิ่งที่ function ต้องการสื่อได้ง่ายแค่ไหน
 
 ## Code Smell
 
-function เติบโตขึ้นเมื่อเวลาผ่านไป มันสะสมtemporary variable ตรงนี้ เงื่อนไขบรรทัดเดียวอันแสนฉลาดตรงนั้น ลูปที่แอบทำงานสามอย่างเงียบ ๆ ในที่สุดก็ไม่มีใครอ่านมันจากบนลงล่างแล้วอธิบายได้ในประโยคเดียว วิธีรักษาในโมดูลนี้โจมตีปัญหานั้นโดยตรง: มันแยกชิ้นส่วนที่พันกันยุ่งเหยิงออกจากกัน ตั้งชื่อให้ส่วนสำคัญ และปล่อยให้ code ที่เหลืออ่านได้เหมือนสรุปย่อ ๆ ของเจตนา
+function โตขึ้นตามเวลา สะสม temporary variable ไว้ตรงนี้ เงื่อนไขบรรทัดเดียวสุดฉลาดตรงนั้น แล้วก็ loop ที่แอบทำงานสามอย่างพร้อมกันเงียบ ๆ สุดท้ายก็ไม่มีใครอ่านจากบนลงล่างแล้วสรุปได้ในประโยคเดียว วิธีรักษาในโมดูลนี้จัดการปัญหานั้นตรง ๆ คือแยกชิ้นส่วนที่พันกันออกจากกัน ตั้งชื่อให้ส่วนสำคัญ แล้วปล่อยให้ code ที่เหลืออ่านได้เหมือนสรุปเจตนาสั้น ๆ
 
 | Code Smell | อาการที่บ่งชี้ | ท่าที่แนะนำ |
 |---|---|---|
@@ -39,26 +39,26 @@ function เติบโตขึ้นเมื่อเวลาผ่าน�
 | Temporary Variable | temporary variable ที่คำนวณค่าซับซ้อนแล้วส่งต่อ | Replace Temp with Query |
 | Divergent Change | function เดียวทำสองงานที่ต่างกัน แก้ที่หนึ่งกระทบอีกที่ | Split Phase |
 
-<Mermaid code={overviewDiagram} title="เลือกการเคลื่อนไหวแบบ composing-methods ตามสิ่งที่ผิดพลาด" />
+<Mermaid code={overviewDiagram} title="เลือกท่า composing-methods จากอาการที่เจอ" />
 
 ## โมดูลนี้ครอบคลุมอะไรบ้าง
 
 refactoring เก้าแบบ แต่ละแบบเล็กและย้อนกลับได้:
 
-- **[Extract Function](/refactoring/th/composing-methods/extract-function/)** — ยกชิ้นส่วนหนึ่งขึ้นไปเป็น function ของตัวเองที่มีชื่อดี เพื่อให้ผู้เรียกอ่านได้เหมือนรายการของเจตนา เป็นการเคลื่อนไหวพื้นฐานที่สุดในบรรดาทั้งหมด
-- **[Inline Function](/refactoring/th/composing-methods/inline-function/)** — สิ่งที่ตรงกันข้าม: เมื่อ body ของ helper เรียบง่ายพอ ๆ กับชื่อของมัน ก็พับมันกลับเข้าไป
+- **[Extract Function](/refactoring/th/composing-methods/extract-function/)** — ยกชิ้นส่วนหนึ่งขึ้นไปเป็น function ที่มีชื่อของตัวเอง เพื่อให้จุดที่เรียกอ่านได้เหมือนรายการของเจตนา เป็นท่าพื้นฐานที่สุดของทั้งหมด
+- **[Inline Function](/refactoring/th/composing-methods/inline-function/)** — ท่าตรงข้าม พอ body ของ helper ง่ายพอ ๆ กับชื่อ ก็พับกลับเข้าไป
 - **[Extract Variable](/refactoring/th/composing-methods/extract-variable/)** — ตั้งชื่อให้ sub-expression ที่ชวนสับสน เพื่อให้บรรทัดนั้นอธิบายตัวเองได้
-- **[Inline Variable](/refactoring/th/composing-methods/inline-variable/)** — สิ่งที่ตรงกันข้าม: ลบตัวแปรที่เป็นเพียงเสียงสะท้อนของ expression ของมันและไม่ได้เพิ่มความชัดเจนใด ๆ
-- **[Replace Temp with Query](/refactoring/th/composing-methods/replace-temp-with-query/)** — เปลี่ยนตัวแปร local ที่เก็บค่าที่คำนวณไว้ให้กลายเป็น function เพื่อให้การคำนวณนำกลับมาใช้ซ้ำได้และ extract ได้ง่าย
-- **[Slide Statements](/refactoring/th/composing-methods/slide-statements/)** — ย้าย statement ที่เกี่ยวข้องกันมาอยู่ด้วยกัน เพื่อให้ชิ้นส่วนที่สอดคล้องกันตั้งพร้อมให้อ่านหรือ extract
-- **[Split Phase](/refactoring/th/composing-methods/split-phase/)** — เมื่อบล็อกหนึ่งทำงานสองอย่างที่ต่างกัน ก็แยกมันออกเป็น phase ที่เรียงลำดับและเชื่อมกันด้วยค่ากลางที่ชัดเจน
-- **[Substitute Algorithm](/refactoring/th/composing-methods/substitute-algorithm/)** — แทนที่วิธีทำบางอย่างที่ซับซ้อนยุ่งเหยิงด้วยวิธีที่ชัดเจนกว่าซึ่งให้ผลลัพธ์เดียวกัน
-- **[Replace Loop with Pipeline](/refactoring/th/composing-methods/replace-loop-with-pipeline/)** — แปลงลูปแบบ imperative ให้เป็นโซ่ของขั้นตอนที่มีชื่อ — filter, map, reduce
+- **[Inline Variable](/refactoring/th/composing-methods/inline-variable/)** — ท่าตรงข้าม ลบตัวแปรที่เป็นแค่เสียงสะท้อนของ expression และไม่ได้เพิ่มความชัดเจนอะไร
+- **[Replace Temp with Query](/refactoring/th/composing-methods/replace-temp-with-query/)** — เปลี่ยนตัวแปร local ที่เก็บค่าคำนวณไว้ให้กลายเป็น function เพื่อให้เอาการคำนวณกลับมาใช้ซ้ำและ extract ต่อได้ง่าย
+- **[Slide Statements](/refactoring/th/composing-methods/slide-statements/)** — ย้าย statement ที่เกี่ยวข้องกันมาอยู่ติดกัน ชิ้นส่วนที่เข้าชุดกันจะได้พร้อมให้อ่านหรือ extract
+- **[Split Phase](/refactoring/th/composing-methods/split-phase/)** — พอบล็อกเดียวทำงานสองอย่างที่ไม่เกี่ยวกัน ก็หั่นออกเป็น phase ที่เรียงลำดับ แล้วเชื่อมด้วยค่ากลางที่ชัดเจน
+- **[Substitute Algorithm](/refactoring/th/composing-methods/substitute-algorithm/)** — เปลี่ยนวิธีทำที่ซับซ้อนยุ่งเหยิงเป็นวิธีที่ชัดเจนกว่าและให้ผลลัพธ์เดียวกัน
+- **[Replace Loop with Pipeline](/refactoring/th/composing-methods/replace-loop-with-pipeline/)** — แปลง loop แบบ imperative ให้เป็นโซ่ของขั้นตอนที่มีชื่อ ได้แก่ filter, map, reduce
 
-แต่ละบทเรียนแสดงตัวอย่าง before-and-after เดียวกันในภาษา TypeScript, Python, Go และ Rust จากนั้นพาเดินผ่าน mechanics ที่ปลอดภัยและเรียงลำดับ — โดยรันเทสต์ของคุณระหว่างทุกขั้นตอน
+แต่ละบทเรียนใช้ตัวอย่าง before-and-after ชุดเดียวกันใน TypeScript, Python, Go และ Rust แล้วพาไล่ mechanics ทีละขั้นแบบปลอดภัย โดยรัน test คั่นทุกขั้นตอน
 
 <Callout title="ออกแบบมาให้รักษา behavior">
-ทุกการเคลื่อนไหวในที่นี้รักษา behavior ที่สังเกตได้ของโปรแกรมให้เหมือนเดิมทุกประการ ถ้า refactoring เปลี่ยนสิ่งที่ code *ทำ* นั่นคือบั๊ก ไม่ใช่ refactoring ชุดเทสต์ของคุณคือสิ่งที่ทำให้คุณเปลี่ยนแปลงเหล่านี้ได้อย่างมั่นใจ
+ทุกท่าในโมดูลนี้รักษา behavior ที่สังเกตได้ของโปรแกรมไว้เหมือนเดิมทุกประการ ถ้า refactoring ไปเปลี่ยนสิ่งที่ code *ทำ* นั่นคือบั๊ก ไม่ใช่ refactoring และชุด test คือสิ่งที่ทำให้คุณกล้าลงมือเปลี่ยนได้อย่างมั่นใจ
 </Callout>
 
 export const quizIndex = [
@@ -73,17 +73,17 @@ export const quizIndex = [
     answer: 1,
   },
   {
-    q: 'refactoring แบบใดที่ถูกอธิบายว่าเป็นการเคลื่อนไหวพื้นฐานที่สุดในโมดูลนี้?',
+    q: 'refactoring แบบใดที่บทเรียนเรียกว่าเป็นท่าพื้นฐานที่สุดในโมดูลนี้?',
     options: ['Split Phase', 'Inline Function', 'Extract Function', 'Replace Temp with Query'],
     answer: 2,
   },
   {
-    q: 'ทำไมชุดเทสต์จึงสำคัญเมื่อนำ refactoring เหล่านี้ไปใช้?',
+    q: 'ทำไมชุด test จึงสำคัญเวลาใช้ refactoring เหล่านี้?',
     options: [
-      'มันทำให้ code รันเร็วขึ้น',
-      'มันพิสูจน์ว่า behavior ยังคงเหมือนเดิมหลังแต่ละขั้นตอนเล็ก ๆ',
-      'มันเป็นข้อกำหนดของ compiler',
-      'มันสร้าง code ที่ refactor แล้วโดยอัตโนมัติ',
+      'ช่วยให้ code รันเร็วขึ้น',
+      'ช่วยพิสูจน์ว่า behavior ยังเหมือนเดิมหลังแต่ละขั้นตอนเล็ก ๆ',
+      'เป็นข้อกำหนดของ compiler',
+      'สร้าง code ที่ refactor แล้วให้อัตโนมัติ',
     ],
     answer: 1,
   },

@@ -1,6 +1,6 @@
 ---
 title: Replace Superclass with Delegation
-description: เมื่อ subclass ใช้ superclass เพียงบางส่วน — หรือ inherit interface ที่เก้งก้าง — ให้ถือ superclass เดิมไว้เป็นฟิลด์แล้ว delegate ไปหามันแทน
+description: เมื่อ subclass ใช้ superclass แค่บางส่วน หรือ inherit interface ที่เก้งก้างมา ให้ถือ superclass เดิมไว้เป็น field แล้ว delegate เข้าไปแทน
 sidebar:
   order: 8
 ---
@@ -27,17 +27,17 @@ export const delegationDiagram = `classDiagram
   }
   StackAfter --> List : after (holds & delegates)`;
 
-## Intent
+## จุดประสงค์
 
-**Replace Superclass with Delegation** เปลี่ยนสายสัมพันธ์ inheritance ให้เป็นสาย *has-a* แทนที่จะเป็น `Stack extends List` ตัว stack จะ *ถือ* list ไว้ในฟิลด์ private แล้วเรียกเข้าไปหามันสำหรับการทำงานไม่กี่อย่างที่มันต้องใช้จริง subclass ยังคง behavior ที่มันพึ่งพาไว้ แต่ไม่ถูกบังคับให้ inherit — และเปิดเผย — ทุกสมาชิกของพ่อแม่ที่มันไม่เคยอยากได้ครบทั้งหมด
+**Replace Superclass with Delegation** เปลี่ยนความสัมพันธ์แบบ inheritance ให้เป็นแบบ *has-a* แทนที่จะเขียน `Stack extends List` ก็ให้ stack *ถือ* list ไว้ใน field private แล้วเรียกเข้าไปเฉพาะงานไม่กี่อย่างที่ต้องใช้จริง subclass ยังได้ behavior ที่ต้องพึ่งครบ แต่ไม่โดนบังคับให้ inherit และเปิดเผยสมาชิกทุกตัวของ superclass ที่ไม่เคยอยากได้
 
 ## Code Smell
 
-คลาสหนึ่ง extends อีกคลาสเพื่อนำเมท็อดไม่กี่ตัวมาใช้ซ้ำ แล้วลงเอยด้วยการลาก public interface ทั้งหมดติดมาด้วย `Stack extends List` inherit `add`, `remove`, `get(index)`, `clear` — ดังนั้นตอนนี้ผู้เรียกสามารถ `stack.remove(item)` จากตรงกลางได้ ละเมิด invariant ที่ stack มีอยู่เพื่อปกป้อง คำกล่าวอ้าง "is-a" เป็นเท็จ: stack ไม่ใช่ list ชนิดหนึ่ง มันแค่ *ใช้* list ตัวหนึ่ง interface ที่ inherit มานั้นเก้งก้าง รั่ว หรือใหญ่เกินจำเป็น — กรณีตัวอย่างของ **Refused Bequest** ที่ทายาทแอบทิ้งสิ่งที่ตนได้รับมาไปเสียมาก
+class หนึ่ง extends อีก class เพียงเพื่อใช้ method ไม่กี่ตัวซ้ำ แล้วดันลาก public interface ทั้งชุดติดมาด้วย อย่าง `Stack extends List` ก็ inherit `add`, `remove`, `get(index)`, `clear` มาหมด ผลคือ caller เรียก `stack.remove(item)` ดึงของจากตรงกลางได้ ทำลาย invariant ที่ stack มีไว้ปกป้องพอดี ข้ออ้าง "is-a" จึงเป็นเท็จ เพราะ stack ไม่ใช่ list ชนิดหนึ่ง แต่แค่ *ใช้* list เท่านั้น interface ที่ inherit มาจึงเก้งก้าง รั่ว และใหญ่เกินจำเป็น เป็นตัวอย่างคลาสสิกของ **Refused Bequest** ที่ทายาทแอบทิ้งมรดกส่วนใหญ่ที่ได้รับมา
 
-## Before → After
+## ก่อน → หลัง
 
-`Stack` ที่ extends `List` เพื่อเอาที่เก็บข้อมูลของมัน ทำให้การทำงานของ list รั่วออกมา หลังจากนั้นมันถือ `List` ไว้และเปิดเผยเพียง `push`/`pop`/`size`
+`Stack` extends `List` เพียงเพื่อเอาที่เก็บข้อมูล ผลคือ operation ของ list รั่วออกมาหมด หลัง refactor stack จะถือ `List` ไว้เฉย ๆ แล้วเปิดเผยแค่ `push`/`pop`/`size`
 
 <Tabs syncKey="lang">
   <TabItem label="TypeScript">
@@ -203,23 +203,23 @@ export const delegationDiagram = `classDiagram
   </TabItem>
 </Tabs>
 
-<Mermaid code={delegationDiagram} title="Stack เลิก extends List แล้วถือมันไว้แทน โดย delegate เฉพาะสิ่งที่ต้องใช้" />
+<Mermaid code={delegationDiagram} title="Stack เลิก extends List แล้วถือไว้เป็น field โดย delegate เฉพาะที่ต้องใช้" />
 
-## Mechanics
+## กลไกการทำงาน
 
-1. เพิ่มฟิลด์ใน subclass ที่ถือ instance ของ superclass เดิมไว้ แล้ว initialize มัน (มักด้วยการสร้างตัวใหม่ขึ้นมา หรือรับมันเข้ามาเป็น argument ของ constructor)
-2. สำหรับแต่ละสมาชิกที่ inherit มาและ subclass ใช้จริง ให้เพิ่มเมท็อด forwarding เล็ก ๆ ที่ delegate ไปยังฟิลด์
-3. อัปเดตเมท็อดของ subclass เองให้เรียกฟิลด์แทน `super`
-4. ลบสาย `extends` / inheritance ออก เพื่อให้ subclass ไม่เป็น subtype ของพ่อแม่อีกต่อไป **รันเทสต์ของคุณ** หลังจากย้ายแต่ละสมาชิก
-5. ตัดพื้นผิวที่ delegate ให้เหลือเฉพาะการทำงานที่คลาสควรเปิดเผยจริง — สมาชิกที่ inherit มาอย่างเก้งก้างก็จะหายไปจาก interface ของมันเอง
+1. เพิ่ม field ใน subclass สำหรับถือ instance ของ superclass เดิม แล้ว initialize ให้เรียบร้อย (ปกติจะสร้างตัวใหม่ขึ้นมา หรือรับเข้ามาเป็น argument ของ constructor)
+2. สำหรับแต่ละสมาชิกที่ inherit มาและ subclass ใช้จริง ให้เพิ่ม method forwarding เล็ก ๆ ที่ delegate ไปยัง field
+3. อัปเดต method ของ subclass เองให้เรียก field แทน `super`
+4. ลบสาย `extends` / inheritance ออก เพื่อให้ subclass ไม่เป็น subtype ของพ่อแม่อีกต่อไป **รัน test** หลังจากย้ายแต่ละสมาชิก
+5. ตัด surface ที่ delegate ให้เหลือเฉพาะ operation ที่ class ควรเปิดเผยจริง ๆ แล้วสมาชิกเก้งก้างที่เคย inherit มาก็จะหายไปจาก interface เอง
 
-## When to use / trade-offs
+## ใช้เมื่อไหร่ / ข้อแลกเปลี่ยน
 
-หยิบสิ่งนี้มาใช้เมื่อ subclass ใช้พ่อแม่เพียงเสี้ยวเดียว เมื่อการ inherit พ่อแม่ทำให้การทำงานรั่วออกมาจนทำลาย invariant ของ subclass หรือเมื่อความสัมพันธ์ "is-a" จริง ๆ แล้วเป็น "uses-a" delegation ให้คุณเปิดเผย interface ที่ถูกต้องเป๊ะ ๆ และทำให้สองคลาสนั้นมีอิสระที่จะวิวัฒน์แยกกัน
+หยิบสิ่งนี้มาใช้เมื่อ subclass ใช้พ่อแม่เพียงเสี้ยวเดียว เมื่อการ inherit พ่อแม่ทำให้การทำงานรั่วออกมาจนทำลาย invariant ของ subclass หรือเมื่อความสัมพันธ์ "is-a" จริง ๆ แล้วเป็น "uses-a" delegation ให้คุณเปิดเผย interface ที่ถูกต้องเป๊ะ ๆ และทำให้สอง class นั้นมีอิสระที่จะวิวัฒน์แยกกัน
 
-ต้นทุนคือเมท็อด forwarding ที่คุณต้องเขียนเองด้วยมือสำหรับสมาชิกที่คุณ *เก็บ* ไว้ — inheritance บริสุทธิ์จะให้สิ่งเหล่านั้นมาฟรี เมื่อ subclass *เป็น* พ่อแม่ของมันโดยชอบธรรมและต้องการ interface ทั้งหมด ก็ปล่อย inheritance ไว้อย่างนั้น สิ่งตรงข้ามคือ **Replace Delegation with Inheritance** ซึ่งคุ้มจะทำเฉพาะเมื่อคุณพบว่าตัวเองกำลัง forward *ทั้ง* interface ตรงตัว Go และ Rust ตัดสินใจแทนคุณ: เมื่อไม่มี inheritance คุณก็ถือฟิลด์แล้ว delegate ตั้งแต่ต้น — และ `struct embedding` ของ Go เป็นเครื่องมือทางกลางที่จงใจ ซึ่งคุณหยิบมาใช้เฉพาะเมื่อคุณ *ต้องการ* ให้ interface ทั้งหมดถูกเลื่อนขึ้นมา
+ต้นทุนคือ method forwarding ที่ต้องเขียนเองสำหรับสมาชิกที่คุณ *เก็บ* ไว้ ซึ่ง inheritance แบบตรง ๆ แถมให้ฟรี ถ้า subclass *เป็น* superclass จริงโดยชอบธรรม และต้องใช้ interface ทั้งชุด ก็ปล่อย inheritance ไว้แบบนั้น ท่ากลับกันคือ **Replace Delegation with Inheritance** ซึ่งคุ้มจะทำเฉพาะตอนที่คุณพบว่าตัวเอง forward *ทั้ง* interface แบบตรงตัวอยู่แล้ว ส่วน Go กับ Rust ตัดสินใจแทนคุณไปแล้ว เพราะไม่มี inheritance ให้ใช้ คุณจึงถือ field แล้ว delegate ตั้งแต่ต้น และ `struct embedding` ของ Go ก็เป็นเครื่องมือกลางทางที่จงใจออกแบบมา ให้หยิบมาใช้เฉพาะตอนที่คุณ *ต้องการ* ให้ interface ทั้งชุดถูกเลื่อนขึ้นมาจริง ๆ
 
-## Related
+## เนื้อหาที่เกี่ยวข้อง
 
 - [Replace Inheritance with Delegation](/refactoring/th/generalization-and-inheritance/replace-inheritance-with-delegation/)
 - [Replace Subclass with Delegation](/refactoring/th/generalization-and-inheritance/replace-subclass-with-delegation/)
@@ -237,7 +237,7 @@ export const delegationDiagram = `classDiagram
 > - delegation จะเพิ่ม boilerplate มากกว่า complexity ที่แก้ได้
 
 <Callout title="inherit ทั้ง interface หรือไม่เอาเลย">
-คำถามชี้ขาดนั้นเรียบง่าย: subclass ต้องการ *ทุกอย่าง* ที่พ่อแม่ให้หรือไม่? ถ้าใช่ inheritance ก็ซื่อสัตย์และราคาถูก ถ้ามันต้องการเพียงเสี้ยวเดียว — และอายกับส่วนที่เหลือ — ก็ถือพ่อแม่ไว้เป็นฟิลด์แล้ว forward เฉพาะเสี้ยวนั้น Go และ Rust ผนวกสิ่งนี้ไว้: ไม่มีทาง inherit เพียงเสี้ยวเดียว คุณจึงประกอบด้วย composition ซึ่งเป็นจุดที่ refactoring นี้นำไปพอดี
+คำถามชี้ขาดง่ายมาก คือ subclass ต้องการ *ทุกอย่าง* ที่ superclass ให้หรือเปล่า ถ้าใช่ inheritance ก็ซื่อสัตย์และถูก แต่ถ้าต้องการแค่เสี้ยวเดียว แล้วอายกับส่วนที่เหลือ ก็ถือ superclass ไว้เป็น field แล้ว forward เฉพาะเสี้ยวนั้นพอ Go กับ Rust บังคับแนวคิดนี้ไว้ในภาษาเลย เพราะ inherit แค่บางส่วนไม่ได้ คุณจึงต้องใช้ composition ซึ่งก็คือปลายทางที่ refactoring นี้พาไปพอดี
 </Callout>
 
 export const quizReplaceSuper = [
@@ -247,17 +247,17 @@ export const quizReplaceSuper = [
       'subclass ที่ใช้ interface ทั้งหมดของพ่อแม่',
       'subclass ที่ใช้ superclass เพียงบางส่วน หรือ inherit interface ที่เก้งก้าง',
       'function ที่ยาวเกินไป',
-      'สองคลาสที่ไม่มีความสัมพันธ์กันเลย',
+      'สอง class ที่ไม่มีความสัมพันธ์กันเลย',
     ],
     answer: 1,
   },
   {
     q: 'หลังจาก refactoring แล้ว subclass เดิมเข้าถึง behavior ที่ต้องการอย่างไร?',
     options: [
-      'มันเรียก super บนพ่อแม่ที่ inherit มา',
-      'มันถือ superclass เดิมไว้เป็นฟิลด์แล้ว delegate ไปหามัน',
-      'มันคัดลอก code ของพ่อแม่มาวางตรง ๆ',
-      'มันใช้ global registry',
+      'เรียก super บน superclass ที่ inherit มา',
+      'ถือ superclass เดิมไว้เป็น field แล้ว delegate เข้าไป',
+      'คัดลอก code ของ superclass มาวางตรง ๆ',
+      'ใช้ global registry',
     ],
     answer: 1,
   },
@@ -267,11 +267,11 @@ export const quizReplaceSuper = [
     answer: 1,
   },
   {
-    q: 'ทำไม Go จึงใช้ฟิลด์แบบ NAMED แทน struct embedding สำหรับกรณีนี้?',
+    q: 'ทำไม Go จึงใช้ field แบบ NAMED แทน struct embedding สำหรับกรณีนี้?',
     options: [
       'embedding ไม่ได้รับอนุญาตใน Go',
-      'embedding จะเลื่อนเมท็อดของ list ทั้งหมดขึ้นมาบน Stack ทำให้ interface ที่ใหญ่เกินจำเป็นเดิมรั่วออกมา',
-      'ฟิลด์แบบ named เร็วกว่า',
+      'embedding จะเลื่อน method ของ list ทั้งหมดขึ้นมาบน Stack ทำให้ interface ที่ใหญ่เกินจำเป็นเดิมรั่วออกมา',
+      'field แบบ named เร็วกว่า',
       'embedding ไม่สามารถถือ generic type ได้',
     ],
     answer: 1,

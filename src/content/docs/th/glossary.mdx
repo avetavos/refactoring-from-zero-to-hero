@@ -1,6 +1,6 @@
 ---
 title: Glossary
-description: คำศัพท์ refactoring ที่ใช้ตลอดทั้ง course นี้ รักษา terminology ในภาษาอังกฤษตามที่นักพัฒนาใช้จริง
+description: คำศัพท์ refactoring ที่ใช้ตลอดทั้งคอร์ส คงศัพท์เทคนิคไว้เป็นภาษาอังกฤษตามที่ dev ใช้กันจริง
 sidebar:
   order: 99
 ---
@@ -18,7 +18,7 @@ sidebar:
 | Coupling | coupling | ระดับการพึ่งพากันระหว่าง module หรือ class |
 | Cohesion | cohesion | ระดับที่ code ในหน่วยเดียวกันเกี่ยวข้องกัน |
 | Responsibility | responsibility | หน้าที่หรือเหตุผลที่ class/function มีอยู่ |
-| Behavior | behavior | สิ่งที่ code ทำ — ผลลัพธ์ที่ผู้เรียกเห็นจากภายนอก |
+| Behavior | behavior | สิ่งที่ code ทำ — ผลลัพธ์ที่ caller มองเห็นจากภายนอก |
 | Legacy Code | legacy code | code เดิมที่ขาด test และเปลี่ยนได้ยาก |
 | Cognitive Load | cognitive load | จำนวนสิ่งที่ต้องคิดพร้อมกันขณะอ่าน code |
 
@@ -30,10 +30,10 @@ sidebar:
 | Extract Class | แยก responsibility ออกจาก class ใหญ่เป็น class ใหม่ |
 | Inline Function | รวม function ที่ชื่อไม่ได้บอกอะไรเพิ่มกลับเข้า caller |
 | Inline Variable | รวม variable ที่ไม่ได้ช่วยอธิบาย กลับไปใส่ใน expression |
-| Move Method | ย้าย method ไปอยู่ใน class ที่มันเกี่ยวข้องมากกว่า |
+| Move Method | ย้าย method ไปอยู่ใน class ที่เกี่ยวข้องกันมากกว่า |
 | Move Field | ย้าย field ไปอยู่ใน class ที่ใช้งานจริง |
 | Rename Variable | เปลี่ยนชื่อให้สื่อ intent ชัดขึ้น |
-| Rename Function | เปลี่ยนชื่อ function ให้ตรงกับสิ่งที่มันทำจริง ๆ |
+| Rename Function | เปลี่ยนชื่อ function ให้ตรงกับสิ่งที่ทำจริง ๆ |
 | Encapsulate Field | ห่อหุ้ม field ด้วย getter/setter เพื่อควบคุม access |
 | Extract Variable | ตั้งชื่อให้ expression ซับซ้อนด้วย variable ที่อธิบาย |
 | Replace Temp with Query | แทน temporary variable ด้วย function ที่ query ค่านั้น |
@@ -56,17 +56,17 @@ sidebar:
 | Shotgun Surgery | เปลี่ยนหนึ่งเรื่องแต่ต้องแก้หลาย class | Move Method / Move Field |
 | Switch Statement | switch ที่ซ้ำอยู่หลายที่ | Replace Conditional with Polymorphism |
 | Magic Number | ตัวเลขลอยตัวใน code ที่ไม่รู้ความหมาย | Replace Magic Literal |
-| Dead Code | code ที่ไม่ถูกเรียกอีกต่อไป | ลบทิ้ง |
+| Dead Code | code ที่ไม่มีใครเรียกแล้ว | ลบทิ้ง |
 | Temporary Field | field ที่มีค่าเฉพาะบางสถานการณ์ | Extract Class |
 | God Object | class เดียวรู้ทุกอย่างและทำทุกอย่าง | Extract Class หลายรอบ |
 
 ## เมื่อ **ไม่** ควร Refactor
 
 - ไม่มี test รองรับ — refactor โดยไม่มี test คือการเดา
-- ใกล้ production release — เสี่ยงต่อ regression
-- ยังไม่เข้าใจ business logic — แก้ผิดที่
-- เป็น code ที่จะถูกลบเร็ว ๆ นี้
-- performance สำคัญกว่า readability ณ จุดนั้น
+- ใกล้ปล่อย production — เสี่ยง regression เกินไป
+- ยังไม่เข้าใจ business logic — แก้ผิดจุดแน่นอน
+- เป็น code ที่ยังไงก็กำลังจะลบทิ้งอยู่แล้ว
+- ตรงจุดนั้น performance สำคัญกว่า readability
 
 import ProgressTracker from '../../../components/ProgressTracker.tsx';
 

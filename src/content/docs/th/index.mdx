@@ -1,9 +1,9 @@
 ---
 title: Refactoring — From Zero to Hero
-description: ปรับปรุง code โดยไม่เปลี่ยนสิ่งที่มันทำ — รู้จัก code smell และใช้แคตตาล็อกของ refactoring แต่ละแบบเป็น before→after ในภาษา TypeScript, Python, Go และ Rust
+description: ปรับปรุง code โดยไม่เปลี่ยน behavior — อ่าน code smell ให้ออก แล้วใช้แคตตาล็อก refactoring ที่มี before→after ครบทั้ง TypeScript, Python, Go และ Rust
 template: splash
 hero:
-  tagline: คอร์ส refactoring แบบ standalone ตั้งแต่ผู้เริ่มต้นจนถึงขั้นสูง — ปรับโครงสร้างภายในของ code โดยไม่เปลี่ยน behavior ภายนอก เรียนวินัย (ทำทีละขั้นเล็ก ๆ โดยมี test คุ้มกัน), มองออกว่ามี code smell ตรงไหน และใช้แคตตาล็อกของ refactoring แต่ละแบบมี before→after ในภาษา TypeScript, Python, Go และ Rust
+  tagline: คอร์ส refactoring ตั้งแต่เริ่มต้นจนถึงขั้นสูง จบในตัว — ปรับโครงสร้างภายในของ code โดยไม่เปลี่ยน behavior ภายนอก คุณจะได้เรียนวินัยการทำทีละขั้นเล็ก ๆ โดยมี test คุ้มกัน มองออกว่า code smell อยู่ตรงไหน และใช้แคตตาล็อก refactoring ที่มี before→after ครบทั้ง TypeScript, Python, Go และ Rust
   actions:
     - text: เริ่มที่นี่
       link: /refactoring/th/intro-and-principles/
@@ -46,15 +46,15 @@ import { Card, CardGrid } from '@astrojs/starlight/components';
 
 <CardGrid>
   <Card title="Before → After สี่ภาษา" icon="seti:default">
-    ทุก refactoring แสดง code ที่ยุ่งและรูปแบบที่ดีขึ้นในภาษา TypeScript, Python, Go และ Rust ผ่านแท็บที่ sync กัน เลือกภาษาครั้งเดียว
+    ทุก refactoring วาง code ที่ยุ่งไว้คู่กับรูปแบบที่ดีกว่า ครบทั้ง TypeScript, Python, Go และ Rust ผ่านแท็บที่ sync กัน เลือกภาษาครั้งเดียวจบ
   </Card>
   <Card title="ขับเคลื่อนด้วย smell" icon="puzzle">
-    ทุก refactoring เริ่มจาก code smell ที่มันแก้ คุณจึงรู้ว่าควรหยิบมาใช้เมื่อไร
+    ทุก refactoring เริ่มจาก code smell ที่ต้องแก้ คุณจึงรู้ว่าควรหยิบมาใช้ตอนไหน
   </Card>
   <Card title="ขั้นเล็ก ๆ ที่ปลอดภัย" icon="approve-check">
-    Mechanics แบ่งการเปลี่ยนแปลงเป็นขั้นเล็ก ๆ ที่รักษา behavior และรัน test ระหว่างขั้น — refactor ได้โดยไม่กลัว
+    Mechanics ซอยการเปลี่ยนแปลงเป็นขั้นเล็ก ๆ ที่รักษา behavior ไว้ แล้วรัน test คั่นทุกขั้น — refactor ได้โดยไม่ต้องกลัว
   </Card>
   <Card title="สองภาษา + read mode" icon="translate">
-    ภาษาอังกฤษและไทย, แบบทดสอบที่บันทึกความคืบหน้า และโหมดอ่านแบบไร้สิ่งรบกวน
+    มีทั้งอังกฤษและไทย แบบทดสอบที่จำความคืบหน้าให้ และโหมดอ่านแบบไร้สิ่งรบกวน
   </Card>
 </CardGrid>

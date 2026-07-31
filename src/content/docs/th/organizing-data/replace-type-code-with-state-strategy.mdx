@@ -1,6 +1,6 @@
 ---
 title: Replace Type Code with State/Strategy
-description: เมื่อ type code ขับเคลื่อน behavior ที่แตกต่างและเปลี่ยนได้ตอน runtime ให้ถืออ็อบเจกต์ State หรือ Strategy ที่ host สลับได้ แทนที่จะอบ variant ลงในซับคลาสที่ตายตัว
+description: เมื่อ type code ขับเคลื่อน behavior ที่แตกต่างและเปลี่ยนได้ตอน runtime ให้ถือ object State หรือ Strategy ที่ host สลับได้ แทนที่จะอบ variant ลงใน subclass ที่ตายตัว
 sidebar:
   order: 11
 ---
@@ -28,17 +28,17 @@ export const stateDiagram = `flowchart TD
   end
   Before -.->|"Replace Type Code with State/Strategy"| After`;
 
-## Intent
+## จุดประสงค์
 
-นำ type code ที่ทั้ง *ขับเคลื่อน behavior ที่แตกต่าง* และ *เปลี่ยนไปตลอดอายุของอ็อบเจกต์* — `status` ของ order, mode ของ connection — มาแทนที่ด้วยอ็อบเจกต์ State (หรือ Strategy) ที่ host ถือไว้และสลับได้ host มอบหมาย behavior ที่แตกต่างให้อ็อบเจกต์นั้น การเปลี่ยนสถานะก็แค่กำหนด state ตัวใหม่ เพราะคลาสของ host ไม่เคยเปลี่ยน วิธีนี้จึงใช้ได้พอดีตรงที่ Replace Type Code with Subclasses ทำไม่ได้
+นำ type code ที่ทั้ง *ขับเคลื่อน behavior ที่แตกต่าง* และ *เปลี่ยนไปตลอดอายุของ object* — `status` ของ order, mode ของ connection — มาแทนที่ด้วย object State (หรือ Strategy) ที่ host ถือไว้และสลับได้ host มอบหมาย behavior ที่แตกต่างให้ object นั้น การเปลี่ยนสถานะก็แค่กำหนด state ตัวใหม่ เพราะ class ของ host ไม่เคยเปลี่ยน วิธีนี้จึงใช้ได้พอดีตรงที่ Replace Type Code with Subclasses ทำไม่ได้
 
-## The smell
+## อาการของปัญหา
 
-smell คือ `switch` ที่กระจัดกระจายบน type code แบบเดียวกับใน refactoring ของซับคลาส แต่มี property เพิ่มมาหนึ่งอย่าง: **code เปลี่ยนได้ตอน runtime** order เลื่อน `pending → shipped → delivered`; document ไป `draft → published → archived` คุณไม่สามารถจำลอง identity ที่เปลี่ยนได้ด้วยการเปลี่ยนคลาสของอ็อบเจกต์ — ภาษาส่วนใหญ่ไม่ยอมให้อ็อบเจกต์กลายเป็นคลาสอื่นกลางอายุ ดังนั้นการแตกกิ่งจึงทวีคูณไปทั่ว method และทุกการเปลี่ยนสถานะคือการกำหนดค่า field ดิบโดยไม่มีหลักประกันว่าค่าใหม่นั้นถูกต้องด้วยซ้ำ
+smell คือ `switch` ที่กระจัดกระจายบน type code แบบเดียวกับใน refactoring ของ subclass แต่มี property เพิ่มมาหนึ่งอย่าง: **code เปลี่ยนได้ตอน runtime** order เลื่อน `pending → shipped → delivered`; document ไป `draft → published → archived` คุณไม่สามารถจำลอง identity ที่เปลี่ยนได้ด้วยการเปลี่ยน class ของ object — ภาษาส่วนใหญ่ไม่ยอมให้ object กลายเป็น class อื่นกลางอายุ ดังนั้นการแตกกิ่งจึงทวีคูณไปทั่ว method และทุกการเปลี่ยนสถานะคือการกำหนดค่า field ดิบโดยไม่มีหลักประกันว่าค่าใหม่นั้นถูกต้องด้วยซ้ำ
 
-## Before → After
+## ก่อน → หลัง
 
-`Order` ที่ string `status` ของมันถูกตรวจด้วย `switch` ในสอง method หลังจากนั้น order ถือ `OrderState` ที่มันมอบหมายให้และสลับเมื่อมีการเปลี่ยนสถานะ
+`Order` ที่ string `status` ถูกตรวจด้วย `switch` ในสอง method หลังจากนั้น order ถือ `OrderState` ที่มอบหมายให้และสลับเมื่อมีการเปลี่ยนสถานะ
 
 <Tabs syncKey="lang">
   <TabItem label="TypeScript">
@@ -204,24 +204,24 @@ smell คือ `switch` ที่กระจัดกระจายบน typ
   </TabItem>
 </Tabs>
 
-<Mermaid code={stateDiagram} title="type code ที่เปลี่ยนตอน runtime กลายเป็นอ็อบเจกต์ State ที่สลับได้ซึ่ง host มอบหมายให้" />
+<Mermaid code={stateDiagram} title="type code ที่เปลี่ยนตอน runtime กลายเป็น object State ที่สลับได้ซึ่ง host มอบหมายให้" />
 
-## Mechanics
+## กลไกการทำงาน
 
-1. Encapsulate field ของ type code ไว้หลัง accessor เพื่อให้ผู้เรียกพึ่งพา getter/setter แทนค่าดิบ
+1. Encapsulate field ของ type code ไว้หลัง accessor เพื่อให้ caller พึ่งพา getter/setter แทนค่าดิบ
 2. นำ interface ของ state เข้ามา ประกาศ operation ที่แตกต่างไปตาม code
-3. สร้างคลาส state หนึ่งตัวต่อหนึ่งค่าของ type code ย้ายแต่ละกิ่งของ method ที่แตกต่างเข้าไปยัง state ที่สอดคล้องกัน
-4. ให้ host มี field ที่ถือ state ปัจจุบัน และให้ method ของมันมอบหมายไปยัง state นั้น **รันเทสต์ของคุณ** หลังต่อสาย method แต่ละตัว
-5. แทนที่การกำหนดค่า type code แต่ละครั้งด้วยการสลับอ็อบเจกต์ state — ในอุดมคติผ่าน method อย่าง `ship()` ที่ตั้งชื่อให้การเปลี่ยนสถานะและคอยกั้นว่าการเปลี่ยนแบบไหนถูกกฎ
-6. เมื่อไม่มีอะไรอ่านค่า code ดิบแล้ว ก็ลบมันทิ้ง ตอนนี้ host เปลี่ยน behavior ล้วน ๆ ด้วยว่ามันถือ state ตัวไหน
+3. สร้าง class state หนึ่งตัวต่อหนึ่งค่าของ type code ย้ายแต่ละกิ่งของ method ที่แตกต่างเข้าไปยัง state ที่สอดคล้องกัน
+4. ให้ host มี field ที่ถือ state ปัจจุบัน และให้ method มอบหมายไปยัง state นั้น **รัน test** หลังต่อสาย method แต่ละตัว
+5. แทนที่การกำหนดค่า type code แต่ละครั้งด้วยการสลับ object state — ในอุดมคติผ่าน method อย่าง `ship()` ที่ตั้งชื่อให้การเปลี่ยนสถานะและคอยกั้นว่าการเปลี่ยนแบบไหนถูกกฎ
+6. เมื่อไม่เหลืออะไรอ่านค่า type code ดิบแล้ว ก็ลบทิ้งได้ ตอนนี้ host เปลี่ยน behavior ด้วยการเลือกว่าจะถือ state ตัวไหนล้วน ๆ
 
-## When to use / trade-offs
+## ใช้เมื่อไหร่ / ข้อแลกเปลี่ยน
 
-เลือก State/Strategy เมื่อ variant **เปลี่ยนได้หลังการสร้าง** เพราะ host คงคลาสของมันไว้และเพียงสลับอ็อบเจกต์ที่ถือ มันจึงจำลอง lifecycle ที่ซับคลาสทำไม่ได้ **State** เหมาะกับชุดของเงื่อนไขที่มีชื่อจำนวนน้อยพร้อมการเปลี่ยนระหว่างกัน (สถานะของ order); **Strategy** เหมาะกับการฉีด algorithm ที่ใช้แทนกันได้หนึ่งตัว (นโยบายการตั้งราคา) ทั้งคู่ยังให้คุณกั้นการเปลี่ยนสถานะและกระทั่งเพิ่มข้อมูลต่อ state ที่ host ไม่ต้องแบกไว้
+เลือก State/Strategy เมื่อ variant **เปลี่ยนได้หลังการสร้าง** เพราะ host คง class ไว้และเพียงสลับ object ที่ถือ จึงจำลอง lifecycle ที่ subclass ทำไม่ได้ **State** เหมาะกับชุดของเงื่อนไขที่มีชื่อจำนวนน้อยพร้อมการเปลี่ยนระหว่างกัน (สถานะของ order); **Strategy** เหมาะกับการฉีด algorithm ที่ใช้แทนกันได้หนึ่งตัว (นโยบายการตั้งราคา) ทั้งคู่ยังให้คุณกั้นการเปลี่ยนสถานะและกระทั่งเพิ่มข้อมูลต่อ state ที่ host ไม่ต้องแบกไว้
 
-เปรียบเทียบกับ **[Replace Type Code with Subclasses](/refactoring/th/organizing-data/replace-type-code-with-subclasses/)**: การย้ายนั้นอบ variant ลงใน *type* ของอ็อบเจกต์ ซึ่งเหมาะที่สุดเมื่อ type **ตายตัวตลอดชีวิต** (บทบาทของพนักงาน) แต่เป็นไปไม่ได้เมื่อมันต้องเปลี่ยน ต้นทุนของ State/Strategy คืออ็อบเจกต์เพิ่มอีกหนึ่งและชั้นของการมอบหมาย คุณจ่ายมันเพื่อให้ได้ lifecycle ที่สลับได้ตอน runtime และกั้นได้ ถ้า type ไม่เคยเปลี่ยน ซับคลาสก็ง่ายกว่า
+เปรียบเทียบกับ **[Replace Type Code with Subclasses](/refactoring/th/organizing-data/replace-type-code-with-subclasses/)**: การย้ายนั้นอบ variant ลงใน *type* ของ object ซึ่งเหมาะที่สุดเมื่อ type **ตายตัวตลอดชีวิต** (บทบาทของพนักงาน) แต่เป็นไปไม่ได้เมื่อต้องเปลี่ยน ต้นทุนของ State/Strategy คือ object เพิ่มอีกหนึ่งตัวกับชั้น delegation อีกชั้น ซึ่งคุณจ่ายไปเพื่อแลกกับ lifecycle ที่สลับได้ตอน runtime และกั้นขอบเขตได้ ถ้า type ไม่เคยเปลี่ยนเลย ใช้ subclass ง่ายกว่า
 
-## Related
+## เนื้อหาที่เกี่ยวข้อง
 
 - [Replace Type Code with Subclasses](/refactoring/th/organizing-data/replace-type-code-with-subclasses/)
 - [Encapsulate Variable](/refactoring/th/organizing-data/encapsulate-variable/)
@@ -238,16 +238,16 @@ smell คือ `switch` ที่กระจัดกระจายบน typ
 > - ต้องการ simple serialization — object ซับซ้อนกว่า enum
 > - มีแค่ 2 state ที่ชัดเจน — boolean flag เพียงพอ
 
-<Callout title="type ตายตัว → ซับคลาส; type เปลี่ยน → State/Strategy">
-switch ที่กระจัดกระจายแบบเดียวกันแก้ได้สองทาง ถ้า variant ลงตัวตั้งแต่อ็อบเจกต์เกิด ให้ทำเป็นซับคลาส ถ้า variant เคลื่อนผ่าน lifecycle ให้ถืออ็อบเจกต์ State ที่ host สลับ — host คงเป็นคลาสเดียวขณะที่ behavior ของมันเปลี่ยนอยู่ข้างใต้
+<Callout title="type ตายตัว → subclass; type เปลี่ยน → State/Strategy">
+switch ที่กระจัดกระจายแบบเดียวกันแก้ได้สองทาง ถ้า variant ลงตัวตั้งแต่ object เกิด ให้ทำเป็น subclass ถ้า variant เคลื่อนผ่าน lifecycle ให้ถือ object State ที่ host สลับ — host คงเป็น class เดียวขณะที่ behavior เปลี่ยนอยู่ข้างใต้
 </Callout>
 
 export const quizStateStrategy = [
   {
-    q: 'property เพิ่มเติมใดที่ผลักคุณไปทาง State/Strategy แทนซับคลาส?',
+    q: 'property เพิ่มเติมใดที่ผลักคุณไปทาง State/Strategy แทน subclass?',
     options: [
-      'อ็อบเจกต์มีหลาย field',
-      'type code เปลี่ยนได้ตอน runtime ตลอดอายุของอ็อบเจกต์',
+      'object มีหลาย field',
+      'type code เปลี่ยนได้ตอน runtime ตลอดอายุของ object',
       'type code ไม่เคยถูกตรวจสอบ',
       'มีค่า type code เพียงค่าเดียว',
     ],
@@ -257,8 +257,8 @@ export const quizStateStrategy = [
     q: 'หลังการ refactor นี้ การเปลี่ยนสถานะระหว่าง variant ถูกแสดงออกอย่างไร?',
     options: [
       'ด้วยการกำหนดค่า string ของ type code ดิบใหม่',
-      'ด้วยการสลับอ็อบเจกต์ State ที่ถืออยู่เป็นตัวอื่น',
-      'ด้วยการเปลี่ยนคลาสของอ็อบเจกต์ host ตอน runtime',
+      'ด้วยการสลับ object State ที่ถืออยู่เป็นตัวอื่น',
+      'ด้วยการเปลี่ยน class ของ object host ตอน runtime',
       'ด้วยการ recompile โปรแกรม',
     ],
     answer: 1,
@@ -266,18 +266,18 @@ export const quizStateStrategy = [
   {
     q: 'เมื่อไรที่ Replace Type Code with Subclasses เป็นทางเลือกที่ดีกว่า?',
     options: [
-      'เมื่อ type ตายตัวตลอดอายุของอ็อบเจกต์',
+      'เมื่อ type ตายตัวตลอดอายุของ object',
       'เมื่อ type เปลี่ยนผ่าน lifecycle',
       'เมื่อคุณต้องการกั้นการเปลี่ยนสถานะ',
-      'เมื่ออ็อบเจกต์ควรถือข้อมูลต่อ state',
+      'เมื่อ object ควรถือข้อมูลต่อ state',
     ],
     answer: 0,
   },
   {
     q: 'ต้นทุนตามปกติของการเลือก State/Strategy คืออะไร?',
     options: [
-      'โปรแกรมไม่สามารถถูกเทสต์ได้อีกต่อไป',
-      'อ็อบเจกต์เพิ่มอีกหนึ่งตัวและชั้นของการมอบหมาย',
+      'โปรแกรมไม่สามารถถูก test ได้อีกต่อไป',
+      'object เพิ่มอีกหนึ่งตัวและชั้นของการมอบหมาย',
       'การแตกกิ่งทั้งหมดต้องคงอยู่ที่เดิม',
       'host ต้องกลายเป็นไม่เปลี่ยนแปลง',
     ],

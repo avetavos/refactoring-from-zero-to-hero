@@ -1,6 +1,6 @@
 ---
 title: Replace Subclass with Delegation
-description: subclass ที่ต่างกันตามแกนเดียวกลายเป็นคลาสเดียวที่ถือ strategy object ซึ่งสลับเปลี่ยนได้
+description: subclass ที่ต่างกันตามแกนเดียวกลายเป็น class เดียวที่ถือ strategy object ซึ่งสลับเปลี่ยนได้
 sidebar:
   order: 5
 ---
@@ -26,17 +26,17 @@ export const strategyDiagram = `classDiagram
   PricingPolicy <|.. RegularPricing
   PricingPolicy <|.. PremiumPricing`;
 
-## Intent
+## จุดประสงค์
 
-**Replace Subclass with Delegation** ยุบครอบครัวของ subclass ที่ต่างกันตาม *แกนของความผันแปรเพียงแกนเดียว* ให้เหลือคลาสเดียวที่ถือ **strategy** object ไว้ แทนที่จะมี subclass `RegularBooking` และ `PremiumBooking` คุณมี `Booking` เดียวที่ delegate behavior ที่ผันแปรไปยัง `PricingPolicy` ที่ถูก inject เข้ามา ความผันแปรย้ายจากลำดับชั้นของ type ไปสู่ฟิลด์ที่คุณตั้งค่าได้ — หรือกระทั่งเปลี่ยนได้ขณะ runtime
+**Replace Subclass with Delegation** ยุบครอบครัวของ subclass ที่ต่างกันตาม *แกนของความผันแปรเพียงแกนเดียว* ให้เหลือ class เดียวที่ถือ **strategy** object ไว้ แทนที่จะมี subclass `RegularBooking` และ `PremiumBooking` คุณมี `Booking` เดียวที่ delegate behavior ที่ผันแปรไปยัง `PricingPolicy` ที่ถูก inject เข้ามา ความผันแปรย้ายจากลำดับชั้นของ type ไปสู่ field ที่คุณตั้งค่าได้ — หรือกระทั่งเปลี่ยนได้ขณะ runtime
 
 ## Code Smell
 
 การ subclass เป็นการเลือกครั้งเดียวแบบ static: object เป็น `PremiumBooking` ตลอดไป และถ้า booking เดียวกันผันแปรตามแกนที่ *สอง* ด้วย — เช่น ราคาวันธรรมดากับวันหยุดสุดสัปดาห์ *และ* คืนเงินได้กับคืนเงินไม่ได้ — คุณก็จะเผชิญกับการระเบิดเชิงผสมของ subclass เมื่อความแตกต่างระหว่าง subclass แท้จริงเป็นเพียง "อัลกอริทึมตัวไหนทำงานตรงนี้" ความแตกต่างนั้นควรอยู่ใน delegate ไม่ใช่ใน type นี่คือการเคลื่อนไหวคลาสสิกจาก inheritance ไปสู่ pattern **Strategy**
 
-## Before → After
+## ก่อน → หลัง
 
-booking ที่ราคาขึ้นกับ tier ของมัน ก่อนหน้านี้แต่ละ tier เป็น subclass หลังจากนั้น tier เป็น `PricingPolicy` ที่ `Booking` เดียว delegate ไปหา
+booking ที่ราคาขึ้นกับ tier ก่อนหน้านี้แต่ละ tier เป็น subclass หลังจากนั้น tier เป็น `PricingPolicy` ที่ `Booking` เดียว delegate ไปหา
 
 <Tabs syncKey="lang">
   <TabItem label="TypeScript">
@@ -180,22 +180,22 @@ booking ที่ราคาขึ้นกับ tier ของมัน ก�
 
 <Mermaid code={strategyDiagram} title="ลำดับชั้นของ tier กลายเป็น Booking เดียวที่ delegate ไปยัง PricingPolicy" />
 
-## Mechanics
+## กลไกการทำงาน
 
-1. ระบุแกนเดียวที่ subclass ต่างกัน — เมท็อด (หรือกลุ่มเล็ก ๆ ของเมท็อด) ที่บอดี้ของมันต่างกัน
+1. ระบุแกนเดียวที่ subclass ต่างกัน — method (หรือกลุ่มเล็ก ๆ ของ method) ที่บอดี้ต่างกัน
 2. นิยาม strategy interface (interface ใน TypeScript/Go, protocol หรือ duck-typed class ใน Python, trait ใน Rust) ที่จับ behavior ที่ผันแปรนั้นไว้
-3. สำหรับแต่ละ subclass ที่มีอยู่ ให้สร้าง strategy implementation ที่ถือ logic ผันแปรเวอร์ชันของมัน
-4. เพิ่มฟิลด์บน base class เพื่อถือ strategy ไว้ แล้วทำให้ base class delegate เมท็อดที่ผันแปรไปยังฟิลด์นั้น
-5. แทนการเรียก `new SubclassX()` แต่ละครั้งด้วย `new Base(..., new StrategyX())` **แล้วรันเทสต์**
+3. สำหรับแต่ละ subclass ที่มีอยู่ ให้สร้าง strategy implementation ที่ถือ logic ผันแปรเวอร์ชัน
+4. เพิ่ม field บน base class เพื่อถือ strategy ไว้ แล้วทำให้ base class delegate method ที่ผันแปรไปยัง field นั้น
+5. แทนการเรียก `new SubclassX()` แต่ละครั้งด้วย `new Base(..., new StrategyX())` **แล้วรัน test**
 6. ลบ subclass ที่ตอนนี้ว่างเปล่าทิ้ง
 
-## When to use / trade-offs
+## ใช้เมื่อไหร่ / ข้อแลกเปลี่ยน
 
-หยิบสิ่งนี้มาใช้เมื่อ subclass ต่างกันเพียงในอัลกอริทึมที่สลับเปลี่ยนได้ เมื่อ object ต้อง *เปลี่ยน* รูปแบบของมันขณะ runtime (สิ่งที่ inheritance ทำไม่ได้) หรือเมื่อแกนของความผันแปรสองแกนที่เป็นอิสระจะคูณกันกลายเป็นการระเบิดของ subclass — การประกอบ strategy field สองตัวขยายเป็นเชิงเส้น ในขณะที่ subclass ขยายเป็นเชิงคูณ
+หยิบสิ่งนี้มาใช้เมื่อ subclass ต่างกันเพียงในอัลกอริทึมที่สลับเปลี่ยนได้ เมื่อ object ต้อง *เปลี่ยน* รูปแบบขณะ runtime (สิ่งที่ inheritance ทำไม่ได้) หรือเมื่อแกนของความผันแปรสองแกนที่เป็นอิสระจะคูณกันกลายเป็นการระเบิดของ subclass — การประกอบ strategy field สองตัวขยายเป็นเชิงเส้น ส่วน subclass ขยายเป็นเชิงคูณ
 
-ข้อแลกเปลี่ยนคือ object พิเศษหนึ่งตัวและชั้นของการอ้อม: ตอนนี้ caller ต้องเดินสาย strategy เมื่อสร้าง base object ซึ่งมักจะคุ้มค่า และใน Go และ Rust มันก็เป็นเพียงวิธีปกติในการทำให้ behavior ผันแปร — ทั้งสองภาษาไม่มีลำดับชั้นของ subclass ให้แทน ดังนั้นคุณจึงเขียนรูปแบบ delegate ตั้งแต่เริ่มต้น
+ข้อแลกเปลี่ยนคือมี object เพิ่มมาหนึ่งตัวกับชั้นการอ้อมอีกชั้น เพราะตอนนี้ caller ต้องเดินสาย strategy ตอนสร้าง base object ซึ่งส่วนใหญ่ก็คุ้ม ส่วนใน Go และ Rust นี่คือวิธีปกติในการทำให้ behavior ผันแปรอยู่แล้ว เพราะทั้งสองภาษาไม่มีลำดับชั้น subclass ให้ใช้ คุณจึงเขียนแบบ delegate มาตั้งแต่ต้น
 
-## Related
+## เนื้อหาที่เกี่ยวข้อง
 
 - [Replace Inheritance with Delegation](/refactoring/th/generalization-and-inheritance/replace-inheritance-with-delegation/)
 - [Collapse Hierarchy](/refactoring/th/generalization-and-inheritance/collapse-hierarchy/)
@@ -213,13 +213,13 @@ booking ที่ราคาขึ้นกับ tier ของมัน ก�
 > - delegation จะเพิ่ม code มากกว่าที่ inheritance ลด
 
 <Callout title="inheritance เป็นการเลือกที่ตายตัว; strategy เปลี่ยนได้">
-เหตุผลลึกที่สุดที่ควรเลือก delegate ตรงนี้คือ *เวลา*: subclass ถูกตัดสินตอน construction และถูกตรึงไว้ตลอดชีวิตของ object ส่วน strategy field สามารถถูก reassign, สลับ, หรือกระทั่งประกอบกับ strategy ตัวที่สองตามแกนที่เป็นอิสระ เมื่อ behavior ต้องผันแปรแบบ dynamic — หรือตามมิติมากกว่าหนึ่ง — composition ชนะอย่างเด็ดขาด ซึ่งเป็นเหตุผลที่ Go และ Rust ยื่นรูปแบบนี้ให้คุณเพียงอย่างเดียว
+เหตุผลลึกที่สุดที่ควรเลือก delegate ตรงนี้คือ *เวลา*: subclass ถูกตัดสินตอน construction และถูกตรึงไว้ตลอดชีวิตของ object ส่วน strategy field สามารถถูก reassign, สลับ, หรือกระทั่งประกอบกับ strategy ตัวที่สองตามแกนที่เป็นอิสระ เมื่อ behavior ต้องผันแปรแบบ dynamic — หรือตามมิติมากกว่าหนึ่ง — composition ชนะอย่างเด็ดขาด นั่นคือเหตุผลที่ Go และ Rust ยื่นรูปแบบนี้ให้คุณเพียงอย่างเดียว
 </Callout>
 
 export const quizReplaceSub = [
   {
     q: 'Replace Subclass with Delegation เหมาะที่สุดเมื่อ subclass ต่างกันตามแกนของความผันแปรกี่แกน?',
-    options: ['ศูนย์', 'แกนเดียว (behavior ที่สลับเปลี่ยนได้หนึ่งอย่าง)', 'เจ็ดแกนเป๊ะ ๆ', 'มันไม่เคยใช้ได้กับ subclass'],
+    options: ['ศูนย์', 'แกนเดียว (behavior ที่สลับเปลี่ยนได้หนึ่งอย่าง)', 'เจ็ดแกนเป๊ะ ๆ', 'ใช้กับ subclass ไม่ได้เลย'],
     answer: 1,
   },
   {
@@ -233,17 +233,17 @@ export const quizReplaceSub = [
       'ถูกตัดสินตอน compile time',
       'ถูก reassign หรือสลับขณะ runtime และประกอบตามหลายแกน',
       'ไม่ถือ state ใด ๆ',
-      'หลีกเลี่ยงการเรียกเมท็อดทั้งหมด',
+      'หลีกเลี่ยงการเรียก method ทั้งหมด',
     ],
     answer: 1,
   },
   {
     q: 'ทำไมนี่จึงเป็นรูปแบบค่าตั้งต้นใน Go และ Rust อยู่แล้ว?',
     options: [
-      'มันปรับ subclass ให้เป็น strategy โดยอัตโนมัติ',
+      'ปรับ subclass ให้เป็น strategy โดยอัตโนมัติ',
       'ทั้งสองภาษาไม่มีลำดับชั้นของ subclass ดังนั้น behavior จึงถูกทำให้ผันแปรด้วยการถือ interface หรือ trait object',
-      'มันห้ามใช้ interface',
-      'มันกำหนดให้ทุก type ต้องเป็น abstract',
+      'ห้ามใช้ interface',
+      'กำหนดให้ทุก type ต้องเป็น abstract',
     ],
     answer: 1,
   },

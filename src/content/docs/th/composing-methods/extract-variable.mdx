@@ -10,17 +10,17 @@ import Callout from '../../../../components/Callout.astro';
 import Quiz from '../../../../components/Quiz.tsx';
 import ProgressTracker from '../../../../components/ProgressTracker.tsx';
 
-## Intent
+## จุดประสงค์
 
-นำชิ้นส่วนหนึ่งของ expression ที่ใหญ่กว่ามากำหนดค่าให้ตัวแปร local ที่มีชื่อดี แล้วใช้ชื่อนั้นแทน sub-expression เดิม รู้จักกันในอีกชื่อว่า Introduce Explaining Variable
+ดึงชิ้นส่วนหนึ่งของ expression ก้อนใหญ่มาเก็บไว้ในตัวแปร local ที่ตั้งชื่อดี ๆ แล้วใช้ชื่อนั้นแทน sub-expression เดิม อีกชื่อที่คุ้นหูคือ Introduce Explaining Variable
 
 ## Code Smell
 
-นี่คือวิธีรักษา **cryptic one-liner** — expression ที่หนาแน่นจนคุณต้องแยกแยะมันในหัวทุกครั้งที่อ่าน เงื่อนไข boolean ที่ถักทอจากการเปรียบเทียบสามครั้ง หรือสูตรราคาที่มีเลขคณิตปริศนา ซ่อนความหมายของมันไว้ในเครื่องหมายวรรคตอน การตั้งชื่อแต่ละส่วนเปลี่ยนบรรทัดนั้นให้เป็นสิ่งที่คุณอ่านออกเสียงได้
+นี่คือวิธีรักษา **cryptic one-liner** คือ expression ที่แน่นจนต้องแกะในหัวใหม่ทุกครั้งที่อ่าน เงื่อนไข boolean ที่ถักจากการเปรียบเทียบสามชั้น หรือสูตรราคาที่เต็มไปด้วยเลขคณิตปริศนา ล้วนซ่อนความหมายไว้หลังเครื่องหมายวรรคตอน พอตั้งชื่อให้แต่ละส่วน บรรทัดนั้นก็กลายเป็นอะไรที่อ่านออกเสียงได้เลย
 
-## Before → After
+## ก่อน → หลัง
 
-การตรวจสอบการจัดส่งฝังความหมายของมันไว้ใน expression แบบ boolean เพียงตัวเดียว การตั้งชื่อให้แต่ละส่วนเผยให้เห็นกฎ
+การตรวจเงื่อนไขจัดส่งอัดความหมายทั้งหมดไว้ใน boolean expression บรรทัดเดียว พอตั้งชื่อให้แต่ละส่วน กฎที่ซ่อนอยู่ก็โผล่ออกมา
 
 <Tabs syncKey="lang">
   <TabItem label="TypeScript">
@@ -87,22 +87,22 @@ import ProgressTracker from '../../../../components/ProgressTracker.tsx';
   </TabItem>
 </Tabs>
 
-## Mechanics
+## กลไกการทำงาน
 
-1. ตรวจสอบว่า sub-expression ไม่มี side effect — การ extract อันที่ทำให้ state เปลี่ยนแปลงอาจเปลี่ยน behavior
-2. ประกาศตัวแปร local แบบ immutable แล้วกำหนดค่า sub-expression ให้มัน
-3. ตั้งชื่อตัวแปรที่บอกว่าค่านั้น *หมายความว่าอะไร* ไม่ใช่บอกว่ามันคำนวณอย่างไร
+1. เช็กก่อนว่า sub-expression ไม่มี side effect เพราะการ extract ชิ้นที่ไปแก้ state อาจเปลี่ยน behavior ได้
+2. ประกาศตัวแปร local แบบ immutable แล้วกำหนดค่า sub-expression ลงไป
+3. ตั้งชื่อที่บอกว่าค่านั้น *หมายถึงอะไร* ไม่ใช่บอกว่าคำนวณมายังไง
 4. แทนที่ sub-expression เดิมด้วยตัวแปรใหม่
-5. **รันเทสต์ของคุณ**
-6. ถ้า sub-expression เดียวกันปรากฏมากกว่าหนึ่งครั้งในขอบเขต ให้แทนที่ทุกการปรากฏแล้วเทสต์อีกครั้ง
+5. **รัน test**
+6. ถ้า sub-expression เดียวกันโผล่หลายครั้งใน scope นั้น ให้แทนที่ให้ครบทุกจุดแล้ว test อีกรอบ
 
-## When to use / trade-offs
+## ใช้เมื่อไหร่ / ข้อแลกเปลี่ยน
 
-ใช้มันเพื่อ debug (ตัวแปร local ที่มีชื่อตรวจสอบได้ง่าย) เพื่อแยกสูตรยาว ๆ ออกเป็นชิ้นที่ review ได้ และเพื่อทำให้เงื่อนไขอธิบายตัวเองได้ ภายใน function เดียว ตัวแปร local ก็เพียงพอ เมื่อคำอธิบายเดียวกันมีประโยชน์ทั่วทั้ง object ให้เลือก **Replace Temp with Query** หรือ extract method ออกมาแทน
+ใช้ตอน debug ได้ดี เพราะตัวแปร local ที่มีชื่อจะส่องดูค่าง่าย นอกจากนี้ยังช่วยหั่นสูตรยาว ๆ ออกเป็นชิ้นที่ review ไหว และทำให้เงื่อนไขอธิบายตัวเองได้ ถ้าใช้อยู่ใน function เดียว ตัวแปร local ก็พอแล้ว แต่ถ้าคำอธิบายชุดเดียวกันมีประโยชน์ทั้ง object ให้ไปทาง **Replace Temp with Query** หรือ extract เป็น method แทน
 
-สิ่งที่ตรงกันข้ามคือ **Inline Variable**: เมื่อชื่อของตัวแปรไม่ได้เพิ่มอะไรเหนือ expression ที่มันถืออยู่ ให้แทนที่ด้วย expression กลับเข้าไปแล้วทิ้งตัวแปร
+ฝั่งตรงข้ามคือ **Inline Variable** ถ้าชื่อตัวแปรไม่ได้เพิ่มอะไรจาก expression ที่เก็บอยู่ ก็เอา expression ใส่กลับเข้าไปแล้วลบตัวแปรทิ้ง
 
-## Related
+## เนื้อหาที่เกี่ยวข้อง
 
 - [Replace Temp with Query](/refactoring/th/composing-methods/replace-temp-with-query/)
 - [Extract Function](/refactoring/th/composing-methods/extract-function/)
@@ -119,7 +119,7 @@ import ProgressTracker from '../../../../components/ProgressTracker.tsx';
 > - กำลังสร้าง variable แบบ `temp` หรือ `result` ที่ไม่บอกอะไร
 
 <Callout title="สิ่งที่ตรงกันข้าม: Inline Variable">
-Extract Variable เพิ่มชื่อ ส่วน Inline Variable กำจัดชื่อที่ไม่คุ้มค่าอีกต่อไป ถ้าคุณอ่าน `const x = order.total` แล้ว `x` ถูกใช้เพียงครั้งเดียวด้านล่างทันที ชื่อนั้นก็เป็นเพียง noise — inline มันเสีย ชื่อควรซื้อความชัดเจน ไม่ใช่พิธีการ
+Extract Variable เพิ่มชื่อเข้าไป ส่วน Inline Variable เอาชื่อที่ไม่คุ้มออก ถ้าเจอ `const x = order.total` แล้ว `x` ถูกใช้แค่ครั้งเดียวถัดลงมาทันที ชื่อนั้นก็เป็นแค่ noise ควร inline ทิ้งไปเลย ชื่อควรแลกมาด้วยความชัดเจน ไม่ใช่แค่พิธีกรรม
 </Callout>
 
 export const quizVariable = [
@@ -127,24 +127,24 @@ export const quizVariable = [
     q: 'เป้าหมายของ Extract Variable คืออะไร?',
     options: [
       'ทำให้ function สั้นลงด้วยการลบบรรทัด',
-      'ตั้งชื่อให้ sub-expression เพื่ออธิบายความหมายของมัน',
+      'ตั้งชื่อให้ sub-expression เพื่ออธิบายความหมายที่ซ่อนอยู่',
       'ปรับปรุงประสิทธิภาพขณะรัน',
       'แปลง function ให้เป็น method',
     ],
     answer: 1,
   },
   {
-    q: 'คุณต้องตรวจสอบอะไรก่อน extract sub-expression เข้าไปในตัวแปร?',
+    q: 'ก่อน extract sub-expression ออกมาเป็นตัวแปร ต้องเช็กอะไรก่อน?',
     options: [
-      'ว่ามันคืนค่า string',
-      'ว่ามันไม่มี side effect',
-      'ว่ามันถูกใช้เพียงครั้งเดียว',
-      'ว่ามันยาวกว่าสิบตัวอักษร',
+      'ว่าคืนค่าเป็น string',
+      'ว่าไม่มี side effect',
+      'ว่าถูกใช้เพียงครั้งเดียว',
+      'ว่ายาวเกินสิบตัวอักษร',
     ],
     answer: 1,
   },
   {
-    q: 'อะไรคือสิ่งที่ตรงกันข้ามกับ Extract Variable?',
+    q: 'อะไรคือท่าที่กลับกันกับ Extract Variable?',
     options: ['Inline Variable', 'Split Phase', 'Inline Function', 'Extract Function'],
     answer: 0,
   },

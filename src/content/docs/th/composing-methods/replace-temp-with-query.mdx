@@ -1,6 +1,6 @@
 ---
 title: Replace Temp with Query
-description: แทนที่temporary variable ที่เก็บค่าที่คำนวณไว้ด้วย function เพื่อให้ logic นำกลับมาใช้ซ้ำได้และการ extract ง่ายขึ้น
+description: แทน temporary variable ที่เก็บค่าที่คำนวณไว้ด้วย function เพื่อให้ logic เอากลับมาใช้ซ้ำได้และ extract ง่ายขึ้น
 sidebar:
   order: 5
 ---
@@ -10,17 +10,17 @@ import Callout from '../../../../components/Callout.astro';
 import Quiz from '../../../../components/Quiz.tsx';
 import ProgressTracker from '../../../../components/ProgressTracker.tsx';
 
-## Intent
+## จุดประสงค์
 
-นำตัวแปร local ที่ถูกกำหนดค่าด้วยผลของการคำนวณแล้วถูกอ่านอย่างเดียว มาแทนที่ด้วย function (เรียกว่า "query") ที่ทำการคำนวณนั้น ทุกที่ที่เคยใช้ temp ตอนนี้เรียก query แทน
+เอาตัวแปร local ที่รับค่าจากการคำนวณครั้งเดียวแล้วอ่านอย่างเดียว มาแทนด้วย function ที่คำนวณค่านั้นให้ (เรียกกันว่า "query") ทุกจุดที่เคยใช้ temp ก็เปลี่ยนไปเรียก query แทน
 
 ## Code Smell
 
-นี่คือวิธีรักษา **temp ที่ตรึง logic ไว้กับที่** temporary variable ผูกการคำนวณไว้กับ function เดียว: คุณนำผลลัพธ์ไปใช้ซ้ำที่อื่นไม่ได้ และคุณ Extract Function รอบ code ที่พึ่งพามันไม่ได้โดยไม่ลาก temp ไปด้วยในฐานะ parameter การเปลี่ยน temp ให้เป็น query ปลดปล่อยการคำนวณนั้น มันมีค่าที่สุดในฐานะขั้นตอน *เตรียมความพร้อม* — เมื่อค่ากลายเป็น method แล้ว การ extract ที่ใหญ่กว่าก็หลุดออกมาอย่างสะอาด
+นี่คือวิธีรักษาอาการ **temp ตรึง logic ไว้กับที่** temporary variable ล็อกการคำนวณไว้ใน function เดียว คุณเอาผลลัพธ์ไปใช้ซ้ำที่อื่นไม่ได้ และจะ Extract Function ครอบ code ที่พึ่ง temp นั้นก็ไม่ได้ ถ้าไม่ลาก temp ตามไปเป็น parameter การเปลี่ยน temp ให้เป็น query ปลดล็อกการคำนวณนั้นออกมา ท่านี้มีค่าที่สุดในฐานะขั้น *เตรียมพร้อม* พอค่ากลายเป็น method แล้ว การ extract ก้อนใหญ่กว่าก็หลุดออกมาได้สะอาด
 
-## Before → After
+## ก่อน → หลัง
 
-`basePrice` เป็น temp ที่คำนวณครั้งเดียวและถูกอ่านสองครั้ง เลื่อนขั้นมันให้เป็น query method บน order
+`basePrice` เป็น temp ที่คำนวณครั้งเดียวแล้วอ่านสองครั้ง เลื่อนขั้นขึ้นเป็น query method บน order ไปเลย
 
 <Tabs syncKey="lang">
   <TabItem label="TypeScript">
@@ -155,22 +155,22 @@ import ProgressTracker from '../../../../components/ProgressTracker.tsx';
   </TabItem>
 </Tabs>
 
-## Mechanics
+## กลไกการทำงาน
 
-1. ตรวจสอบว่า temp ถูกกำหนดค่าเพียงครั้งเดียวและไม่เคยถูก mutate หลังการกำหนดค่า ถ้ามันถูกกำหนดค่าใหม่ ให้แยกมันก่อน เพื่อให้แต่ละค่าถูกกำหนดในที่เดียว
-2. ยืนยันว่าการคำนวณฝั่งขวามือไม่มี side effect
-3. extract การคำนวณออกมาเป็น function query (เป็น method เมื่อข้อมูลอยู่บน object)
-4. แทนที่การอ่าน temp แต่ละครั้งด้วยการเรียก query
-5. **รันเทสต์ของคุณ** หลังการแทนที่แต่ละครั้ง
-6. ลบการประกาศ temp ที่ตอนนี้ไม่ได้ใช้แล้วทิ้ง
+1. เช็คว่า temp กำหนดค่าครั้งเดียวและไม่โดน mutate หลังจากนั้น ถ้ามีการกำหนดค่าใหม่ ให้แยกตัวแปรก่อน แต่ละค่าจะได้กำหนดที่เดียว
+2. ยืนยันว่าการคำนวณฝั่งขวาไม่มี side effect
+3. extract การคำนวณออกมาเป็น query function (ถ้าข้อมูลอยู่บน object ก็ทำเป็น method)
+4. แทนทุกจุดที่อ่าน temp ด้วยการเรียก query
+5. **รัน test** หลังแทนแต่ละจุด
+6. ลบบรรทัดประกาศ temp ที่ไม่มีใครใช้แล้วทิ้ง
 
-## When to use / trade-offs
+## ใช้เมื่อไหร่ / ข้อแลกเปลี่ยน
 
-ใช้มันเมื่อ temp ขวาง Extract Function ที่คุณอยากทำ เมื่อการคำนวณเดียวกันจะมีประโยชน์จากมากกว่าหนึ่ง method หรือเพียงเพื่อลด local state ของ method ที่ยาว ข้อแลกเปลี่ยนหลักคือการคำนวณซ้ำ: query อาจคำนวณใหม่ในทุกการเรียก สำหรับ business logic ทั่วไปสิ่งนี้แทบไม่มีผล และความชัดเจนก็คุ้มค่า สำหรับ hot path ที่ร้อนจริง ๆ ให้วัดก่อนตัดสินใจ
+ใช้ท่านี้เมื่อ temp ขวาง Extract Function ที่คุณอยากทำ เมื่อการคำนวณเดียวกันมีประโยชน์กับหลาย method หรือแค่อยากลด local state ของ method ยาว ๆ ข้อแลกเปลี่ยนหลักคือการคำนวณซ้ำ เพราะ query อาจคำนวณใหม่ทุกครั้งที่เรียก สำหรับ business logic ทั่วไปแทบไม่มีผล และความชัดเจนที่ได้ก็คุ้ม ส่วน hot path จริง ๆ ให้วัดก่อนตัดสินใจ
 
-ทิศทางตรงข้ามคือ cache ค่ากลับเข้าไปใน local เมื่อการ profiling พิสูจน์ว่า query เป็นคอขวดจริง — แต่เอื้อมไปหาสิ่งนั้นเมื่อมีหลักฐานเท่านั้น
+ทิศทางกลับกันคือ cache ค่าไว้ใน local อีกครั้ง เมื่อ profiling พิสูจน์แล้วว่า query เป็นคอขวดจริง แต่หยิบทางนี้มาใช้ก็ต่อเมื่อมีหลักฐานเท่านั้น
 
-## Related
+## เนื้อหาที่เกี่ยวข้อง
 
 - [Extract Function](/refactoring/th/composing-methods/extract-function/)
 - [Extract Variable](/refactoring/th/composing-methods/extract-variable/)
@@ -178,7 +178,7 @@ import ProgressTracker from '../../../../components/ProgressTracker.tsx';
 
 | ใช้ Replace Temp with Query เมื่อ | หลีกเลี่ยงเมื่อ |
 |---|---|
-| temporary variable ถูกใช้หลายครั้งใน function | query นั้น expensive — เรียกซ้ำหลายครั้งทำให้ช้า |
+| temporary variable ใช้หลายครั้งใน function | query แพง — เรียกซ้ำหลายครั้งแล้วช้า |
 | ต้องการ extract function ที่ใช้ค่านั้น | temporary variable คือ accumulator ที่ค่าเปลี่ยนใน loop |
 | ค่านั้นต้องการใน subclass | function ที่ได้จะมีชื่อที่อธิบายแย่กว่า variable เดิม |
 
@@ -188,7 +188,7 @@ import ProgressTracker from '../../../../components/ProgressTracker.tsx';
 > - context object ไม่มีข้อมูลที่จำเป็นสำหรับ query
 
 <Callout title="query ปลดล็อก refactoring ที่ใหญ่กว่า">
-ผลตอบแทนที่แท้จริงไม่ใช่ temp ที่หายไป — แต่เป็นสิ่งที่เป็นไปได้หลังจากนั้น เมื่อการคำนวณอยู่ใน query ของตัวเอง code รอบ ๆ ก็หยุดพึ่งพา local และ Extract Function บนส่วนที่เหลือของ method ก็ทำงานได้ทันทีโดยไม่ต้องมี parameter ที่อึดอัด
+ผลตอบแทนจริงไม่ใช่ temp ที่หายไป แต่เป็นสิ่งที่ทำต่อได้หลังจากนั้น พอการคำนวณย้ายเข้าไปอยู่ใน query ของตัวเอง code รอบ ๆ ก็เลิกพึ่ง local และ Extract Function กับส่วนที่เหลือของ method ก็ทำได้ทันที ไม่ต้องมี parameter อึดอัด ๆ ตามมา
 </Callout>
 
 export const quizTemp = [
@@ -198,22 +198,22 @@ export const quizTemp = [
     answer: 1,
   },
   {
-    q: 'temp ควรเข้าเงื่อนไขใดก่อนนำ refactoring นี้ไปใช้?',
+    q: 'temp ต้องผ่านเงื่อนไขใดก่อนใช้ refactoring นี้?',
     options: [
-      'มันต้องถูกกำหนดค่าครั้งเดียวและไม่ถูก mutate หลังจากนั้น',
-      'มันต้องเป็น string',
-      'มันต้องถูกใช้ในลูป',
-      'มันต้องถูกประกาศเป็นค่าคงที่อยู่แล้ว',
+      'ต้องกำหนดค่าครั้งเดียวและไม่โดน mutate หลังจากนั้น',
+      'ต้องเป็น string',
+      'ต้องใช้อยู่ใน loop',
+      'ต้องประกาศเป็นค่าคงที่อยู่แล้ว',
     ],
     answer: 0,
   },
   {
-    q: 'ทำไม refactoring นี้จึงมักถูกใช้เป็นขั้นตอนเตรียมความพร้อม?',
+    q: 'ทำไม refactoring นี้จึงมักใช้เป็นขั้นเตรียมพร้อม?',
     options: [
-      'มันกำจัดความจำเป็นในการเทสต์',
-      'เมื่อค่ากลายเป็น query แล้ว code รอบ ๆ ก็ไม่พึ่งพา local อีกต่อไป ทำให้ Extract Function ง่ายขึ้น',
-      'มันทำให้โปรแกรมเร็วขึ้นเสมอ',
-      'มันลบ class ที่ครอบอยู่',
+      'ทำให้ไม่ต้องเขียน test อีกต่อไป',
+      'พอค่ากลายเป็น query แล้ว code รอบ ๆ ก็เลิกพึ่ง local ทำให้ Extract Function ง่ายขึ้น',
+      'ทำให้โปรแกรมเร็วขึ้นเสมอ',
+      'ลบ class ที่ครอบอยู่ออกไป',
     ],
     answer: 1,
   },

@@ -1,6 +1,6 @@
 ---
 title: การทำให้ API เรียบง่าย
-description: ปรับเปลี่ยนวิธีที่ function ถูกเรียกใช้ — ชื่อที่ชัดเจนขึ้น อาร์กิวเมนต์น้อยลง ไม่มี flag ที่ชวนสับสน — เพื่อให้ interface เป็นสิ่งที่ใช้แล้วรู้สึกดีแทนที่จะเป็นปริศนาที่ต้องมานั่งถอดรหัส
+description: ปรับเปลี่ยนวิธีที่ function ถูกเรียกใช้ — ชื่อที่ชัดเจนขึ้น argument น้อยลง ไม่มี flag ที่ชวนสับสน — เพื่อให้ interface เป็นสิ่งที่ใช้แล้วรู้สึกดีแทนที่จะเป็นปริศนาที่ต้องมานั่งถอดรหัส
 sidebar:
   order: 1
 ---
@@ -23,50 +23,50 @@ export const overviewDiagram = `flowchart TD
   F --> H
   G --> H`;
 
-## Intent
+## จุดประสงค์
 
-กลุ่ม **simplifying APIs** ว่าด้วยเรื่อง *ภายนอก* ของ function นั่นคือส่วนที่ผู้เรียกใช้ทุกคนต้องอ่านและทำความเข้าใจ function อาจมีเนื้อในที่สมบูรณ์แบบแต่ก็ยังเจ็บปวดเวลาใช้งานได้ เพราะชื่อมันโกหก รายการอาร์กิวเมนต์ยาวเป็นไมล์ หรือ boolean ที่หลงเข้ามาเปลี่ยนสิ่งที่มันทำอย่างเงียบ ๆ การรีแฟกเตอร์เหล่านี้จัดระเบียบจุดเรียกใช้ให้เรียบร้อย เพื่อให้ interface โฆษณาสิ่งที่มันมอบให้ได้อย่างตรงไปตรงมา
+กลุ่ม **simplifying APIs** ว่าด้วยเรื่อง *ภายนอก* ของ function นั่นคือส่วนที่ caller ทุกคนต้องอ่านและทำความเข้าใจ function อาจมีเนื้อในที่สมบูรณ์แบบแต่ก็ยังเจ็บปวดเวลาใช้งานได้ เพราะชื่อโกหก รายการ argument ยาวเป็นไมล์ หรือ boolean ที่หลงเข้ามาเปลี่ยนสิ่งที่ทำอย่างเงียบ ๆ การรีแฟกเตอร์เหล่านี้จัดระเบียบจุดเรียกใช้ให้เรียบร้อย เพื่อให้ interface โฆษณาสิ่งที่มอบให้ได้อย่างตรงไปตรงมา
 
 ## Code Smell
 
-โดยทั่วไปคุณจะรู้สึกได้ถึง interface ที่ไม่ดีตรงจุดเรียกใช้ คุณหรี่ตามองรายการอาร์กิวเมนต์แล้วจำไม่ได้ว่า `true` ตัวไหนหมายถึงอะไร คุณเจอ function สองตัวที่เหมือนกันเก้าสิบเปอร์เซ็นต์และต่างกันแค่ตัวเลขที่ฝังไว้ตายตัว คุณส่งค่าสามตัวเดิมไปด้วยกันเรื่อย ๆ ในลำดับเดิม ให้กับทุก function ในโมดูล สิ่งเหล่านี้ไม่ใช่บั๊ก — code มันทำงานได้ — แต่แต่ละอย่างก็เก็บภาษีจากทุกคนที่อ่านจุดเรียกใช้
+โดยทั่วไปคุณจะรู้สึกได้ถึง interface ที่ไม่ดีตรงจุดเรียกใช้ คุณหรี่ตามองรายการ argument แล้วจำไม่ได้ว่า `true` ตัวไหนหมายถึงอะไร คุณเจอ function สองตัวที่เหมือนกันเก้าสิบเปอร์เซ็นต์และต่างกันแค่ตัวเลขที่ฝังไว้ตายตัว คุณส่งค่าสามตัวเดิมไปด้วยกันเรื่อย ๆ ในลำดับเดิม ให้กับทุก function ในโมดูล สิ่งเหล่านี้ไม่ใช่บั๊ก เพราะ code ก็ทำงานได้ แต่แต่ละอย่างเก็บภาษีจากทุกคนที่อ่านจุดเรียกใช้
 
 | Code Smell | อาการที่บ่งชี้ | ท่าที่แนะนำ |
 |---|---|---|
 | Long Parameter List | parameter เกิน 3-4 ตัว หรือชุดเดิมปรากฏในหลาย function | Introduce Parameter Object |
 | Flag Argument | boolean ที่ call site — `true` ตัวนี้หมายถึงอะไรกันแน่? | Remove Flag Argument |
 | Duplicated Code | function สองตัวที่ต่างกันแค่ค่า literal เดียว | Parameterize Function |
-| Feature Envy | caller แกะหลายฟิลด์จาก object เพียงเพื่อส่งต่อ | Preserve Whole Object |
+| Feature Envy | caller แกะหลาย field จาก object เพียงเพื่อส่งต่อ | Preserve Whole Object |
 | Misleading Name | ต้องเปิด implementation เพื่อรู้ว่า function ทำอะไร | Rename Function |
 
 <Mermaid code={overviewDiagram} title="เลือกท่า simplifying-APIs จากสิ่งที่ทำให้การเรียกใช้ดูเก้กัง" />
 
 ## โมดูลนี้ครอบคลุมอะไรบ้าง
 
-การรีแฟกเตอร์เก้าแบบที่ทำให้ interface ของ function และเมท็อดชัดเจนและเรียกใช้ง่ายขึ้น:
+การรีแฟกเตอร์เก้าแบบที่ทำให้ interface ของ function และ method ชัดเจนและเรียกใช้ง่ายขึ้น:
 
-- **[Rename Function/Variable](/refactoring/th/simplifying-apis/rename-function/)** — เมื่อชื่อชวนเข้าใจผิดหรืออธิบายได้ไม่พอ ให้เปลี่ยนชื่อมันและอัปเดตผู้เรียกใช้ทุกจุด ชื่อคือเอกสารที่ราคาถูกที่สุดที่คุณจะได้เขียน
-- **[Parameterize Function](/refactoring/th/simplifying-apis/parameterize-function/)** — เมื่อ function สองตัวที่เกือบเหมือนกันต่างกันแค่ค่า literal ให้รวมมันเป็น function เดียวที่รับค่านั้นเป็นพารามิเตอร์
-- **[Introduce Parameter Object](/refactoring/th/simplifying-apis/introduce-parameter-object/)** — เมื่ออาร์กิวเมนต์กลุ่มหนึ่งเดินทางไปด้วยกันเสมอ ให้จัดมันเข้าเป็นออบเจกต์เดียวเพื่อให้ความสัมพันธ์ชัดเจน
-- **[Remove Flag Argument](/refactoring/th/simplifying-apis/remove-flag-argument/)** — เมื่ออาร์กิวเมนต์แบบ boolean สลับ behavior ให้แยก function ออกเป็นสอง function ที่มีชื่อชัดเจน
-- **[Replace Constructor with Factory Function](/refactoring/th/simplifying-apis/replace-constructor-with-factory/)** — เมื่อ constructor จำกัดเกินไป ให้ห่อมันด้วย function factory ที่สามารถเลือก subtype ได้และมีชื่อที่สื่อความหมาย
-- **[Separate Query from Modifier](/refactoring/th/simplifying-apis/separate-query-from-modifier/)** — เมื่อ function ทั้งคืนค่าและเปลี่ยนสถานะ ให้แยกมันออกเป็น query ที่บริสุทธิ์และ command แยกต่างหาก
-- **[Preserve Whole Object](/refactoring/th/simplifying-apis/preserve-whole-object/)** — เมื่อผู้เรียกใช้แกะหลายฟิลด์ออกจากออบเจกต์แค่เพื่อส่งต่อไป ให้ส่งทั้งออบเจกต์ไปแทน
-- **[Replace Parameter with Query](/refactoring/th/simplifying-apis/replace-parameter-with-query/)** — เมื่อพารามิเตอร์สามารถหาได้จากข้อมูลที่ function มีอยู่แล้ว ให้ตัดมันทิ้งและคำนวณภายในเอง
-- **[Remove Setting Method](/refactoring/th/simplifying-apis/remove-setting-method/)** — เมื่อฟิลด์ควรถูกตรึงไว้ตั้งแต่ตอนสร้าง ให้ลบ setter ของมันเพื่อทำให้ออบเจกต์เปลี่ยนแปลงไม่ได้
+- **[Rename Function/Variable](/refactoring/th/simplifying-apis/rename-function/)** — เมื่อชื่อชวนเข้าใจผิดหรืออธิบายได้ไม่พอ ให้เปลี่ยนชื่อแล้วอัปเดต caller ทุกจุด ชื่อคือเอกสารที่ราคาถูกที่สุดที่คุณจะได้เขียน
+- **[Parameterize Function](/refactoring/th/simplifying-apis/parameterize-function/)** — เมื่อ function สองตัวที่เกือบเหมือนกันต่างกันแค่ค่า literal ให้ยุบเหลือ function เดียวที่รับค่านั้นเป็น parameter
+- **[Introduce Parameter Object](/refactoring/th/simplifying-apis/introduce-parameter-object/)** — เมื่อ argument กลุ่มหนึ่งเดินทางไปด้วยกันเสมอ ให้รวบเป็น object เดียว ความสัมพันธ์จะได้ชัดเจน
+- **[Remove Flag Argument](/refactoring/th/simplifying-apis/remove-flag-argument/)** — เมื่อ argument แบบ boolean สลับ behavior ให้แยก function ออกเป็นสอง function ที่มีชื่อชัดเจน
+- **[Replace Constructor with Factory Function](/refactoring/th/simplifying-apis/replace-constructor-with-factory/)** — เมื่อ constructor จำกัดเกินไป ให้ห่อด้วย factory function ที่เลือก subtype ได้และตั้งชื่อสื่อความหมายได้
+- **[Separate Query from Modifier](/refactoring/th/simplifying-apis/separate-query-from-modifier/)** — เมื่อ function ทั้งคืนค่าและเปลี่ยนสถานะ ให้แยกออกเป็น query บริสุทธิ์กับ command คนละตัว
+- **[Preserve Whole Object](/refactoring/th/simplifying-apis/preserve-whole-object/)** — เมื่อ caller แกะหลาย field ออกจาก object แค่เพื่อส่งต่อไป ให้ส่งทั้ง object ไปแทน
+- **[Replace Parameter with Query](/refactoring/th/simplifying-apis/replace-parameter-with-query/)** — เมื่อ parameter สามารถหาได้จากข้อมูลที่ function มีอยู่แล้ว ให้ตัดทิ้งแล้วคำนวณข้างในเอง
+- **[Remove Setting Method](/refactoring/th/simplifying-apis/remove-setting-method/)** — เมื่อ field ควรถูกตรึงไว้ตั้งแต่ตอนสร้าง ให้ลบ setter เพื่อทำให้ object เปลี่ยนแปลงไม่ได้
 
-แต่ละบทเรียนแสดงตัวอย่างก่อนและหลังแบบเดียวกันใน TypeScript, Python, Go และ Rust แล้วพาเดินผ่านกลไกที่ปลอดภัยและเรียงลำดับเป็นขั้นตอน — โดยรันเทสต์ระหว่างทุกขั้น
+แต่ละบทเรียนแสดงตัวอย่างก่อนและหลังแบบเดียวกันใน TypeScript, Python, Go และ Rust แล้วพาเดินผ่านกลไกที่ปลอดภัยและเรียงลำดับเป็นขั้นตอน — โดยรัน test ระหว่างทุกขั้น
 
 <Callout title="interface คือสัญญา">
-เนื้อในของ function เป็นเรื่องส่วนตัว ส่วนลายเซ็นของมันเป็นคำสัญญาต่อทุกคนที่เรียกใช้ การปรับปรุง interface ให้ผลตอบแทนทุกครั้งที่ function ถูกอ่านหรือถูกเรียกใช้ — ซึ่งสำหรับ function ยอดนิยมแล้ว เกิดขึ้นบ่อยกว่าการที่เนื้อในของมันถูกแก้ไขเสียอีก
+เนื้อในของ function เป็นเรื่องส่วนตัว ส่วนลายเซ็นเป็นคำสัญญาต่อทุกคนที่เรียกใช้ การปรับปรุง interface ให้ผลตอบแทนทุกครั้งที่ function ถูกอ่านหรือถูกเรียกใช้ — ซึ่งสำหรับ function ยอดนิยมแล้ว เกิดขึ้นบ่อยกว่าการที่เนื้อในถูกแก้ไขเสียอีก
 </Callout>
 
 export const quizIndex = [
   {
     q: 'การรีแฟกเตอร์กลุ่ม "simplifying APIs" ปรับปรุงส่วนไหนของ function เป็นหลัก?',
     options: [
-      'การ implement ภายในที่ผู้เรียกใช้ไม่เคยเห็น',
-      'interface — ชื่อ พารามิเตอร์ และวิธีที่ function ถูกเรียกใช้',
+      'การ implement ภายในที่ caller ไม่เคยเห็น',
+      'interface — ชื่อ parameter และวิธีที่ function ถูกเรียกใช้',
       'การตั้งค่า build',
       'สคีมาฐานข้อมูลที่อยู่เบื้องหลัง function',
     ],
@@ -81,7 +81,7 @@ export const quizIndex = [
     q: 'ทำไมการปรับปรุง interface จึงมักคุ้มค่ากว่าการปรับปรุงเนื้อใน?',
     options: [
       'เนื้อในถูกอ่านบ่อยกว่า interface',
-      'ลายเซ็นถูกอ่านและถูกเรียกใช้บ่อยกว่าการที่เนื้อในของมันถูกเปลี่ยนมาก',
+      'ลายเซ็นถูกอ่านและถูกเรียกใช้บ่อยกว่าการที่เนื้อในถูกเปลี่ยนมาก',
       'interface คอมไพล์เร็วกว่าเนื้อใน',
       'คอมไพเลอร์เพิกเฉยต่อเนื้อในของ function',
     ],
