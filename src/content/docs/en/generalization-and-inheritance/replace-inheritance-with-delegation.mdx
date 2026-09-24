@@ -22,7 +22,7 @@ export const delegationDiagram = `classDiagram
 
 ## Intent
 
-**Replace Inheritance with Delegation** unhooks a subclass from its parent and instead gives it a *field* holding an instance of the former parent. The class forwards (delegates) the calls it genuinely needs and ignores the rest. You do this when a subclass uses only a fraction of its superclass's interface, or when the inheritance modelled a "has-a" relationship dressed up as "is-a".
+**Replace Inheritance with Delegation** unhooks a subclass from its parent and instead gives it a *field* holding an instance of the former parent. The class forwards (delegates) the calls it genuinely needs and ignores the rest. You do this when a subclass uses only a fraction of its superclass's interface, or when the inheritance modelled a "has-a" relationship dressed up as "is-a". This is the first-edition name; Fowler's second edition (2018) calls the same move *Replace Superclass with Delegate*, which the [Replace Superclass with Delegation](/refactoring/en/generalization-and-inheritance/replace-superclass-with-delegation/) lesson walks through with a fuller `List`.
 
 ## The smell
 
@@ -164,7 +164,7 @@ The cost is a little forwarding boilerplate — one short method per delegated o
 - [Extract Superclass & Interface](/refactoring/en/generalization-and-inheritance/extract-superclass-and-interface/)
 
 <Callout title="Favour composition over inheritance">
-Inheritance binds you to the *whole* parent interface and its evolution; composition lets you forward only what you mean to support. When in doubt, hold the collaborator as a field and delegate. Go and Rust bake this advice into the language — they give you no inheritance to misuse, so you reach for delegation by default and your relationships stay honest.
+Inheritance binds you to the *whole* parent interface and its evolution; composition lets you forward only what you mean to support — the *Design Patterns* (Gamma et al., 1994) advice to "favor object composition over class inheritance". When in doubt, hold the collaborator as a field and delegate. Go and Rust bake this advice into the language — they give you no inheritance to misuse, so you reach for delegation by default and your relationships stay honest.
 </Callout>
 
 export const quizReplaceInh = [

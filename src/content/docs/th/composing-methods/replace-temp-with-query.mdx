@@ -176,17 +176,6 @@ import ProgressTracker from '../../../../components/ProgressTracker.tsx';
 - [Extract Variable](/refactoring/th/composing-methods/extract-variable/)
 - [Split Phase](/refactoring/th/composing-methods/split-phase/)
 
-| ใช้ Replace Temp with Query เมื่อ | หลีกเลี่ยงเมื่อ |
-|---|---|
-| temporary variable ใช้หลายครั้งใน function | query แพง — เรียกซ้ำหลายครั้งแล้วช้า |
-| ต้องการ extract function ที่ใช้ค่านั้น | temporary variable คือ accumulator ที่ค่าเปลี่ยนใน loop |
-| ค่านั้นต้องการใน subclass | function ที่ได้จะมีชื่อที่อธิบายแย่กว่า variable เดิม |
-
-> ⚠️ ไม่ควร Replace Temp with Query เมื่อ:
-> - calculation มี side effect — เรียกซ้ำจะทำงานหลายครั้ง
-> - ค่านั้นซับซ้อนและเรียกบ่อย — cache ไว้ใน variable ดีกว่า
-> - context object ไม่มีข้อมูลที่จำเป็นสำหรับ query
-
 <Callout title="query ปลดล็อก refactoring ที่ใหญ่กว่า">
 ผลตอบแทนจริงไม่ใช่ temp ที่หายไป แต่เป็นสิ่งที่ทำต่อได้หลังจากนั้น พอการคำนวณย้ายเข้าไปอยู่ใน query ของตัวเอง code รอบ ๆ ก็เลิกพึ่ง local และ Extract Function กับส่วนที่เหลือของ method ก็ทำได้ทันที ไม่ต้องมี parameter อึดอัด ๆ ตามมา
 </Callout>

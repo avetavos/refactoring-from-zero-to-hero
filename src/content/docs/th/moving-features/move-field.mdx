@@ -231,17 +231,6 @@ field อยู่บน record หนึ่ง แต่คนที่อ่�
 - [Extract Class](/refactoring/th/moving-features/extract-class/)
 - [Inline Class](/refactoring/th/moving-features/inline-class/)
 
-| ใช้ Move Field เมื่อ | หลีกเลี่ยงเมื่อ |
-|---|---|
-| field ถูกใช้โดย class อื่นบ่อยกว่า class ที่เป็นเจ้าของ | การย้ายจะสร้าง circular dependency |
-| field เป็นส่วนหนึ่งของ Extract Class ที่กำลังทำ | field นั้น computed จาก data ใน class ปัจจุบัน |
-| เปลี่ยน field นี้ต้องแก้ class อื่นเสมอ | ทีมไม่มี test ครอบคลุม access patterns ของ field |
-
-> ⚠️ ไม่ควร Move Field เมื่อ:
-> - field นั้นถูก access จากทั้งสอง class ในปริมาณพอ ๆ กัน
-> - การย้ายทำให้ API เปลี่ยน ซึ่ง break external caller
-> - ยังไม่แน่ใจว่า class ใหม่จะมีชีวิตยืนยาว
-
 <Callout title="ห่อหุ้มก่อนย้าย">
 ส่วนที่เจ็บปวดของการย้าย field คือผู้อ่านโดยตรงที่กระจัดกระจายอยู่ทั่ว code ห่อ field ไว้ใน getter และ setter ก่อน ชี้ทุกคนไปที่ตัวนั้น แล้วการย้ายเองก็จะกลายเป็นการเปลี่ยนแปลงเดียวภายใน accessor เดียว
 </Callout>

@@ -116,17 +116,6 @@ inline เมื่อ body ชัดเจนอย่างน้อยเท�
 - [Extract Function](/refactoring/th/composing-methods/extract-function/)
 - [Replace Temp with Query](/refactoring/th/composing-methods/replace-temp-with-query/)
 
-| ใช้ Inline Function เมื่อ | หลีกเลี่ยงเมื่อ |
-|---|---|
-| ชื่อ function ไม่ได้บอกอะไรมากกว่า body | function ถูกใช้งานหลายที่ |
-| function แค่ delegate ต่อไปยังอีก function | body ซับซ้อนกว่าชื่อ — ชื่อยังมีประโยชน์ |
-| กำลังจัดระเบียบใหม่ และอยากรวม logic ก่อนแบ่งใหม่ | ต้อง override ใน subclass |
-
-> ⚠️ ไม่ควร Inline Function เมื่อ:
-> - function นั้นซ่อน complexity จริง ๆ — inline แล้ว code จะอ่านยากขึ้น
-> - เป็น API ที่ external caller ใช้อยู่
-> - ต้องใช้ trace ตอน debug — ชื่อ function ช่วยให้อ่าน stack trace ออก
-
 <Callout title="Inline คือปุ่มรีเซ็ต">
 พอขอบเขตของ helper ผิด อย่าฝืนแก้ตรงนั้น ให้ inline ทุกอย่างกลับเข้า function เดียวก่อน มองให้เห็น flow ทั้งหมดชัด ๆ แล้วค่อย extract ตามขอบเขตที่สำคัญจริง inline จึงมักเป็น *ทางผ่าน* ไปสู่การ extract ที่สะอาดกว่าเดิม
 </Callout>

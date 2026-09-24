@@ -170,7 +170,7 @@ The cost is that a caller who genuinely wanted both behaviours now makes two cal
 - [Rename Function/Variable](/refactoring/en/simplifying-apis/rename-function/)
 
 <Callout title="Command-Query Separation">
-This refactoring is the practical form of the Command-Query Separation principle: a method should either change state or return a result, but not both. When you can trust that queries are side-effect free, you can read code without fear that a glance triggers a change.
+This refactoring is the practical form of Bertrand Meyer's Command-Query Separation principle (*Object-Oriented Software Construction*, 1988): a method should either change state or return a result, but not both. When you can trust that queries are side-effect free, you can read code without fear that a glance triggers a change.
 </Callout>
 
 export const quizSeparate = [

@@ -34,7 +34,7 @@ export const fieldsDiagram = `classDiagram
 
 ## The smell
 
-You spot a subclass whose every override is a one-liner returning a literal: `isMale() { return true; }`, `code() { return "M"; }`. The subclass adds no logic, holds no per-instance state, and never varies its answer. A whole type — with its own file, its own constructor, its own slot in the hierarchy — exists only to hard-code two constants. That is a **Lazy Class** dressed up as a subtype, and it makes the differences between variants harder to see than a row of field assignments would.
+You spot a subclass whose every override is a one-liner returning a literal: `isMale() { return true; }`, `code() { return "M"; }`. The subclass adds no logic, holds no per-instance state, and never varies its answer. A whole type — with its own file, its own constructor, its own slot in the hierarchy — exists only to hard-code two constants. That is a **Lazy Element** dressed up as a subtype, and it makes the differences between variants harder to see than a row of field assignments would.
 
 ## Before → After
 

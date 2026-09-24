@@ -137,17 +137,6 @@ function สองตัวที่คำนวณราคาหลังห�
 - [Introduce Parameter Object](/refactoring/th/simplifying-apis/introduce-parameter-object/)
 - [Extract Function](/refactoring/th/composing-methods/extract-function/)
 
-| ใช้ Parameterize Function เมื่อ | หลีกเลี่ยงเมื่อ |
-|---|---|
-| function สองตัวต่างกันแค่ literal เดียว | ความแตกต่างคือ behavior ไม่ใช่ data |
-| มีตัวแปรใน namespace เพิ่มขึ้นเรื่อย ๆ | parameter ใหม่ทำให้ signature อ่านยากขึ้น |
-| จะ copy-paste function แล้วเปลี่ยนตัวเลขเดียว | function ที่ได้มี parameter เกิน 4 ตัว |
-
-> ⚠️ ไม่ควร Parameterize Function เมื่อ:
-> - ความแตกต่างระหว่างสอง function คือ behavior — ให้ Remove Flag Argument แทน
-> - ค่าที่จะเป็น parameter มีชุดจำกัดและมีความหมาย — ใช้ enum หรือแยก function แทน
-> - เพิ่ม parameter เพราะ "อาจจะต้องการ" ในอนาคต — YAGNI
-
 <Callout title="Parameterize ที่ค่า ไม่ใช่ที่ behavior">
 ท่านี้เปล่งประกายเมื่อความแตกต่างเพียงอย่างเดียวคือ *ข้อมูล* — อัตรา ขีดจำกัด ป้ายกำกับ เมื่อความแตกต่างคือ *behavior* — ตัวแปรหนึ่งบันทึก log และอีกตัวส่งอีเมล — parameter boolean ตัวเดียวมักจะแตกเนื้อในออกเป็นสอง ซึ่งคือกลิ่นของ Flag Argument ให้ parameter บรรยายค่า และให้การแยก function บรรยาย behavior
 </Callout>

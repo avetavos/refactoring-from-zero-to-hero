@@ -121,17 +121,6 @@ function ที่ชื่อบอกน้อยกว่างานที�
 - [Remove Flag Argument](/refactoring/th/simplifying-apis/remove-flag-argument/)
 - [Extract Function](/refactoring/th/composing-methods/extract-function/)
 
-| ใช้ Rename Function/Variable เมื่อ | หลีกเลี่ยงเมื่อ |
-|---|---|
-| ต้องเปิด implementation อ่านถึงจะรู้ว่าทำอะไร | ชื่อเก่าเป็นส่วนหนึ่งของ public API ที่ publish ไปแล้ว |
-| ชื่อหลอกให้เข้าใจผิดหรือ outdated | มี caller จำนวนมากที่ยังไม่พร้อม migrate |
-| behavior เคลื่อนออกห่างจากสิ่งที่ชื่อสัญญาไว้ | rename ที่ทำโดยไม่มี test จะไม่รู้ว่าพังหรือเปล่า |
-
-> ⚠️ ไม่ควร Rename Function/Variable เมื่อ:
-> - ชื่อเป็นส่วนของ stable public API — ต้องมี deprecation period และ wrapper ชั่วคราว
-> - ทำ rename พร้อมกับ behavior change — ให้แยก commit เพื่อให้ git blame ชัดเจน
-> - ยังไม่เข้าใจ function นั้นดีพอ — rename ที่ผิดแย่กว่าชื่อเดิม
-
 <Callout title="ชื่อคือ comment เล็ก ๆ ที่ฟรี">
 comment เน่าเงียบ ๆ ได้ตลอด เพราะ code ข้าง ๆ เปลี่ยนไปเรื่อย ส่วนชื่อเดินทางไปพร้อมกับสิ่งที่บรรยาย จึงมีแนวโน้มจะซื่อสัตย์กว่า ลงแรงเพิ่มอีกไม่กี่วินาทีเพื่อตั้งชื่อ function ตามผลลัพธ์ แล้วคุณจะประหยัดเวลาให้ผู้อ่านทุกคนในอนาคตที่ไม่ต้องมุดเข้าไปอ่านข้างใน
 </Callout>

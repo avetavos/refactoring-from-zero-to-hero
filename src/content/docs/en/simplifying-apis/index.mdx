@@ -31,6 +31,14 @@ The **simplifying APIs** family is about the *outside* of a function: the part e
 
 You can usually feel a bad interface at the call site. You squint at an argument list and cannot remember which `true` means what. You find two functions that are ninety percent identical and only differ by a hard-coded number. You keep passing the same three values together, in the same order, to every function in a module. None of these are bugs — the code works — but each one taxes everyone who reads the call.
 
+| Smell (Fowler, ch. 3) | What you notice | Move |
+|---|---|---|
+| Long Parameter List | More than three or four arguments, or the same group passed to many functions | Introduce Parameter Object |
+| Flag Argument | A bare `true` at the call site — which behaviour is that? | Remove Flag Argument |
+| Duplicated Code | Two functions that differ only by one literal | Parameterize Function |
+| Feature Envy | A caller unpacks several fields from an object just to pass them on | Preserve Whole Object |
+| Mysterious Name | You have to open the body to learn what a function does | Rename Function |
+
 <Mermaid code={overviewDiagram} title="Choosing a simplifying-APIs move by what makes the call awkward" />
 
 ## What this module covers

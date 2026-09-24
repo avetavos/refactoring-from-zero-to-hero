@@ -41,7 +41,7 @@ Refactoring ที่ทำได้ดีจะดูน่าเบื่อ�
 
 หัวใจของนิยาม refactoring คือ *การรักษา behavior* และ test คือวิธี *พิสูจน์* เรื่องนั้น หลังจบแต่ละก้าว แถบสีเขียวคือหลักฐานว่าการเปลี่ยนแปลงที่เพิ่งทำมองไม่เห็นจากภายนอก ถ้าไม่มี test คุณก็แค่ *หวัง* ว่า behavior ยังเหมือนเดิม และความหวังไม่ใช่ตาข่ายนิรภัย
 
-ถ้า code ที่จะ refactor ยังไม่มี test เลย ให้เขียนขึ้นมาก่อน แค่ **characterization test** ไม่กี่ตัวก็พอ คือ test ที่ตรึงสิ่งที่ code ทำอยู่ *วันนี้* ไว้ ไม่ว่าพฤติกรรมนั้นจะถูกหรือผิด เท่านี้ก็ได้ตาข่ายที่ต้องใช้เพื่อปรับโครงสร้างอย่างมั่นใจแล้ว
+ถ้า code ที่จะ refactor ยังไม่มี test เลย ให้เขียนขึ้นมาก่อน แค่ **characterization test** ไม่กี่ตัวก็พอ คือ test ที่ตรึงสิ่งที่ code ทำอยู่ *วันนี้* ไว้ ไม่ว่าพฤติกรรมนั้นจะถูกหรือผิด (คำนี้มาจาก Michael Feathers ใน *Working Effectively with Legacy Code*, 2004) เท่านี้ก็ได้ตาข่ายที่ต้องใช้เพื่อปรับโครงสร้างอย่างมั่นใจแล้ว
 
 ## ตัวอย่างก้าวเล็ก ๆ ที่ลงมือทำจริง
 
@@ -153,17 +153,6 @@ input เดียวกันให้ส่วนลดเดียวกั�
 - [refactoring คืออะไร?](/refactoring/th/intro-and-principles/what-is-refactoring/)
 - [การอ่าน code smell](/refactoring/th/intro-and-principles/reading-code-smells/)
 - [Replace Temp with Query](/refactoring/th/composing-methods/replace-temp-with-query/)
-
-| ใช้ Small Steps + Tests เมื่อ | หลีกเลี่ยงเมื่อ |
-|---|---|
-| refactoring ครั้งใหญ่ที่แตะหลาย file | แก้ typo เล็กน้อยที่ test เห็นได้ชัด |
-| code มี test coverage ดีพอที่จะ catch regression | test suite ช้ามากจนทำ TDD ได้ยาก |
-| ทีมมีหลายคน merge ใน branch เดียวกัน | งาน spike เพื่อ learn — ยังไม่ใช่ production |
-
-> ⚠️ ไม่ควร skip tests เมื่อ refactor เมื่อ:
-> - code ที่แตะเป็น production path ที่สำคัญ
-> - ไม่มี automated test และกำลัง refactor logic ที่ซับซ้อน
-> - หลาย คนทำงานใน codebase เดียวกัน — regression ตาม track ยาก
 
 <Callout title="จากแถบเขียวสู่แถบเขียว">
 จงปฏิบัติต่อทุก commit เสมือนเป็นจุดตรวจที่ test เป็นสีเขียว ขยับจากแถบเขียวหนึ่งไปยังอันถัดไปด้วยก้าวที่เล็กพอจนหากมีอะไรพัง การ undo ก้าวล่าสุดจะกินเวลาคุณแค่ไม่กี่วินาที — ไม่ใช่ทั้งบ่าย นั่นคือโมเดลความปลอดภัยทั้งหมดของ refactoring

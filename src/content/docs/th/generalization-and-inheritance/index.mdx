@@ -36,13 +36,13 @@ export const overviewDiagram = `classDiagram
 
 inheritance ทรงพลังและล้ำเส้นได้ง่ายมาก เช่น method ชุดเดียวกันถูก copy-paste ลงไปใน subclass สามตัว หรือ field วางอยู่บน superclass แต่มี subclass แค่ครึ่งเดียวที่แตะ หรือ class หนึ่ง extends อีก class เพียงเพื่อยืม helper สองตัว แล้วพลอย inherit อีกสิบสองตัวที่ต้องแกล้งทำเป็นไม่มี ทุกกรณีคือลำดับชั้นที่เลิกบอกความจริงเรื่องความสัมพันธ์ระหว่าง type ไปแล้ว refactoring ในโมดูลนี้จะจัดลำดับชั้นให้ตรง หรือสลายทิ้งไปเป็น delegation เมื่อ composition เหมาะกว่า
 
-| Code Smell | อาการที่บ่งชี้ | ท่าที่แนะนำ |
+| Smell (Fowler บทที่ 3) | อาการที่บ่งชี้ | ท่าที่แนะนำ |
 |---|---|---|
 | Duplicated Code | method เดิมคัดลอกวางใน subclass พี่น้องหลายตัว | Pull Up Method / Field |
-| Refused Bequest | subclass inherit แต่ต้องแกล้งทำเป็นว่า member ไม่มีอยู่ | Replace Inheritance with Delegation |
+| Refused Bequest | subclass inherit แต่ต้องแกล้งทำเป็นว่า member ไม่มีอยู่ | Push Down · Replace Superclass with Delegation |
 | Speculative Generality | hierarchy ที่สร้างขึ้นสำหรับอนาคตที่ยังไม่มาถึง | Collapse Hierarchy |
-| Inappropriate Intimacy | subclass ใช้ superclass เพียงเสี้ยวเดียวแต่ยึดทั้งหมด | Replace Subclass with Delegation |
-| Parallel Inheritance Hierarchies | เพิ่ม subclass ที่หนึ่งต้องเพิ่มอีก hierarchy ด้วย | Extract Superclass / Interface |
+| Lazy Element | subclass ที่ต่างกันแค่ค่าคงที่ที่คืนออกมา | Replace Subclass with Fields |
+| Alternative Classes with Different Interfaces | สอง class ทำงานเดียวกันแต่ signature ต่างกัน | Extract Superclass / Interface |
 
 <Mermaid code={overviewDiagram} title="ฟีเจอร์เคลื่อนข้ามลำดับชั้นอย่างไรในโมดูลนี้" />
 

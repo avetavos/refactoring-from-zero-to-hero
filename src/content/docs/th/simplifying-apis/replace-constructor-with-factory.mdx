@@ -228,17 +228,6 @@ type พนักงานที่ constructor รับ stringtype หลั�
 - [Introduce Parameter Object](/refactoring/th/simplifying-apis/introduce-parameter-object/)
 - [Rename Function/Variable](/refactoring/th/simplifying-apis/rename-function/)
 
-| ใช้ Replace Constructor with Factory เมื่อ | หลีกเลี่ยงเมื่อ |
-|---|---|
-| ต้องการ subtype ที่แตกต่างกันตาม input | type เดียว รูปทรงเดียว ไม่มี variant |
-| ชื่อ constructor ไม่สื่อความหมายของ use case | เพิ่ม indirection โดยไม่ได้รับประโยชน์จริง |
-| ต้องการ validate input ก่อน construct | factory ที่ซับซ้อนเกินไปจนเข้าใจยากกว่า constructor |
-
-> ⚠️ ไม่ควร Replace Constructor with Factory เมื่อ:
-> - type ธรรมดา ไม่มี variant และไม่ต้องการชื่อพิเศษ — constructor ตรงไปตรงมากว่า
-> - factory ทำแค่ `return new Thing(args)` โดยไม่เพิ่มค่าอะไร
-> - team ไม่คุ้นชินกับ pattern นี้และ codebase ไม่มี convention รองรับ
-
 <Callout title="factory คือ constructor ที่ได้เลือกเอง">
 constructor ต้องคืน type ของตัวเอง ภายใต้ชื่อของตัวเอง ส่วน factory function หลุดจากกฎทั้งสองข้อ คือตั้งชื่อว่า `hire` ก็ได้ คืน `Manager` หรือ `Engineer` ก็ได้ และถ้า input ผิดก็ปฏิเสธไม่สร้างเลยก็ยังได้ อิสระตรงนี้แหละคือประเด็นทั้งหมด
 </Callout>

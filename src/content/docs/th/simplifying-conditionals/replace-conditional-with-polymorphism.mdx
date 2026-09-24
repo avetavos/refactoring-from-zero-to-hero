@@ -242,17 +242,6 @@ export const polymorphismDiagram = `flowchart TD
 - [Replace Nested Conditional with Guard Clauses](/refactoring/th/simplifying-conditionals/replace-nested-conditional-with-guard-clauses/)
 - [Introduce Special Case](/refactoring/th/simplifying-conditionals/introduce-special-case/)
 
-| ใช้ Replace Conditional with Polymorphism เมื่อ | หลีกเลี่ยงเมื่อ |
-|---|---|
-| switch เดิมกระจายซ้ำในหลาย function | switch ตัวเดียว ใน function เดียว ไม่ซ้ำที่อื่น |
-| การเพิ่ม type ใหม่ต้องแก้หลาย switch พร้อมกัน | type มีจำนวนน้อยและ stable ไม่เพิ่มบ่อย |
-| behavior แต่ละ type ต่างกันชัดเจนและมีความซับซ้อน | ลำดับชั้น class เพิ่ม indirection โดยไม่ได้ลด switch จริง |
-
-> ⚠️ ไม่ควร Replace Conditional with Polymorphism เมื่อ:
-> - switch นั้นตัวเดียวในโปรแกรมทั้งหมด — Decompose Conditional หรือ guard clause ง่ายกว่า
-> - type ถูก hardcode และไม่มีแผนเพิ่ม — overhead ของ class hierarchy ไม่คุ้ม
-> - team ที่ดูแล codebase ไม่คุ้นชิน pattern นี้ — อ่านยากกว่า switch ธรรมดา
-
 <Callout title="ใช้อย่างประหยัด — เฉพาะเมื่อเงื่อนไขเกิดซ้ำ">
 switch ตัวเดียวใน function เดียวไม่เป็นไร ปล่อยไว้เถอะ ตัวกระตุ้นของ polymorphism คือ type switch *ชุดเดียวกัน* ที่โผล่ข้ามหลาย function จนทุกชนิดใหม่บังคับให้ต้องแก้หลายที่ ให้ดึงลำดับชั้นเข้ามาก็ต่อเมื่อความซ้ำนั้นเกิดขึ้นจริงแล้ว ไม่ใช่เพราะเดาล่วงหน้า
 </Callout>

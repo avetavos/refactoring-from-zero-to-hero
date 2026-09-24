@@ -14,18 +14,18 @@ import ProgressTracker from '../../../../components/ProgressTracker.tsx';
 export const combineDiagram = `flowchart LR
   subgraph Before["Before"]
     D["reading data<br/>(customer, quantity, month)"]
-    F1["baseCharge(reading)"]
-    F2["taxableCharge(reading)"]
-    F3["calculateBaseCharge(reading)"]
+    F1["baseRate(month)"]
+    F2["baseCharge(reading)"]
+    F3["taxableCharge(reading)"]
     D -.-> F1
     D -.-> F2
     D -.-> F3
   end
   subgraph After["After"]
     C["Reading (class)<br/>fields: customer, quantity, month"]
-    C --> M1["baseCharge()"]
-    C --> M2["taxableCharge()"]
-    C --> M3["calculateBaseCharge()"]
+    C --> M1["baseRate"]
+    C --> M2["baseCharge"]
+    C --> M3["taxableCharge"]
   end
   Before -.->|"Combine Functions into Class"| After`;
 
@@ -35,11 +35,11 @@ export const combineDiagram = `flowchart LR
 
 ## อาการของปัญหา
 
-คุณเห็น function กลุ่มหนึ่งรับ record ตัวเดียวกันแล้วดึงค่าออกมาใช้ เช่น `baseCharge(reading)`, `taxableCharge(reading)`, `calculateBaseCharge(reading)` ตัว record เดินทางจาก function หนึ่งไปอีก function ในรูป parameter และ function พวกนี้ก็เกาะกันเป็นครอบครัวชัดเจน แต่ไม่มีอะไรตั้งชื่อให้ครอบครัวนั้นเลย นี่คือ **Data Clump** ที่มี behavior โคจรอยู่รอบ ๆ พอห่อข้อมูลไว้ใน class ครอบครัวนี้ก็ได้บ้าน method เรียกกันเองได้โดยไม่ต้องส่งข้อมูลซ้ำ และ function ที่เกี่ยวข้องตัวถัดไปก็รู้ว่าจะไปลงตรงไหน
+คุณเห็น function กลุ่มหนึ่งรับ record ตัวเดียวกันแล้วดึงค่าออกมาใช้ เช่น `baseRate(month)`, `baseCharge(reading)`, `taxableCharge(reading)` ตัว record เดินทางจาก function หนึ่งไปอีก function ในรูป parameter และ function พวกนี้ก็เกาะกันเป็นครอบครัวชัดเจน แต่ไม่มีอะไรตั้งชื่อให้ครอบครัวนั้นเลย นี่คือ **Data Clump** ที่มี behavior โคจรอยู่รอบ ๆ พอห่อข้อมูลไว้ใน class ครอบครัวนี้ก็ได้บ้าน method เรียกกันเองได้โดยไม่ต้องส่งข้อมูลซ้ำ และ function ที่เกี่ยวข้องตัวถัดไปก็รู้ว่าจะไปลงตรงไหน
 
 ## ก่อน → หลัง
 
-function สามตัวต่างก็รับ `reading` ของมิเตอร์แล้วคำนวณค่าใช้จ่าย เรารวมทั้งสามเข้าเป็น class `Reading` ที่เก็บข้อมูลของ reading ไว้เป็น field
+function สามตัวต่างก็ทำงานจาก `reading` ของมิเตอร์ตัวเดียวกัน (โดยตรง หรือผ่าน `month` ของมัน) แล้วคำนวณค่าใช้จ่าย เรารวมทั้งสามเข้าเป็น class `Reading` ที่เก็บข้อมูลของ reading ไว้เป็น field
 
 <Tabs syncKey="lang">
   <TabItem label="TypeScript">
@@ -203,17 +203,6 @@ function สามตัวต่างก็รับ `reading` ของมิ
 - [Split Loop](/refactoring/th/moving-features/split-loop/)
 - [Extract Class](/refactoring/th/moving-features/extract-class/)
 - [Extract Function](/refactoring/th/composing-methods/extract-function/)
-
-| ใช้ Combine Functions into Class เมื่อ | หลีกเลี่ยงเมื่อ |
-|---|---|
-| function หลายตัวใช้ data record เดียวกันเสมอ | function เหล่านั้นไม่มี shared state จริง ๆ |
-| ต้องการ method ที่ computed จาก shared data | data นั้นเป็น primitive ที่ไม่ควร wrap |
-| ต้องการส่ง "bundle of functions + data" ไปรอบ ๆ | เพื่อ convenience เท่านั้น ไม่ใช่ cohesion |
-
-> ⚠️ ไม่ควร Combine Functions into Class เมื่อ:
-> - function เหล่านั้นทำงานกับ data ที่ต่างกัน — cohesion ต่ำ
-> - สร้าง class เพื่อ OOP แต่ภาษาที่ใช้ถนัด functional มากกว่า
-> - ยังไม่แน่ใจว่า data เหล่านี้จะอยู่ด้วยกันตลอด
 
 <Callout title="จับกลุ่มรอบข้อมูล ไม่ใช่รอบกริยา">
 เหตุผลที่รวม function พวกนี้เข้าด้วยกันคือข้อมูลที่ใช้ร่วมกัน ไม่ใช่เพราะชื่อคล้องจองกัน ถ้าทุกตัวรับ record เดียวกันและอ่านจาก record นั้น class จะเขียนตัวเองออกมาเลย แต่ถ้าแค่หน้าตาคล้ายกันแล้วแตะข้อมูลคนละชุด ก็ปล่อยให้แยกกันอยู่ต่อไป

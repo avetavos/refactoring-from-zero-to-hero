@@ -31,6 +31,16 @@ The **simplifying conditionals** family is about decision logic: the branches, g
 
 Complex conditional logic is one of the loudest signals that a function is hard to maintain. The warning signs are familiar: a boolean expression so long you have to read it twice, an arrow of nested `if` blocks marching off the right edge of the screen, a `switch` on a "type" field repeated in five functions, and `if (x == null)` scattered through every method that touches `x`. Each of these has a named cure, and each cure leaves the behaviour identical while making the intent obvious.
 
+| Symptom | What you notice | Move |
+|---|---|---|
+| Complex conditional | A boolean expression you must read twice to decode | Decompose Conditional |
+| Duplicated conditional | Several checks that all lead to the same result | Consolidate Conditional Expression |
+| Nested conditional | `if/else` nested so deep the happy path is hidden | Replace Nested Conditional with Guard Clauses |
+| Repeated Switches (Fowler, ch. 3) | The same type switch repeated in several functions | Replace Conditional with Polymorphism |
+| Null check | The same `if (x == null)` in every method that touches `x` | Introduce Special Case |
+| Control flag | A boolean that exists only to steer a loop | Replace Control Flag with Break/Return |
+| Error code | A sentinel value for failure that is easy to ignore | Replace Error Code with Exception |
+
 <Mermaid code={overviewDiagram} title="Choosing a simplifying-conditionals move by what is wrong" />
 
 ## What this module covers

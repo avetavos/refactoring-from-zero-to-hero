@@ -32,13 +32,13 @@ export const overviewDiagram = `flowchart TD
 
 ข้อมูลที่ยุ่งเหยิงโผล่มาในรูปแบบเล็ก ๆ ที่เกิดซ้ำ ๆ ค่าคงที่ตัวเดียวกันปรากฏในห้าไฟล์โดยไม่มีใครจำได้ว่าแปลว่าอะไร field ที่เป็น list ถูกส่งต่อออกไป แล้ว caller ไกล ๆ ก็ `push` ลงไป ทำลาย invariant ที่เจ้าของไม่เคยตกลงด้วย เบอร์โทรถูกเก็บเป็น `string` ทุกการ validate และการจัดรูปแบบจึงถูก copy-paste ซ้ำที่จุดใช้งานทุกแห่ง แต่ละอย่างไม่ร้ายแรงเลย แต่พอรวมกันก็ทำให้ codebase เปราะ เพราะเปลี่ยน *วิธีเก็บ* ข้อมูลทีเดียว แรงกระเพื่อมจะไปถึงทุกจุดที่อ่านข้อมูลนั้นโดยตรง
 
-| Code Smell | อาการที่บ่งชี้ | ท่าที่แนะนำ |
+| Smell (Fowler บทที่ 3) | อาการที่บ่งชี้ | ท่าที่แนะนำ |
 |---|---|---|
 | Primitive Obsession | primitive ที่สะสม validation และ formatting ไว้รอบตัว | Replace Primitive with Object |
-| Magic Number / String | ค่าคงที่ลอยตัวที่ไม่มีชื่อ โผล่ซ้ำในหลายไฟล์ | Replace Magic Literal |
+| Mysterious Name | literal ไม่มีชื่ออย่าง `0.07` โผล่ซ้ำในหลายไฟล์ | Replace Magic Literal |
 | Mutable Data | field ลิสต์ถูก mutate จากข้างนอก ทำให้ invariant พัง | Encapsulate Collection |
-| Switch Statement | type code ขับเคลื่อน switch ที่กระจายอยู่ในหลาย function | Replace Type Code with Subclasses |
 | Global Data | ตัวแปรที่ถูกอ่านและเขียนจากทุกที่โดยไม่มีจุดควบคุม | Encapsulate Variable |
+| Repeated Switches | switch บน type code ตัวเดียวกันกระจายอยู่ในหลาย function | Replace Type Code with Subclasses |
 
 <Mermaid code={overviewDiagram} title="การเลือกท่า organizing-data ตามว่าอะไรกำลังผิดพลาด" />
 

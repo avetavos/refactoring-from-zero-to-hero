@@ -29,7 +29,7 @@ export const delegationDiagram = `classDiagram
 
 ## Intent
 
-**Replace Superclass with Delegation** turns an inheritance link into a *has-a* link. Instead of `Stack extends List`, the stack *holds* a list in a private field and calls into it for the handful of operations it actually needs. The subclass keeps the behaviour it relied on but is no longer forced to inherit — and expose — every member of a parent it never wanted in full.
+**Replace Superclass with Delegation** (Fowler, 2nd ed.: *Replace Superclass with Delegate*; first edition: *Replace Inheritance with Delegation*) turns an inheritance link into a *has-a* link. Instead of `Stack extends List`, the stack *holds* a list in a private field and calls into it for the handful of operations it actually needs. The subclass keeps the behaviour it relied on but is no longer forced to inherit — and expose — every member of a parent it never wanted in full.
 
 ## The smell
 
@@ -50,14 +50,21 @@ A `Stack` that extends `List` to get its storage, leaking list operations. After
         const i = this.items.indexOf(item);
         if (i >= 0) this.items.splice(i, 1);
       }
+      removeAt(index: number): void { this.items.splice(index, 1); }
       get(index: number): T { return this.items[index]; }
       size(): number { return this.items.length; }
     }
 
-    // A Stack should not expose remove(item) or get(index)!
+    // A Stack should not expose remove(item), removeAt(index) or get(index)!
     class Stack<T> extends List<T> {
       push(item: T): void { this.add(item); }
-      pop(): T | undefined { return undefined; /* awkward */ }
+      pop(): T | undefined {
+        const n = this.size();
+        if (n === 0) return undefined;
+        const top = this.get(n - 1);
+        this.removeAt(n - 1);
+        return top;
+      }
     }
 
     // After — Stack holds a List and delegates only what it needs
@@ -70,7 +77,7 @@ A `Stack` that extends `List` to get its storage, leaking list operations. After
         const n = this.storage.size();
         if (n === 0) return undefined;
         const top = this.storage.get(n - 1);
-        this.storage.remove(top);
+        this.storage.removeAt(n - 1);
         return top;
       }
 
@@ -91,16 +98,27 @@ A `Stack` that extends `List` to get its storage, leaking list operations. After
         def remove(self, item):
             self._items.remove(item)
 
+        def remove_at(self, index):
+            del self._items[index]
+
         def get(self, index):
             return self._items[index]
 
         def size(self):
             return len(self._items)
 
-    # A Stack should not expose remove(item) or get(index)!
+    # A Stack should not expose remove(item), remove_at(index) or get(index)!
     class Stack(CustomList):
         def push(self, item):
             self.add(item)
+
+        def pop(self):
+            n = self.size()
+            if n == 0:
+                return None
+            top = self.get(n - 1)
+            self.remove_at(n - 1)
+            return top
 
     # After — Stack holds a list and delegates only what it needs
     class Stack:
@@ -115,7 +133,7 @@ A `Stack` that extends `List` to get its storage, leaking list operations. After
             if n == 0:
                 return None
             top = self._storage.get(n - 1)
-            self._storage.remove(top)
+            self._storage.remove_at(n - 1)
             return top
 
         def size(self):

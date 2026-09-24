@@ -132,17 +132,6 @@ Rename Field คุ้มที่จะทำทันทีที่ชื่�
 - [Self-Encapsulate Field](/refactoring/th/organizing-data/self-encapsulate-field/)
 - [Replace Primitive with Object](/refactoring/th/organizing-data/replace-primitive-with-object/)
 
-| ใช้ Rename Field เมื่อ | หลีกเลี่ยงเมื่อ |
-|---|---|
-| ชื่อเดิมทำให้เข้าใจผิดหรือไม่สื่อ intent | field นั้นเป็น public API ที่ external system ใช้งาน |
-| domain ของ code เปลี่ยนและชื่อเดิมไม่ตรงแล้ว | ต้องแก้ไขหลายไฟล์มากและไม่มี automated refactoring |
-| code review เริ่มถามว่า field นี้หมายถึงอะไร | การ rename จะ break serialization format (JSON, DB) |
-
-> ⚠️ ไม่ควร Rename Field เมื่อ:
-> - field เป็น public API ที่ external client serialize/deserialize
-> - database column ที่ต้องการ migration — ต้องทำพร้อมกับ DB schema
-> - ชื่อใหม่ไม่ได้ชัดเจนกว่าชื่อเดิมมากพอที่จะคุ้มกับความเสี่ยง
-
 <Callout title="encapsulate ก่อนเมื่อข้อมูลหลุดออกจาก module ของคุณ">
 rename ภายในไฟล์เดียวเป็นเรื่องเล็ก แต่ rename field ที่ถูก serialize หรือแชร์ข้าม service ไม่ใช่ เพราะอาจทำให้ consumer ที่คุณไม่เคยเห็นพังไปด้วย ให้วาง accessor คั่นรอบ field ไว้ก่อน คุณจะได้เปลี่ยนชื่อข้างในอย่างอิสระ ขณะที่ contract ข้างนอกยังคงเดิม
 </Callout>

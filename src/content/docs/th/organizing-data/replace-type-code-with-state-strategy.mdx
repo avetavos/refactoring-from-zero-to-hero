@@ -73,6 +73,7 @@ smell คือ `switch` ที่กระจัดกระจายบน typ
       label(): string { return this.state.label(); }
       canCancel(): boolean { return this.state.canCancel(); }
       ship(): void { this.state = Shipped; } // a transition is a swap
+      deliver(): void { this.state = Delivered; }
     }
     ```
   </TabItem>
@@ -121,6 +122,8 @@ smell คือ `switch` ที่กระจัดกระจายบน typ
             return self.state.can_cancel()
         def ship(self):
             self.state = Shipped()  # a transition is a swap
+        def deliver(self):
+            self.state = Delivered()
     ```
   </TabItem>
   <TabItem label="Go">
@@ -154,11 +157,16 @@ smell คือ `switch` ที่กระจัดกระจายบน typ
     func (shipped) Label() string   { return "On the way" }
     func (shipped) CanCancel() bool { return false }
 
+    type delivered struct{}
+    func (delivered) Label() string   { return "Complete" }
+    func (delivered) CanCancel() bool { return false }
+
     type Order struct{ state OrderState }
-    func NewOrder() *Order          { return &Order{state: pending{}} }
-    func (o *Order) Label() string  { return o.state.Label() }
+    func NewOrder() *Order           { return &Order{state: pending{}} }
+    func (o *Order) Label() string   { return o.state.Label() }
     func (o *Order) CanCancel() bool { return o.state.CanCancel() }
-    func (o *Order) Ship()          { o.state = shipped{} } // swap
+    func (o *Order) Ship()           { o.state = shipped{} }   // a transition is a swap
+    func (o *Order) Deliver()        { o.state = delivered{} }
     ```
   </TabItem>
   <TabItem label="Rust">
@@ -192,13 +200,19 @@ smell คือ `switch` ที่กระจัดกระจายบน typ
         fn label(&self) -> &str { "On the way" }
         fn can_cancel(&self) -> bool { false }
     }
+    struct Delivered;
+    impl OrderState for Delivered {
+        fn label(&self) -> &str { "Complete" }
+        fn can_cancel(&self) -> bool { false }
+    }
 
     struct Order { state: Box<dyn OrderState> }
     impl Order {
         fn new() -> Self { Order { state: Box::new(Pending) } }
         fn label(&self) -> &str { self.state.label() }
         fn can_cancel(&self) -> bool { self.state.can_cancel() }
-        fn ship(&mut self) { self.state = Box::new(Shipped); } // swap
+        fn ship(&mut self) { self.state = Box::new(Shipped); } // a transition is a swap
+        fn deliver(&mut self) { self.state = Box::new(Delivered); }
     }
     ```
   </TabItem>
@@ -226,17 +240,6 @@ smell คือ `switch` ที่กระจัดกระจายบน typ
 - [Replace Type Code with Subclasses](/refactoring/th/organizing-data/replace-type-code-with-subclasses/)
 - [Encapsulate Variable](/refactoring/th/organizing-data/encapsulate-variable/)
 - [Replace Primitive with Object](/refactoring/th/organizing-data/replace-primitive-with-object/)
-
-| ใช้ Replace Type Code with State/Strategy เมื่อ | หลีกเลี่ยงเมื่อ |
-|---|---|
-| behavior เปลี่ยนตาม type code และเปลี่ยนได้ใน runtime | type code คงที่ตลอด lifecycle ของ object |
-| type code ถูกใช้ใน switch ที่ซ้ำในหลายที่ | มีแค่ 2-3 type และไม่น่าจะเพิ่ม |
-| ต้องการเพิ่ม type ใหม่โดยไม่แก้ code เดิม | subclass เป็นตัวเลือกที่ง่ายกว่าและ type ไม่เปลี่ยน |
-
-> ⚠️ ไม่ควร Replace Type Code with State/Strategy เมื่อ:
-> - type code ไม่ส่งผลต่อ behavior — เป็นแค่ label
-> - ต้องการ simple serialization — object ซับซ้อนกว่า enum
-> - มีแค่ 2 state ที่ชัดเจน — boolean flag เพียงพอ
 
 <Callout title="type ตายตัว → subclass; type เปลี่ยน → State/Strategy">
 switch ที่กระจัดกระจายแบบเดียวกันแก้ได้สองทาง ถ้า variant ลงตัวตั้งแต่ object เกิด ให้ทำเป็น subclass ถ้า variant เคลื่อนผ่าน lifecycle ให้ถือ object State ที่ host สลับ — host คงเป็น class เดียวขณะที่ behavior เปลี่ยนอยู่ข้างใต้

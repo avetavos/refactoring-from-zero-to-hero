@@ -22,7 +22,7 @@ export const delegationDiagram = `classDiagram
 
 ## จุดประสงค์
 
-**Replace Inheritance with Delegation** ปลด subclass ออกจาก superclass แล้วให้ถือ *field* ที่เก็บ instance ของ superclass เดิมไว้แทน จากนั้น class จะ delegate เฉพาะการเรียกที่ต้องใช้จริง ส่วนที่เหลือก็ไม่ต้องสนใจ ใช้ท่านี้เมื่อ subclass ใช้ interface ของ superclass แค่เสี้ยวเดียว หรือเมื่อ inheritance ที่เขียนไว้จริง ๆ แล้วคือความสัมพันธ์ "has-a" ที่แต่งตัวมาเป็น "is-a"
+**Replace Inheritance with Delegation** ปลด subclass ออกจาก superclass แล้วให้ถือ *field* ที่เก็บ instance ของ superclass เดิมไว้แทน จากนั้น class จะ delegate เฉพาะการเรียกที่ต้องใช้จริง ส่วนที่เหลือก็ไม่ต้องสนใจ ใช้ท่านี้เมื่อ subclass ใช้ interface ของ superclass แค่เสี้ยวเดียว หรือเมื่อ inheritance ที่เขียนไว้จริง ๆ แล้วคือความสัมพันธ์ "has-a" ที่แต่งตัวมาเป็น "is-a" ชื่อนี้เป็นชื่อในฉบับพิมพ์ครั้งแรก ส่วนฉบับพิมพ์ครั้งที่ 2 (2018) ของ Fowler เรียกท่าเดียวกันนี้ว่า *Replace Superclass with Delegate* ซึ่งบท [Replace Superclass with Delegation](/refactoring/th/generalization-and-inheritance/replace-superclass-with-delegation/) เดินผ่านด้วย `List` ที่ครบกว่า
 
 ## Code Smell
 
@@ -163,19 +163,8 @@ export const delegationDiagram = `classDiagram
 - [Pull Up & Push Down](/refactoring/th/generalization-and-inheritance/pull-up-and-push-down/)
 - [Extract Superclass & Interface](/refactoring/th/generalization-and-inheritance/extract-superclass-and-interface/)
 
-| ใช้ Replace Inheritance with Delegation เมื่อ | หลีกเลี่ยงเมื่อ |
-|---|---|
-| subclass ใช้เพียงบางส่วนของ superclass interface | subclass เป็น "is-a" อย่างแท้จริง ไม่ใช่แค่ "has-a" |
-| inheritance ทำให้ subclass ผูกพันกับ superclass implementation | delegation จะเพิ่ม forwarding methods มากเกินไป |
-| ต้องการ swap implementation โดยไม่เปลี่ยน interface | client code ต้อง downcast ไปยัง superclass type |
-
-> ⚠️ ไม่ควร Replace Inheritance with Delegation เมื่อ:
-> - subclass ใช้ superclass interface ครบทุก method
-> - Liskov Substitution Principle ยังคงใช้ได้ — subclass คือ superclass จริง ๆ
-> - delegation จะสร้าง wrapper ที่ไม่เพิ่ม value
-
 <Callout title="เลือก composition มากกว่า inheritance">
-inheritance มัดคุณไว้กับ interface *ทั้งชุด* ของ superclass รวมถึงทุกการเปลี่ยนแปลงในอนาคต ส่วน composition ให้คุณส่งต่อเฉพาะสิ่งที่ตั้งใจจะรองรับ ถ้าไม่แน่ใจ ให้ถือ collaborator ไว้เป็น field แล้ว delegate เอา Go กับ Rust อบคำแนะนำนี้ไว้ในตัวภาษาแล้ว เพราะไม่มี inheritance ให้ใช้ผิด คุณจึงหยิบ delegation มาใช้โดยปริยาย และความสัมพันธ์ก็ซื่อตรงเสมอ
+inheritance มัดคุณไว้กับ interface *ทั้งชุด* ของ superclass รวมถึงทุกการเปลี่ยนแปลงในอนาคต ส่วน composition ให้คุณส่งต่อเฉพาะสิ่งที่ตั้งใจจะรองรับ ตามคำแนะนำใน *Design Patterns* (Gamma และคณะ, 1994) ที่ว่า "favor object composition over class inheritance" ถ้าไม่แน่ใจ ให้ถือ collaborator ไว้เป็น field แล้ว delegate เอา Go กับ Rust อบคำแนะนำนี้ไว้ในตัวภาษาแล้ว เพราะไม่มี inheritance ให้ใช้ผิด คุณจึงหยิบ delegation มาใช้โดยปริยาย และความสัมพันธ์ก็ซื่อตรงเสมอ
 </Callout>
 
 export const quizReplaceInh = [

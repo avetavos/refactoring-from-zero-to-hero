@@ -204,17 +204,6 @@ subclass พนักงานสองตัวมีการคำนวณ `
 - [Collapse Hierarchy](/refactoring/th/generalization-and-inheritance/collapse-hierarchy/)
 - [Replace Inheritance with Delegation](/refactoring/th/generalization-and-inheritance/replace-inheritance-with-delegation/)
 
-| ใช้ Pull Up / Push Down เมื่อ | หลีกเลี่ยงเมื่อ |
-|---|---|
-| method เดียวกันปรากฏในหลาย subclass ที่ควร share | method ที่ขึ้นไปที่ superclass ไม่ได้ถูกใช้โดย subclass ทั้งหมด |
-| field ใช้โดย subclass ทุกตัวและควรอยู่ที่เดียว | push down method ที่ยังคงถูกเรียกจาก superclass |
-| behavior เดียวกันต้องการ single point of maintenance | abstraction ยังไม่ชัดเจนพอที่จะดึงขึ้น |
-
-> ⚠️ ไม่ควร Pull Up เมื่อ:
-> - method/field ที่จะดึงขึ้นไม่ได้ใช้โดย subclass ทุกตัว
-> - การดึงขึ้นจะทำให้ superclass รู้เรื่อง subclass มากเกินไป
-> - method มี logic ที่ต่างกันใน subclass แม้จะชื่อเดียวกัน
-
 <Callout title="ดึงขึ้นเฉพาะสิ่งที่ใช้ร่วมกันจริง ๆ เท่านั้น">
 กับดักที่คนตกบ่อยคือดึง method ที่ *เกือบ* เหมือนกันขึ้นไป แล้วเพิ่ม flag มากลบความต่าง นั่นคือการแลก code ซ้ำมาเป็น conditional บน superclass ซึ่งมักเป็นดีลที่แย่กว่าเดิม ให้ดึงขึ้นเฉพาะตอนที่ body ตรงกันเป๊ะ ถ้าแค่คล้ายกัน ให้ค่อย ๆ ทำให้เหมือนกันจริงก่อน แล้วค่อยยกขึ้นไป
 </Callout>

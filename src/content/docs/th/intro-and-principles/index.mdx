@@ -23,7 +23,7 @@ export const loopDiagram = `flowchart LR
 
 code แทบไม่เคยมาถึงมือเราในสภาพสะอาดเรียบร้อย ส่วนใหญ่โตขึ้นมาใต้เส้นตาย โดนแปะแก้โดยคนที่ย้ายงานไปแล้ว และสะสมทางลัดจนไม่มีใครกล้าแตะ **Refactoring** คือวินัยที่ดึงรูปทรงของ code แบบนั้นกลับมาให้อ่านออกและแก้ไหว — *โดยไม่* เปลี่ยนสิ่งที่ผู้ใช้ได้รับ
 
-โมดูลแรกนี้ว่าด้วยแนวคิดที่อยู่เบื้องหลังการลงมือ ส่วนที่เหลือของคอร์สเป็นแคตตาล็อกท่าเฉพาะ แต่ท่าที่ไม่มีหลักการรองรับก็เป็นแค่การแก้แบบเสี่ยงดวง จบบทเรียนทั้งห้านี้แล้วคุณจะบอกได้แม่น ๆ ว่า refactoring คืออะไร อธิบายได้ว่าคุ้มกับเวลาที่เสียไปตรงไหน และทำตามจังหวะที่คุ้มกันคุณไว้ระหว่างลงมือ
+โมดูลแรกนี้ว่าด้วยแนวคิดที่อยู่เบื้องหลังการลงมือ ส่วนที่เหลือของคอร์สเป็นแคตตาล็อกท่าเฉพาะ แต่ท่าที่ไม่มีหลักการรองรับก็เป็นแค่การแก้แบบเสี่ยงดวง จบบทเรียนทั้งสี่นี้แล้วคุณจะบอกได้แม่น ๆ ว่า refactoring คืออะไร อธิบายได้ว่าคุ้มกับเวลาที่เสียไปตรงไหน และทำตามจังหวะที่คุ้มกันคุณไว้ระหว่างลงมือ
 
 ## กฎหนึ่งเดียวที่นิยามวินัยนี้
 
@@ -52,14 +52,14 @@ loop นี้คือจังหวะหัวใจของทุกเร
 
 ## Code Smell → โมดูล
 
-| ประเภท Code Smell | ตัวอย่างที่พบบ่อย | โมดูลที่จัดการ |
+| ประเภท code smell | ตัวอย่างจากแคตตาล็อกของ Fowler (บทที่ 3) | โมดูลที่จัดการ |
 |---|---|---|
-| Function ยาวและซับซ้อน | Long Method, Duplicated Code, Magic Number | [Composing Methods](/refactoring/th/composing-methods/) |
-| Feature อยู่ผิดที่ | Feature Envy, Large Class, Data Clumps | [Moving Features](/refactoring/th/moving-features/) |
+| Function ยาวและซับซ้อน | Long Function, Duplicated Code, Loops | [Composing Methods](/refactoring/th/composing-methods/) |
+| Feature อยู่ผิดที่ | Feature Envy, Large Class, Message Chains | [Moving Features](/refactoring/th/moving-features/) |
 | ข้อมูลไม่มีขอบเขต | Primitive Obsession, Mutable Data, Global Data | [Organizing Data](/refactoring/th/organizing-data/) |
-| API เรียกใช้ยาก | Long Parameter List, Flag Argument, Misleading Name | [Simplifying APIs](/refactoring/th/simplifying-apis/) |
-| เงื่อนไขอ่านยาก | Complex Conditional, Nested If, Null Check | [Simplifying Conditionals](/refactoring/th/simplifying-conditionals/) |
-| Hierarchy ไม่ตรงความจริง | Refused Bequest, Speculative Generality | [Generalization & Inheritance](/refactoring/th/generalization-and-inheritance/) |
+| API เรียกใช้ยาก | Long Parameter List, Data Clumps, Mysterious Name | [Simplifying APIs](/refactoring/th/simplifying-apis/) |
+| เงื่อนไขอ่านยาก | Repeated Switches, เงื่อนไขซ้อนลึก, null check ซ้ำ ๆ | [Simplifying Conditionals](/refactoring/th/simplifying-conditionals/) |
+| Hierarchy ไม่ตรงความจริง | Refused Bequest, Speculative Generality, Lazy Element | [Generalization & Inheritance](/refactoring/th/generalization-and-inheritance/) |
 
 <Callout title="หลักการมาก่อนท่า">
 คุณจะท่องชื่อ refactoring ได้เป็นร้อยท่าแต่ก็ยังพัง codebase ได้อยู่ดี หลักการในโมดูลนี้ — รักษา behavior ก้าวทีละนิด และมีตาข่ายจาก test — คือสิ่งที่เปลี่ยนท่าเหล่านั้นจากการแก้แบบอันตราย ให้กลายเป็นงานกิจวัตรที่น่าเบื่อและ *ปลอดภัย* ความน่าเบื่อนั่นแหละคือเป้าหมาย

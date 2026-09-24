@@ -152,17 +152,6 @@ function แจ้งเตือนที่ boolean เลือกระห�
 - [Rename Function/Variable](/refactoring/th/simplifying-apis/rename-function/)
 - [Replace Constructor with Factory Function](/refactoring/th/simplifying-apis/replace-constructor-with-factory/)
 
-| ใช้ Remove Flag Argument เมื่อ | หลีกเลี่ยงเมื่อ |
-|---|---|
-| boolean เลือกระหว่าง behavior สองแบบ | boolean แค่สลับค่า config ไม่มีการ branch |
-| `true`/`false` ที่ call site อ่านไม่รู้เรื่อง | ทั้งสอง path แชร์ logic ส่วนใหญ่ร่วมกัน |
-| สองแขนงแทบไม่มี code ร่วมกัน | มี flags มากกว่า 1 ตัวซ้อนกัน — Extract Class แทน |
-
-> ⚠️ ไม่ควร Remove Flag Argument เมื่อ:
-> - flag เป็น enum ที่มี 3+ ค่า — แยกแต่ละค่าออกเป็น function อาจสร้าง duplication มากกว่าเดิม
-> - สองแขนง share prep logic มาก — extract helper ก่อนค่อยแยก function
-> - caller ผ่าน flag จาก variable — การแยก function อาจแค่ย้าย if ไปข้างนอก
-
 <Callout title="ให้ชื่อ function ตอบคำถาม">
 flag argument บังคับให้ caller เข้ารหัสการตัดสินใจเป็นข้อมูลที่ผู้อ่านต้องถอดรหัส สอง function ย้ายการตัดสินใจนั้นเข้าไปในชื่อ เพื่อให้ `notifyUrgent("Server down")` อ่านได้เหมือนประโยค จุดเรียกใช้ควรบอกคุณว่าเกิดอะไรขึ้น — ไม่ใช่ทำให้คุณต้องไปค้นหาเอง
 </Callout>

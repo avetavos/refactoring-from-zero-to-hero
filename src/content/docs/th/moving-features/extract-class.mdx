@@ -205,17 +205,6 @@ class หนึ่งค่อย ๆ รับความรับผิดช
 - [Move Field](/refactoring/th/moving-features/move-field/)
 - [Move Function](/refactoring/th/moving-features/move-function/)
 
-| ใช้ Extract Class เมื่อ | หลีกเลี่ยงเมื่อ |
-|---|---|
-| class มี field/method ที่แบ่งออกเป็นกลุ่มได้ชัด | class ใหม่จะมีแค่ 1-2 field และไม่มี behavior |
-| นักพัฒนาต้องรู้เรื่องมากเกินไปเพื่อแก้ class เดียว | กำลัง extract เพื่อ architecture ล่วงหน้าโดยไม่มีเหตุผลปัจจุบัน |
-| test ของ class นี้ซับซ้อนเพราะมีหลาย responsibility | class ที่ extract ออกมาจะยังพึ่งพา class เดิมอยู่มาก |
-
-> ⚠️ ไม่ควร Extract Class เมื่อ:
-> - ยังไม่รู้ว่า responsibility ที่แท้จริงของ class นี้คืออะไร
-> - class ที่ extract จะมี coupling สูงกับ class เดิม — ไม่ได้ลด complexity จริง ๆ
-> - ทำเพื่อให้ "ดูเหมือน" ทำตาม Single Responsibility Principle
-
 <Callout title="เหตุผลเดียวในการเปลี่ยนแปลง">
 class ที่สมบูรณ์ดีมีเหตุผลในการเปลี่ยนแปลงเพียงอย่างเดียว หากคุณสามารถอธิบาย class ได้เพียงโดยการเชื่อมสองวลีด้วยคำว่า "and" — "เก็บตัวตนของบุคคล *และ* จัดรูปแบบหมายเลขโทรศัพท์ของพวกเขา" — คำว่า "and" นั้นคือรอยต่อ แยกตามรอยนั้นแล้วแต่ละ class ใหม่ก็จะได้รับความรับผิดชอบที่ชัดเจนหนึ่งอย่าง
 </Callout>

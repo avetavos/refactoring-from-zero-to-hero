@@ -201,17 +201,6 @@ export const primitiveDiagram = `flowchart LR
 - [Encapsulate Variable](/refactoring/th/organizing-data/encapsulate-variable/)
 - [Replace Type Code with Subclasses](/refactoring/th/organizing-data/replace-type-code-with-subclasses/)
 
-| ใช้ Replace Primitive with Object เมื่อ | หลีกเลี่ยงเมื่อ |
-|---|---|
-| primitive นั้นมี validation หรือ behavior ของตัวเอง | primitive นั้นเป็นค่าทั่วไปที่ไม่มี domain meaning |
-| ต้องการ add method ที่เกี่ยวข้องกับ primitive นั้น | overhead ของ object ไม่คุ้มสำหรับค่าที่ใช้ภายใน |
-| primitive เดิมปรากฏเป็น Data Clumps กับ primitive อื่น | type ใหม่จะมีแค่ getter ไม่มี behavior จริง |
-
-> ⚠️ ไม่ควร Replace Primitive with Object เมื่อ:
-> - primitive นั้นเป็นค่าที่ไม่มีความหมายเฉพาะ domain (เช่น index, count)
-> - ทำให้ serialization ซับซ้อนขึ้นโดยไม่จำเป็น
-> - สร้าง Value Object ที่มีแค่ constructor และ getter — ไม่มี behavior
-
 <Callout title="ตรวจสอบครั้งเดียว ตรงประตู">
 กำไรก้อนใหญ่ที่สุดของ value object คือ constructor เป็นประตูทางเข้าบานเดียว วาง validate ไว้ตรงนั้น แล้วทุก instance ที่มีอยู่จะถูกต้องตั้งแต่วินาทีที่สร้าง ไม่มี caller ตัวไหนถือเบอร์โทรผิดรูปแบบได้เลย เพราะสร้างขึ้นมาไม่ได้ตั้งแต่แรก แล้ว code ส่วนที่เหลือก็เลิกไล่เช็คซ้ำในสิ่งที่ผิดไม่ได้อยู่แล้ว
 </Callout>

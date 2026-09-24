@@ -23,7 +23,7 @@ export const loopDiagram = `flowchart LR
 
 Code rarely arrives clean. It grows under deadlines, gets patched by people who have since moved on, and accumulates clever shortcuts that nobody dares touch. **Refactoring** is the discipline that lets you reshape that code into something you can read and change again — *without* altering what it does for the user.
 
-This first module is about the ideas behind the practice. The rest of the course is a catalog of specific moves, but moves without principles are just risky edits. By the end of these five lessons you will be able to say precisely what refactoring is, defend why it is worth your time, and follow a rhythm that keeps you safe while you do it.
+This first module is about the ideas behind the practice. The rest of the course is a catalog of specific moves, but moves without principles are just risky edits. By the end of these four lessons you will be able to say precisely what refactoring is, defend why it is worth your time, and follow a rhythm that keeps you safe while you do it.
 
 ## The one rule that defines the discipline
 
@@ -49,6 +49,17 @@ That loop is the heartbeat of everything that follows. Big, scary refactorings a
 | [Reading code smells](/refactoring/en/intro-and-principles/reading-code-smells/) | The triggers that tell you *what* to refactor and which move to reach for |
 
 Once you finish here, you are ready for the practical catalog, starting with [Composing Methods](/refactoring/en/composing-methods/).
+
+## Code smell → module
+
+| Kind of code smell | Examples from Fowler's catalogue (ch. 3) | Module that addresses it |
+|---|---|---|
+| Long, tangled functions | Long Function, Duplicated Code, Loops | [Composing Methods](/refactoring/en/composing-methods/) |
+| Features in the wrong place | Feature Envy, Large Class, Message Chains | [Moving Features](/refactoring/en/moving-features/) |
+| Data with no boundary | Primitive Obsession, Mutable Data, Global Data | [Organizing Data](/refactoring/en/organizing-data/) |
+| APIs that are hard to call | Long Parameter List, Data Clumps, Mysterious Name | [Simplifying APIs](/refactoring/en/simplifying-apis/) |
+| Conditionals that are hard to read | Repeated Switches, deep nesting, repeated null checks | [Simplifying Conditionals](/refactoring/en/simplifying-conditionals/) |
+| A hierarchy that no longer tells the truth | Refused Bequest, Speculative Generality, Lazy Element | [Generalization & Inheritance](/refactoring/en/generalization-and-inheritance/) |
 
 <Callout title="Principles before moves">
 You can memorize a hundred named refactorings and still wreck a codebase. The principles in this module — behavior preservation, small steps, and a test safety net — are what turn those moves from dangerous edits into routine, boring, *safe* work. Boring is the goal.

@@ -31,7 +31,7 @@ export const hideDelegateDiagram = `flowchart LR
 
 ## อาการของปัญหา
 
-Hide Delegate รักษา **Inappropriate Intimacy** กับภายในของ class และเป็นหน้าตาภาคปฏิบัติของ **Law of Demeter** คือคุยกับเพื่อนของคุณ ไม่ใช่เพื่อนของเพื่อน สายยาว ๆ อย่าง `a.getB().getC().doIt()` มัดให้ caller ผูกกับความสัมพันธ์สองชั้นที่ไม่มีธุระต้องรู้ ส่วน smell ฝั่งตรงข้ามคือ **Middle Man** คือ class ที่ method เกือบทั้งหมดเขียนว่า "return delegate.something()" ส่งต่อเยอะจนตัวห่อไม่ได้เพิ่มอะไรเลย
+Hide Delegate รักษา **Message Chains** (Fowler บทที่ 3) และเป็นหน้าตาภาคปฏิบัติของ **Law of Demeter** (Lieberherr, Holland และ Riel, OOPSLA 1988) คือคุยกับเพื่อนของคุณ ไม่ใช่เพื่อนของเพื่อน สายยาว ๆ อย่าง `a.getB().getC().doIt()` มัดให้ caller ผูกกับความสัมพันธ์สองชั้นที่ไม่มีธุระต้องรู้ ส่วน smell ฝั่งตรงข้ามคือ **Middle Man** คือ class ที่ method เกือบทั้งหมดเขียนว่า "return delegate.something()" ส่งต่อเยอะจนตัวห่อไม่ได้เพิ่มอะไรเลย
 
 ## ก่อน → หลัง
 
@@ -208,17 +208,6 @@ Hide Delegate รักษา **Inappropriate Intimacy** กับภายใ�
 - [Move Function](/refactoring/th/moving-features/move-function/)
 - [Extract Class](/refactoring/th/moving-features/extract-class/)
 - [Inline Class](/refactoring/th/moving-features/inline-class/)
-
-| ใช้ Hide Delegate เมื่อ | ใช้ Remove Middle Man เมื่อ |
-|---|---|
-| client รู้เรื่อง internal structure มากเกินไป | class กลายเป็น pass-through ทุกอย่าง ไม่มี logic |
-| ต้องการลด coupling ระหว่าง client กับ delegate | การเพิ่ม delegation method ทุก method ของ delegate ไม่คุ้มค่า |
-| การเปลี่ยน delegate ต้องแก้ client หลายจุด | client ที่ต่างกันต้องการ access ที่ต่างกัน |
-
-> ⚠️ รู้จักเวลาที่ต้องสลับทิศทาง:
-> - ถ้า class กำลังซ่อน delegate จนกลายเป็น God Object ให้ Remove Middle Man
-> - ถ้า client ต้อง traverse chain ยาว (`a.b.c.d()`) ให้ Hide Delegate
-> - ทั้งสองเป็น refactoring ที่ตรงข้ามกัน — ใช้ตามที่ pain จริง ๆ บอก
 
 <Callout title="ปุ่มหมุน ไม่ใช่กฎ">
 Hide Delegate กับ Remove Middle Man ชี้คนละทาง และนั่นแหละคือบทเรียน การห่อหุ้มมีต้นทุนเสมอ ซ่อน delegate เมื่อความสัมพันธ์ข้างหลังมีโอกาสเปลี่ยน ถอด middle man ออกเมื่อการส่งต่อไม่ได้อะไรเลย หมุนปุ่มให้ตรงกับความเสถียรจริง ๆ ของโครงสร้าง

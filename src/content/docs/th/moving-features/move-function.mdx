@@ -265,17 +265,6 @@ export const moveFnDiagram = `flowchart LR
 - [Extract Class](/refactoring/th/moving-features/extract-class/)
 - [Hide Delegate and Remove Middle Man](/refactoring/th/moving-features/hide-delegate-and-remove-middle-man/)
 
-| ใช้ Move Function เมื่อ | หลีกเลี่ยงเมื่อ |
-|---|---|
-| function ใช้ data ของ class อื่นมากกว่า class ตัวเอง | function ถูก override ใน subclass |
-| function ต้องถูก call จาก context ที่ต่างกันหลายจุด | การย้ายจะสร้าง circular reference |
-| Feature Envy ชัดเจน — function "สนใจ" class อื่น | function นั้นเป็น core logic ของ class ปัจจุบัน |
-
-> ⚠️ ไม่ควร Move Function เมื่อ:
-> - function เข้าถึง private data ของ class ปัจจุบัน — ย้ายแล้วจะต้องเปิด access
-> - ไม่มีที่ที่เหมาะกว่าให้ย้ายไป — อาจต้องสร้าง class ใหม่แทน
-> - การย้ายทำให้ test เดิมเสีย โดยไม่มีเหตุผลด้าน design ที่ชัดเจน
-
 <Callout title="เดินตามข้อมูล">
 สัญญาณเดียวที่ดีที่สุดว่า function ควรอยู่ที่ไหน คือข้อมูลที่ function แตะ ลองนับ field ที่อ่าน แล้วดูว่า object ไหนเป็นเจ้าของ field เหล่านั้นมากที่สุด object นั้นแหละคือบ้านที่แท้จริง ย้าย behavior ไปหาข้อมูล ไม่ใช่ย้ายข้อมูลไปหา behavior
 </Callout>

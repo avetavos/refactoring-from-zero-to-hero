@@ -204,18 +204,6 @@ function ใบเสร็จตัวนี้คำนวณ subtotal คิ�
 - [Replace Temp with Query](/refactoring/th/composing-methods/replace-temp-with-query/)
 - [Split Phase](/refactoring/th/composing-methods/split-phase/)
 
-| ใช้ Extract Function เมื่อ | หลีกเลี่ยงเมื่อ |
-|---|---|
-| บล็อกนั้นต้องมี comment อธิบาย | ตั้งชื่อที่ดีให้ไม่ได้ — แปลว่ายังแบ่งไม่ถูกที่ |
-| logic เดิมปรากฏมากกว่าหนึ่งที่ | function มีแค่ 1-2 บรรทัดและชื่อไม่ได้อธิบายเพิ่ม |
-| function ยาวจน scroll ไม่ถึงท้าย | extract เพื่อสร้าง abstraction ทั้งที่ยังไม่รู้ว่าจะได้ใช้ |
-| test ล้มเหลวแต่ไม่รู้ว่า logic ไหนผิด | |
-
-> ⚠️ ไม่ควร Extract Function เมื่อ:
-> - ยังไม่มี test — refactor โดยไม่มี safety net คือการเดา
-> - บล็อกนั้นใช้ตัวแปรจากบริบทภายนอกมากเกินสี่ตัว — อาจควร Extract Class แทน
-> - กำลัง extract เพื่อให้ดูเหมือนทำงาน ไม่ใช่เพราะ code อ่านยากจริง ๆ
-
 <Callout title="ตั้งชื่อตามสิ่งที่ทำได้ ไม่ใช่ตามวิธีที่ทำ">
 ชื่อ `loopOverItemsAndAdd` อธิบายกลไก ส่วน `subtotal` อธิบายผลลัพธ์ ตั้งชื่อตาม *ผลลัพธ์* แล้วจุดที่เรียกจะอ่านได้เหมือนประโยค และถ้าวันหลังคุณเปลี่ยน *วิธี* คำนวณ subtotal ชื่อเดิมก็ยังใช้ได้อยู่
 </Callout>

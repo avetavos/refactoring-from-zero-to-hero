@@ -38,8 +38,6 @@ A temperature range that exposes a `width`. Before, the getter reads the fields 
       constructor(private _low: number, private _high: number) {}
       get low(): number { return this._low; }
       get high(): number { return this._high; }
-      set low(v: number) { this._low = v; }
-      set high(v: number) { this._high = v; }
       width(): number {
         return this.high - this.low; // routed through accessors
       }

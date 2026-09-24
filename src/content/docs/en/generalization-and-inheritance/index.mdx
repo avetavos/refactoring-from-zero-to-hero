@@ -36,6 +36,14 @@ The **generalization and inheritance** family moves features *vertically* and *s
 
 Inheritance is powerful and easy to overreach with. Identical methods get copy-pasted into three subclasses. A field lives in the superclass but only half the subclasses touch it. A class extends another just to borrow two helpers and inherits a dozen it must now pretend not to have. Each of these is a hierarchy that no longer tells the truth about how the types relate. The refactorings here straighten the hierarchy out — or dissolve it into delegation when composition fits better.
 
+| Smell (Fowler, ch. 3) | What you notice | Move |
+|---|---|---|
+| Duplicated Code | The same method copy-pasted into sibling subclasses | Pull Up Method / Field |
+| Refused Bequest | A subclass inherits members it has to pretend do not exist | Push Down · Replace Superclass with Delegation |
+| Speculative Generality | A hierarchy built for a future that never arrived | Collapse Hierarchy |
+| Lazy Element | Subclasses whose only difference is a returned constant | Replace Subclass with Fields |
+| Alternative Classes with Different Interfaces | Two classes do the same job with different signatures | Extract Superclass / Interface |
+
 <Mermaid code={overviewDiagram} title="How features move across a hierarchy in this module" />
 
 ## What this module covers

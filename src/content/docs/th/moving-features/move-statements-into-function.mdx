@@ -191,17 +191,6 @@ function ตัวนี้ปล่อย HTML รูปภาพของบ�
 - [Move Function](/refactoring/th/moving-features/move-function/)
 - [Extract Function](/refactoring/th/composing-methods/extract-function/)
 
-| ใช้ Move Statements into Function เมื่อ | หลีกเลี่ยงเมื่อ |
-|---|---|
-| statement เดิมซ้ำทุกครั้งก่อนหรือหลัง call | statement นั้นบางครั้งต้องการ แต่บางครั้งไม่ |
-| statement นั้นเป็นส่วนหนึ่งของ invariant ของ function | caller ที่ต่างกันต้องการ behavior ที่ต่างกันหลัง call |
-| ทุก caller ทำ statement เดิมหลัง call เสมอ | การย้ายเข้าไปจะซ่อน side effect จากผู้อ่าน caller |
-
-> ⚠️ ไม่ควร Move Statements into Function เมื่อ:
-> - มี caller บางตัวที่ไม่ต้องการ statement นั้น
-> - statement นั้นขึ้นกับ state ที่ function ไม่รู้จัก
-> - ต้องการ flexibility ให้ caller เลือก behavior เอง
-
 <Callout title="ย้ายเฉพาะสิ่งที่แชร์กันจริง ๆ">
 เกณฑ์ตัดสินง่ายมาก คือ caller *ทุกตัว* รัน statement นี้เหมือนกันเป๊ะ ติดกับการเรียกหรือเปล่า ถ้าใช่ก็ย้ายเข้าไปได้ แต่ถ้าต้องเพิ่ม boolean มารองรับข้อยกเว้นเมื่อไร ให้หยุดทันที เพราะ statement นั้นไม่ได้ใช้ร่วมกันจริง และควรอยู่ฝั่ง caller ต่อไป
 </Callout>

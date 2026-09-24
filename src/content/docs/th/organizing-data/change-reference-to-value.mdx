@@ -104,7 +104,7 @@ object `Money` ถูกแชร์แบบ reference การ mutate จึ�
         }
     }
 
-    // After — a Copy/Clone value compared by contents
+    // After — a Clone value compared by contents
     #[derive(Clone, PartialEq, Eq)]
     struct Money {
         amount: i64,
@@ -142,17 +142,6 @@ object `Money` ถูกแชร์แบบ reference การ mutate จึ�
 - [Replace Primitive with Object](/refactoring/th/organizing-data/replace-primitive-with-object/)
 - [Encapsulate Variable](/refactoring/th/organizing-data/encapsulate-variable/)
 - [Replace Magic Literal](/refactoring/th/organizing-data/replace-magic-literal/)
-
-| ใช้ Change Reference to Value เมื่อ | หลีกเลี่ยงเมื่อ |
-|---|---|
-| object เป็น immutable และไม่มี shared identity | object ต้องการ update ที่ทุก reference เห็นพร้อมกัน |
-| ต้องการ equality ตาม content ไม่ใช่ identity | object มี lifecycle ที่ต้องจัดการ (open/close) |
-| ต้องการใช้ใน map key หรือ set | หลาย component ต้อง observe การเปลี่ยนแปลงเดียวกัน |
-
-> ⚠️ ไม่ควร Change Reference to Value เมื่อ:
-> - หลายส่วนของระบบต้องเห็น mutation เดียวกันพร้อมกัน
-> - object มีขนาดใหญ่มาก — copying ทุกครั้งแพงเกินไป
-> - object เป็น entity ที่มี identity สำคัญ (เช่น user account, database record)
 
 <Callout title="ถามว่า: การเปลี่ยนแปลงควรถูกเห็นโดยทุกคนไหม?">
 คำถามเดียวนั้นตัดสินทิศทางทั้งหมด ถ้าการอัปเดต object ต้องกระจายไปถึงผู้ถือทุกคน นั่นคือ entity เดียวที่แชร์กัน ให้ใช้ reference แต่ถ้าเนื้อหาเท่ากันแปลว่าเป็นสิ่งเดียวกัน และไม่ควรมีใครเห็นการ mutate ก็ทำให้เป็น value แบบ immutable แล้วเลิกแชร์

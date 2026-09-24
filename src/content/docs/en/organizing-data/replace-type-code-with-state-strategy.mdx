@@ -73,6 +73,7 @@ An `Order` whose `status` string is checked by a `switch` in two methods. After,
       label(): string { return this.state.label(); }
       canCancel(): boolean { return this.state.canCancel(); }
       ship(): void { this.state = Shipped; } // a transition is a swap
+      deliver(): void { this.state = Delivered; }
     }
     ```
   </TabItem>
@@ -121,6 +122,8 @@ An `Order` whose `status` string is checked by a `switch` in two methods. After,
             return self.state.can_cancel()
         def ship(self):
             self.state = Shipped()  # a transition is a swap
+        def deliver(self):
+            self.state = Delivered()
     ```
   </TabItem>
   <TabItem label="Go">
@@ -154,11 +157,16 @@ An `Order` whose `status` string is checked by a `switch` in two methods. After,
     func (shipped) Label() string   { return "On the way" }
     func (shipped) CanCancel() bool { return false }
 
+    type delivered struct{}
+    func (delivered) Label() string   { return "Complete" }
+    func (delivered) CanCancel() bool { return false }
+
     type Order struct{ state OrderState }
-    func NewOrder() *Order          { return &Order{state: pending{}} }
-    func (o *Order) Label() string  { return o.state.Label() }
+    func NewOrder() *Order           { return &Order{state: pending{}} }
+    func (o *Order) Label() string   { return o.state.Label() }
     func (o *Order) CanCancel() bool { return o.state.CanCancel() }
-    func (o *Order) Ship()          { o.state = shipped{} } // swap
+    func (o *Order) Ship()           { o.state = shipped{} }   // a transition is a swap
+    func (o *Order) Deliver()        { o.state = delivered{} }
     ```
   </TabItem>
   <TabItem label="Rust">
@@ -192,13 +200,19 @@ An `Order` whose `status` string is checked by a `switch` in two methods. After,
         fn label(&self) -> &str { "On the way" }
         fn can_cancel(&self) -> bool { false }
     }
+    struct Delivered;
+    impl OrderState for Delivered {
+        fn label(&self) -> &str { "Complete" }
+        fn can_cancel(&self) -> bool { false }
+    }
 
     struct Order { state: Box<dyn OrderState> }
     impl Order {
         fn new() -> Self { Order { state: Box::new(Pending) } }
         fn label(&self) -> &str { self.state.label() }
         fn can_cancel(&self) -> bool { self.state.can_cancel() }
-        fn ship(&mut self) { self.state = Box::new(Shipped); } // swap
+        fn ship(&mut self) { self.state = Box::new(Shipped); } // a transition is a swap
+        fn deliver(&mut self) { self.state = Box::new(Delivered); }
     }
     ```
   </TabItem>

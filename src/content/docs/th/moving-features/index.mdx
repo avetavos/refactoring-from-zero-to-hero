@@ -31,13 +31,15 @@ export const overviewDiagram = `flowchart TD
 
 การตัดสินใจเรื่องซอฟต์แวร์ในวันแรกแทบไม่เคยรอดมาถึงวันที่ร้อย function ที่เคยเป็นของ `Order` ค่อย ๆ เติบโตจนอ่านข้อมูลส่วนใหญ่จาก `Customer` field ที่เพิ่มเข้าไปใน record หนึ่งกลับถูกแตะต้องทุกที่ยกเว้น record นั้น class เล็ก ๆ ค่อย ๆ ดูดซับความรับผิดชอบที่สองเข้ามาอย่างเงียบ ๆ จนกลายเป็นสอง class ที่สวมชื่อเดียวกัน เมื่อ behavior กับข้อมูลที่ต้องใช้อยู่ห่างกัน ทุกการแก้ก็แปลว่าต้องกระโดดไปมาระหว่างไฟล์ ท่าย้ายในโมดูลนี้จะดึงทั้งสองอย่างกลับมาอยู่ด้วยกัน
 
-| Code Smell | อาการที่บ่งชี้ | ท่าที่แนะนำ |
+| Smell (Fowler บทที่ 3) | อาการที่บ่งชี้ | ท่าที่แนะนำ |
 |---|---|---|
 | Feature Envy | function อ้างอิงข้อมูลของ class อื่นมากกว่า class ตัวเอง | Move Function |
-| Data Clumps | field ชุดเดิมเดินทางไปด้วยกันในหลาย function | Move Field |
+| Shotgun Surgery | การเปลี่ยนเล็ก ๆ ครั้งเดียวบังคับให้แก้หลาย class | Move Function / Move Field |
 | Large Class | class ทำสองงานที่ไม่เกี่ยวกัน เปลี่ยนด้านหนึ่งกระทบอีกด้าน | Extract Class |
-| Inappropriate Intimacy | caller เดินตามสาย object เพื่อถึง dependency | Hide Delegate |
-| Middle Man | class ส่งต่อทุก method call โดยไม่เพิ่มค่า | Inline Class |
+| Lazy Element | class ที่ไม่คุ้มค่าที่จะมีอยู่อีกต่อไป | Inline Class |
+| Message Chains | caller เดินตามสาย `a.b.c` เพื่อถึง dependency | Hide Delegate |
+| Middle Man | class ส่งต่อทุก method call โดยไม่เพิ่มค่า | Remove Middle Man |
+| Data Clumps | ค่าชุดเดิมเดินทางไปด้วยกันในหลาย function | Combine Functions into Class |
 
 <Mermaid code={overviewDiagram} title="เลือกการย้ายแบบ moving-features ตามสิ่งที่วางผิดที่" />
 

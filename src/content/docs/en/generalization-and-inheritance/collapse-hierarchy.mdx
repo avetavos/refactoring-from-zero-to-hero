@@ -25,7 +25,7 @@ export const collapseDiagram = `classDiagram
 
 ## The smell
 
-Hierarchies erode. Refactorings pull members up and push them down until a subclass adds almost nothing — maybe one trivial field, maybe an override that now matches the parent. This is **Lazy Class** wearing a subclass costume: an extra type, an extra file, an extra hop for every reader, all to express a distinction that has quietly disappeared. When a subclass and its superclass have become near-twins, the honest move is to make them one.
+Hierarchies erode. Refactorings pull members up and push them down until a subclass adds almost nothing — maybe one trivial field, maybe an override that now matches the parent. This is **Lazy Element** (Fowler, ch. 3; *Lazy Class* in the first edition) wearing a subclass costume: an extra type, an extra file, an extra hop for every reader, all to express a distinction that has quietly disappeared. When a subclass and its superclass have become near-twins, the honest move is to make them one.
 
 ## Before → After
 
@@ -196,7 +196,7 @@ export const quizCollapse = [
   },
   {
     q: 'Which smell does an almost-empty subclass exhibit?',
-    options: ['Feature Envy', 'Lazy Class', 'Long Parameter List', 'Primitive Obsession'],
+    options: ['Feature Envy', 'Lazy Element', 'Long Parameter List', 'Primitive Obsession'],
     answer: 1,
   },
   {

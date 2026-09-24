@@ -135,17 +135,6 @@ caller ถือ object อยู่ในมืออยู่แล้ว แ�
 - [Replace Parameter with Query](/refactoring/th/simplifying-apis/replace-parameter-with-query/)
 - [Parameterize Function](/refactoring/th/simplifying-apis/parameterize-function/)
 
-| ใช้ Preserve Whole Object เมื่อ | หลีกเลี่ยงเมื่อ |
-|---|---|
-| หลาย field ที่แกะมาล้วนมาจาก object เดียวกัน | ต้องการแยก function จาก type นั้นเพื่อ reuse |
-| function น่าจะต้องการ field เพิ่มในภายหลัง | มี circular dependency ถ้าส่ง whole object |
-| รายการ parameter ยาวเพราะ accessor chain | caller ยังไม่มี whole object ต้องสร้างขึ้นมาใหม่ |
-
-> ⚠️ ไม่ควร Preserve Whole Object เมื่อ:
-> - function ที่ถูกเรียกอยู่คนละ layer และไม่ควรรู้จัก type นั้น
-> - ส่ง whole object สร้าง tight coupling ที่ทำให้ test ยากขึ้น
-> - fields ที่ส่งมาไม่ได้อยู่ใน object เดียวกันจริง ๆ
-
 <Callout title="Whole object vs parameter object">
 Preserve Whole Object นำ object ที่คุณมีอยู่แล้วกลับมาใช้ ส่วน Introduce Parameter Object คิดค้น type *ใหม่* ขึ้นมาเพื่อมัด argument ที่ก่อนหน้านี้ไม่มีที่อยู่ ทั้งสองต่างก็หดรายการ argument — เลือก object ที่มีอยู่เมื่อมีตัวหนึ่งจัดกลุ่มค่าให้แล้ว และเลือก type ใหม่เมื่อไม่มีอะไรทำหน้าที่นั้น
 </Callout>

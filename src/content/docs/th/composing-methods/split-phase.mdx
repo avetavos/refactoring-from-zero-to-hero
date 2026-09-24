@@ -199,17 +199,6 @@ function ตัวนี้ parse string `"name:qty:price"` ดิบ ๆ แล
 - [Extract Function](/refactoring/th/composing-methods/extract-function/)
 - [Replace Temp with Query](/refactoring/th/composing-methods/replace-temp-with-query/)
 
-| ใช้ Split Phase เมื่อ | หลีกเลี่ยงเมื่อ |
-|---|---|
-| function ทำสองขั้นตอนที่แยกกันชัดเจน | สองขั้นตอนนั้นพันกันจนแยกไม่ได้ง่าย |
-| data ที่ phase แรกสร้างขึ้น ถูกใช้โดย phase สอง | แต่ละ phase มีแค่ 2-3 บรรทัด — overhead ไม่คุ้ม |
-| ต้องการ test แต่ละ phase แยกกัน | กำลัง optimize performance — การแยก phase อาจเพิ่ม pass |
-
-> ⚠️ ไม่ควร Split Phase เมื่อ:
-> - function นั้นทำขั้นตอนเดียวที่ชัดเจน — การแยกจะสร้าง complexity ไม่จำเป็น
-> - สองส่วนแชร์ state เยอะเกินไปจนต้องส่ง parameter มากมาย
-> - ทีมยังไม่คุ้นกับ data-transfer object pattern
-
 <Callout title="โครงสร้างกลางคือหัวใจทั้งหมด">
 การแยกจะคุ้มค่าก็ต่อเมื่อข้อมูลที่ส่งผ่านระหว่าง phase นั้นชัดเจนและมีชื่อดี ถุงคลุมเครือของตัวแปรที่เหลือ ๆ ไม่ดีไปกว่าความยุ่งเหยิงที่คุณเริ่มต้นมา ออกแบบ type กลางให้อธิบายได้แม่นยำว่า phase หนึ่งสร้างอะไรและ phase สองต้องการอะไร — ไม่มากไปกว่านั้น
 </Callout>

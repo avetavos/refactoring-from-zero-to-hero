@@ -208,17 +208,6 @@ export const typeCodeDiagram = `flowchart TD
 - [Replace Magic Literal](/refactoring/th/organizing-data/replace-magic-literal/)
 - [Replace Primitive with Object](/refactoring/th/organizing-data/replace-primitive-with-object/)
 
-| ใช้ Replace Type Code with Subclasses เมื่อ | หลีกเลี่ยงเมื่อ |
-|---|---|
-| แต่ละ type มี behavior ที่แตกต่างกันชัดเจน | type เปลี่ยนได้ใน runtime — ใช้ State pattern แทน |
-| ต้องการ polymorphism แทน switch statement | object ต้องการเป็นหลาย type พร้อมกัน |
-| type ใหม่จะเพิ่มขึ้นบ่อย | subclass hierarchy จะ combine กับ hierarchy อื่น |
-
-> ⚠️ ไม่ควร Replace Type Code with Subclasses เมื่อ:
-> - type เปลี่ยนได้หลัง object ถูกสร้าง — ต้องใช้ State แทน
-> - subclass จะมีแค่ data ต่างกัน ไม่มี behavior ต่างกัน — ใช้ parameter แทน
-> - สร้าง class hierarchy ที่ลึกเกินไป ทำให้ navigate ยาก
-
 <Callout title="ชนิดคงที่ → subclass; ชนิดเปลี่ยนแปลง → State">
 คำถามที่ตัดสินคือชนิดสามารถเปลี่ยนได้หลังจาก object ถือกำเนิดหรือไม่ บทบาทของพนักงานคงที่พอที่จะเป็น class ได้ ส่วนสถานะของออเดอร์พลิกไปพลิกมาครั้งแล้วครั้งเล่า ดังนั้นจึงต้องเป็นข้อมูลที่ object ถือไว้ ไม่ใช่ class ที่ *เป็น* ใช้ Subclasses สำหรับกรณีแรก และแพตเทิร์น State สำหรับกรณีหลัง
 </Callout>

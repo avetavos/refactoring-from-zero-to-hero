@@ -108,17 +108,6 @@ inline ตัวแปรเมื่อชื่อไม่ได้ให้�
 - [Inline Function](/refactoring/th/composing-methods/inline-function/)
 - [Replace Temp with Query](/refactoring/th/composing-methods/replace-temp-with-query/)
 
-| ใช้ Inline Variable เมื่อ | หลีกเลี่ยงเมื่อ |
-|---|---|
-| variable name ไม่ได้อธิบายดีกว่า expression | expression ซับซ้อน — variable ช่วยให้อ่านง่าย |
-| variable ใช้แค่ครั้งเดียว ทันทีหลัง assign | ต้องการ debug — variable ทำให้เห็นค่ากลาง |
-| กำลัง refactor และ variable กลายเป็น noise | expression มี side effect |
-
-> ⚠️ ไม่ควร Inline Variable เมื่อ:
-> - expression นั้นใช้หลายจุด — inline แล้วจะ evaluate ซ้ำ
-> - ชื่อ variable บอก business intent ที่ expression ไม่บอก
-> - expression มี side effect ที่ต้องรันแค่ครั้งเดียว
-
 <Callout title="คำพ้องความหมายไม่ใช่คำอธิบาย">
 ตัวแปรจะคุ้มที่ที่กินไปก็ต่อเมื่อบอกบางอย่างที่ expression ไม่ได้บอก ถ้า `total` แปลว่า `a + b` แล้วใช้ในบรรทัดถัดไปทันที ชื่อนั้นเพิ่มงานค้นหา ไม่ได้เพิ่มความเข้าใจ เก็บชื่อที่อธิบายอะไรได้จริงไว้ ส่วนชื่อที่เป็นแค่การพูดซ้ำก็ inline ทิ้ง
 </Callout>

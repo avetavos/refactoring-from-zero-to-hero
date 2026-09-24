@@ -150,17 +150,6 @@ function คืน `-1` แปลว่า "ไม่พบ" คืน `null` �
 - [Introduce Assertion](/refactoring/th/simplifying-conditionals/introduce-assertion/)
 - [Replace Nested Conditional with Guard Clauses](/refactoring/th/simplifying-conditionals/replace-nested-conditional-with-guard-clauses/)
 
-| ใช้ Replace Error Code with Exception เมื่อ | หลีกเลี่ยงเมื่อ |
-|---|---|
-| sentinel value ดูเหมือนค่าปกติและถูกมองข้ามได้ง่าย | "หายไป" เป็น expected case ปกติ — ใช้ Special Case แทน |
-| ต้องการให้ failure ไม่สามารถถูก ignore ได้ | ใช้ exception สำหรับ control flow ปกติ ทำให้ code ช้า |
-| caller ทุกรายต้องจัดการ failure ไม่ใช่แค่บางราย | function เดียวกันผสมทั้ง exception และ sentinel |
-
-> ⚠️ ไม่ควร Replace Error Code with Exception เมื่อ:
-> - failure นั้นเป็น normal expected case — exception มี cost และทำให้ trace ยาก
-> - ภาษาใช้ `Result`/`error` เป็น convention แล้ว — นำ exception เข้ามาสร้าง inconsistency
-> - ผสม exception กับ sentinel ใน function เดียวกัน — เพิ่มช่องทางที่ caller ทำผิดสองเท่า
-
 <Callout title="exception ในบางภาษา, error ที่ชัดเจนในภาษาอื่น">
 "Replace Error Code with Exception" ถูกตั้งชื่อตามภาษาที่มี exception Go และ Rust จงใจไม่ใช้ exception สำหรับความล้มเหลวธรรมดา — ที่นั่นแนวคิดเดียวกันหมายถึงการคืน error หรือ Result ที่ชัดเจน เพื่อให้ความล้มเหลวอยู่ใน type signature หลักการคงที่เสมอ: sentinel ที่ caller มองข้ามได้เงียบ ๆ ควรถูกแทนที่ด้วยช่องทางความล้มเหลวที่พวกเขามองข้ามไม่ได้
 </Callout>

@@ -184,17 +184,6 @@ smell คือ getter ที่คืน **collection ตัวจริงท�
 - [Replace Primitive with Object](/refactoring/th/organizing-data/replace-primitive-with-object/)
 - [Replace Magic Literal](/refactoring/th/organizing-data/replace-magic-literal/)
 
-| ใช้ Encapsulate Collection เมื่อ | หลีกเลี่ยงเมื่อ |
-|---|---|
-| client สามารถ mutate collection โดยตรงโดยไม่ผ่าน class | class นั้นเป็น simple data holder ที่ไม่มี invariant |
-| ต้องการ enforce business rule เมื่อ add/remove | overhead ของ getter/setter ไม่คุ้มสำหรับ internal data |
-| ต้องการ observe การเปลี่ยนแปลง collection | collection เป็น read-only อยู่แล้ว |
-
-> ⚠️ ไม่ควร Encapsulate Collection เมื่อ:
-> - collection เป็น private และไม่มีทางที่ external code จะ access โดยตรง
-> - class เป็นแค่ DTO — ไม่มี business logic ที่ต้องปกป้อง
-> - ทำเพื่อ OOP แต่ไม่มี invariant จริง ๆ ที่ต้องรักษา
-
 <Callout title="getter ที่คืนค่าลิสต์สดคือการโกหก">
 ถ้า getter ยังคืน container ตัวจริงออกไป method add และ remove ก็เป็นแค่ฉากละคร เพราะ caller เมินแล้วไปแก้ list ตรง ๆ ได้สบาย การห่อหุ้มจะอยู่รอดก็ต่อเมื่อการอ่านคืนสำเนาหรือ read-only view เท่านั้น method จึงจะเป็นทาง *เดียว* ที่เปลี่ยนเนื้อหาได้
 </Callout>

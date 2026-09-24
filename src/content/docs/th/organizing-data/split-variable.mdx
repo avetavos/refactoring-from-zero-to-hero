@@ -120,17 +120,6 @@ smell คือ **ตัวแปรที่ถูกกำหนดค่า�
 - [Replace Magic Literal](/refactoring/th/organizing-data/replace-magic-literal/)
 - [Rename Field](/refactoring/th/organizing-data/rename-field/)
 
-| ใช้ Split Variable เมื่อ | หลีกเลี่ยงเมื่อ |
-|---|---|
-| variable ถูก reassign เพื่อใช้งานที่ต่างกัน | variable เป็น loop counter ที่ชัดเจน (`i`, `j`) |
-| ชื่อ variable ไม่สามารถสื่อ intent ได้ชัดเจน | ทั้งสองค่าเกี่ยวข้องกันแน่นและ split แล้วสับสนกว่า |
-| tracking bug พบว่า variable มีหลายความหมาย | split จะเพิ่ม variable ที่ used-once และทิ้งทันที |
-
-> ⚠️ ไม่ควร Split Variable เมื่อ:
-> - loop variable ที่ทุกคนรู้ว่า `i` หมายถึงอะไร
-> - accumulator ที่ชัดเจนว่าสะสมค่าเดียวกันตลอด
-> - split แล้วต้องส่งผ่านหลาย scope ทำให้ซับซ้อนขึ้น
-
 <Callout title="หนึ่งชื่อ หนึ่งความหมาย หนึ่งการกำหนดค่า">
 ตัวแปร local ที่สะอาดที่สุดคือตัวที่กำหนดค่าครั้งเดียวแล้วไม่แตะอีกเลย เมื่อไรที่คุณจับได้ว่ากำลังกำหนดค่าใหม่ให้ตัวแปรเพื่อเก็บค่าคนละชนิด นั่นคือสัญญาณว่าจริง ๆ แล้วมีตัวแปรสองตัว และแต่ละตัวสมควรได้ชื่อของตัวเอง
 </Callout>

@@ -31,15 +31,15 @@ export const overviewDiagram = `flowchart TD
 
 logic เงื่อนไขที่ซับซ้อนเป็นหนึ่งในสัญญาณที่ดังที่สุดว่า function นั้นดูแลรักษายาก สัญญาณเตือนก็คุ้นหน้าคุ้นตา ได้แก่ boolean expression ที่ยาวจนต้องอ่านสองรอบ ลูกศรของบล็อก `if` ที่ซ้อนกันไล่ออกไปทางขอบขวาของจอ การ `switch` บน field "type" ที่ทำซ้ำในห้า function และ `if (x == null)` ที่กระจายอยู่ในทุก method ที่แตะต้อง `x` แต่ละอย่างมีวิธีแก้ที่มีชื่อเฉพาะ และวิธีแก้แต่ละแบบทำให้ behavior เหมือนเดิมทุกประการ แต่ทำให้เจตนาชัดเจนขึ้น
 
-| Code Smell | อาการที่บ่งชี้ | ท่าที่แนะนำ |
+| อาการ | อาการที่บ่งชี้ | ท่าที่แนะนำ |
 |---|---|---|
-| Complex Conditional | expressionboolean ยาวที่ต้องอ่านสองรอบเพื่อถอดรหัส | Decompose Conditional |
-| Duplicated Conditional | การตรวจสอบหลายอันนำไปสู่ผลลัพธ์เดียวกัน | Consolidate Conditional Expression |
-| Nested Conditional | `if/else` ซ้อนลึกจนหา happy path ไม่เจอ | Replace Nested Conditional with Guard Clauses |
-| Switch Statement | type switch ตัวเดียวกันซ้ำใน function หลายตัว | Replace Conditional with Polymorphism |
-| Null Check | `if (x == null)` เดิมซ้ำในทุก method ที่แตะ `x` | Introduce Special Case |
-| Control Flag | boolean ที่มีไว้เพียงเพื่อบังคับ loop | Replace Control Flag with Break/Return |
-| Error Code | sentinel value สำหรับรายงานความล้มเหลว ถูกมองข้ามได้ง่าย | Replace Error Code with Exception |
+| Complex conditional | expression boolean ยาวที่ต้องอ่านสองรอบเพื่อถอดรหัส | Decompose Conditional |
+| Duplicated conditional | การตรวจสอบหลายอันนำไปสู่ผลลัพธ์เดียวกัน | Consolidate Conditional Expression |
+| Nested conditional | `if/else` ซ้อนลึกจนหา happy path ไม่เจอ | Replace Nested Conditional with Guard Clauses |
+| Repeated Switches (Fowler บทที่ 3) | type switch ตัวเดียวกันซ้ำใน function หลายตัว | Replace Conditional with Polymorphism |
+| Null check | `if (x == null)` เดิมซ้ำในทุก method ที่แตะ `x` | Introduce Special Case |
+| Control flag | boolean ที่มีไว้เพียงเพื่อบังคับ loop | Replace Control Flag with Break/Return |
+| Error code | sentinel value สำหรับรายงานความล้มเหลว ถูกมองข้ามได้ง่าย | Replace Error Code with Exception |
 
 <Mermaid code={overviewDiagram} title="การเลือกท่า simplifying-conditionals ตามสิ่งที่ผิดปกติ" />
 

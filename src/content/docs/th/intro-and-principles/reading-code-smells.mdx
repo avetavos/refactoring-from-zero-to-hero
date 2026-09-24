@@ -25,20 +25,20 @@ export const smellDiagram = `flowchart LR
 
 ## ภาพรวมแคตตาล็อก
 
-นี่คือ smell ที่คุณจะเจอบ่อยที่สุด แต่ละตัวจับคู่กับ refactoring ที่คอร์สนี้สอนไว้แก้ ใช้ตารางนี้เป็นแผนที่ พอรู้สึกว่ามีอะไรผิดปกติ ให้ตั้งชื่อ smell ให้ได้ก่อน แล้วค่อยเปิดดูท่าที่ใช้แก้
+นี่คือ smell ที่คุณจะเจอบ่อยที่สุด แต่ละตัวจับคู่กับ refactoring ที่คอร์สนี้สอนไว้แก้ ใช้ตารางนี้เป็นแผนที่ พอรู้สึกว่ามีอะไรผิดปกติ ให้ตั้งชื่อ smell ให้ได้ก่อน แล้วค่อยเปิดดูท่าที่ใช้แก้ ชื่อ smell ทั้งหมดมาจากแคตตาล็อกใน *Refactoring* ของ Fowler (พิมพ์ครั้งที่ 2, 2018) บทที่ 3 "Bad Smells in Code" ซึ่งเขียนร่วมกับ Kent Beck
 
 | Smell | สิ่งที่คุณสังเกตเห็น | คอร์สนี้แก้ไว้ที่ไหน |
 | --- | --- | --- |
 | **Long Function** | function ที่ยาวเลื่อนพ้นหน้าจอและทำหลายสิ่ง | [Composing Methods](/refactoring/th/composing-methods/) — [Extract Function](/refactoring/th/composing-methods/extract-function/) |
 | **Duplicated Code** | ชิ้นส่วนเดียวกันปรากฏในสองที่หรือมากกว่า | [Extract Function](/refactoring/th/composing-methods/extract-function/) และ [Moving Features](/refactoring/th/moving-features/) |
-| **Mysterious Name** | ตัวแปรหรือ function ที่ชื่อซ่อนจุดประสงค์ไว้ | [Extract Variable](/refactoring/th/composing-methods/extract-variable/) |
+| **Mysterious Name** | ตัวแปร function หรือ field ที่ชื่อซ่อนจุดประสงค์ไว้ | [Rename Function/Variable](/refactoring/th/simplifying-apis/rename-function/), [Rename Field](/refactoring/th/organizing-data/rename-field/), [Extract Variable](/refactoring/th/composing-methods/extract-variable/) |
 | **Large Class** | class ที่กักตุน field และความรับผิดชอบไว้มากเกินไป | [Moving Features](/refactoring/th/moving-features/) |
 | **Long Parameter List** | การเรียกที่มี argument มากมายจนคุณตามไม่ทัน | [Simplifying APIs](/refactoring/th/simplifying-apis/) |
 | **Feature Envy** | method ที่สนใจข้อมูลของ object อื่นมากกว่าของตัวเอง | [Moving Features](/refactoring/th/moving-features/) |
 | **Primitive Obsession** | string และ number เปล่า ๆ ที่ถูกใช้แทนแนวคิดจริง | [Organizing Data](/refactoring/th/organizing-data/) |
 | **Shotgun Surgery** | การเปลี่ยนแปลงเล็ก ๆ หนึ่งครั้งบังคับให้ต้องแก้กระจัดกระจายไปทั่วหลายไฟล์ | [Moving Features](/refactoring/th/moving-features/) |
-| **Tangled Conditionals** | การแตกแขนงที่ซ้อนลึกหรือซ้ำกันจนซ่อน logic ไว้ | [Simplifying Conditionals](/refactoring/th/simplifying-conditionals/) |
-| **Temporary Field / Inheritance Misuse** | สถานะที่ถูกใช้เพียงบางครั้ง หรือลำดับชั้นที่ขัดขากับคุณ | [Generalization & Inheritance](/refactoring/th/generalization-and-inheritance/) |
+| **Repeated Switches** | switch หรือการแตกแขนงซ้อนลึกที่ซ้ำกันจนซ่อน logic ไว้ | [Simplifying Conditionals](/refactoring/th/simplifying-conditionals/) |
+| **Refused Bequest / Temporary Field** | subclass ที่ไม่ยอมรับสิ่งที่ inherit มา หรือสถานะที่ถูกใช้เพียงบางครั้ง | [Generalization & Inheritance](/refactoring/th/generalization-and-inheritance/) |
 
 ## ตัวอย่าง smell สั้น ๆ
 
@@ -118,17 +118,6 @@ export const smellDiagram = `flowchart LR
 - [ทำไมและเมื่อไหร่ควร refactor](/refactoring/th/intro-and-principles/why-and-when/)
 - [ก้าวเล็ก ๆ และ test](/refactoring/th/intro-and-principles/small-steps-and-tests/)
 - [Composing Methods](/refactoring/th/composing-methods/)
-
-| Refactor เมื่อ | หลีกเลี่ยงเมื่อ |
-|---|---|
-| เห็น Code Smell ที่ชัดเจนและตั้งชื่อได้ | ยังไม่มี test รองรับ |
-| ต้องการ add feature ในพื้นที่นั้น | deadline กำลังจะมาถึงและ feature ยังไม่พร้อม |
-| code ทำให้ review ยากและทีมถามซ้ำ ๆ | code นั้นยังไงก็กำลังจะลบทิ้ง |
-
-> ⚠️ ไม่ควร Refactor เมื่อ:
-> - ยังไม่รู้ว่า code นั้นทำอะไรจริง ๆ — อ่านให้เข้าใจก่อน
-> - ไม่มี test และ refactoring จะเปลี่ยน behavior โดยไม่รู้ตัว
-> - refactor เพราะความรู้สึก ไม่ใช่เพราะ smell จริง ๆ
 
 <Callout title="ตั้งชื่อ smell ก่อนหยิบท่ามาใช้">
 อย่า refactor เพราะความรู้สึกลอย ๆ พอ code เริ่มกวนใจ ให้ตั้งชื่อ smell ก่อน เช่น "อันนี้ Long Function" หรือ "นั่น Duplicated Code" การตั้งชื่อจะบอกเองว่า refactoring ไหนเหมาะ และบังคับให้คุณซื่อสัตย์กับตัวเองว่าการแก้ครั้งนี้คุ้มจะทำตอนนี้หรือเปล่า

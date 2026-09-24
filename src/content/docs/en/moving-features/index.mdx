@@ -31,6 +31,16 @@ The **moving features** family is about *location*. The composing-methods moves 
 
 Software decisions made on day one rarely survive contact with day one hundred. A function that once belonged on `Order` slowly grows to read mostly from `Customer`. A field added to a record gets touched everywhere except that record. A small class quietly absorbs a second responsibility until it is two classes wearing one name. When behaviour and the data it depends on drift apart, every change means hopping between files. The moves in this module pull them back together.
 
+| Smell (Fowler, ch. 3) | What you notice | Move |
+|---|---|---|
+| Feature Envy | A function reads another class's data more than its own | Move Function |
+| Shotgun Surgery | One small change forces edits in several classes | Move Function / Move Field |
+| Large Class | A class doing two unrelated jobs; changing one side breaks the other | Extract Class |
+| Lazy Element | A class that no longer earns its keep | Inline Class |
+| Message Chains | Callers walk `a.b.c` to reach a dependency | Hide Delegate |
+| Middle Man | A class that forwards every call and adds nothing | Remove Middle Man |
+| Data Clumps | The same bundle of values travels through many functions | Combine Functions into Class |
+
 <Mermaid code={overviewDiagram} title="Choosing a moving-features move by what is misplaced" />
 
 ## What this module covers

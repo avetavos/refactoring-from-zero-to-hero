@@ -32,6 +32,14 @@ The **organizing data** family is about the *shape* of the values a program carr
 
 Tangled data shows up in small, recurring ways. The same literal appears in five files and nobody remembers what it means. A list field gets handed out and a distant caller `push`es into it, breaking an invariant the owner never agreed to. A phone number lives as a `string`, so every validation and every reformat is copy-pasted at each use site. None of these are dramatic, but together they make the codebase brittle: a change to *how* data is stored ripples through every place that read it directly.
 
+| Smell (Fowler, ch. 3) | What you notice | Move |
+|---|---|---|
+| Primitive Obsession | A primitive that keeps attracting validation and formatting | Replace Primitive with Object |
+| Mysterious Name | An unnamed literal like `0.07` repeated across files | Replace Magic Literal |
+| Mutable Data | A list field mutated from outside, breaking an invariant | Encapsulate Collection |
+| Global Data | A variable read and written from everywhere with no control point | Encapsulate Variable |
+| Repeated Switches | The same switch on a type code scattered across functions | Replace Type Code with Subclasses |
+
 <Mermaid code={overviewDiagram} title="Choosing an organizing-data move by what is wrong" />
 
 ## What this module covers

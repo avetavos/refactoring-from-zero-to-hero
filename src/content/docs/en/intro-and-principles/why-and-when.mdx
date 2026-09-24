@@ -28,7 +28,7 @@ Refactoring does not add features and does not delight users directly, so it is 
 
 ## Technical debt
 
-A useful way to think about messy code is **technical debt**. When you take a shortcut to ship faster, you borrow against the future: the code works now, but it is harder to change. Like financial debt, it charges *interest* — every future change in that area costs a little more than it should.
+A useful way to think about messy code is **technical debt** — a metaphor Ward Cunningham coined in his [1992 OOPSLA experience report](https://c2.com/doc/oopsla92.html). When you take a shortcut to ship faster, you borrow against the future: the code works now, but it is harder to change. Like financial debt, it charges *interest* — every future change in that area costs a little more than it should.
 
 A small, deliberate loan can be smart; it gets a feature out the door. The danger is never paying it down. Ignored, the interest compounds until a one-line change takes a week. Refactoring is how you repay the principal and stop the interest.
 
@@ -38,13 +38,15 @@ A small, deliberate loan can be smart; it gets a feature out the door. The dange
 
 > Always leave the code a little cleaner than you found it.
 
+Robert C. Martin popularised this as the *Boy Scout Rule* in *Clean Code* (2008) and in *97 Things Every Programmer Should Know* (2010).
+
 You do not need a dedicated "refactoring sprint." The most sustainable improvement comes from tiny acts of tidying woven into normal work: rename one confusing variable, extract one tangled block, delete one dead branch each time you pass through. The codebase trends toward clean without anyone ever scheduling it.
 
 ## The three occasions to refactor
 
-In practice, good refactoring is *opportunistic* — it rides along with work you were already doing. There are three natural moments:
+In practice, good refactoring is *opportunistic* — it rides along with work you were already doing. Fowler (*Refactoring*, 2nd ed., ch. 2, "When Should We Refactor?") names three natural moments:
 
-- **Preparatory refactoring** — *"make the change easy, then make the easy change."* Before adding a feature, reshape the surrounding code so the feature drops in cleanly. You are about to read this code anyway; spend a few minutes making it ready.
+- **Preparatory refactoring** — *"make the change easy, then make the easy change"* (Kent Beck, 2012). Before adding a feature, reshape the surrounding code so the feature drops in cleanly. You are about to read this code anyway; spend a few minutes making it ready.
 - **Comprehension refactoring** — when you finally understand a confusing piece of code, encode that understanding back into it. Rename things, extract the part you just figured out, so the next reader does not have to repeat your struggle.
 - **Litter-pickup refactoring** — you spot some unrelated mess while passing through. If it is small, fix it on the spot. If it is large, note it and come back; do not let a cleanup balloon into an unreviewable diff.
 

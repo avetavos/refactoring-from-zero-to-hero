@@ -169,19 +169,8 @@ function ตัวนี้สแกนคะแนน คืนค่าสู�
 - [Replace Parameter with Query](/refactoring/th/simplifying-apis/replace-parameter-with-query/)
 - [Rename Function/Variable](/refactoring/th/simplifying-apis/rename-function/)
 
-| ใช้ Separate Query from Modifier เมื่อ | หลีกเลี่ยงเมื่อ |
-|---|---|
-| function คืนค่าพร้อมกับมี side effect | operation นั้นเป็น atomic โดยธรรมชาติ เช่น `pop` |
-| ต้องการ query ใน assertion หรือ test โดยไม่ trigger side effect | การแยกทำให้ต้องคำนวณซ้ำแบบ expensive |
-| side effect ซ่อนอยู่และ caller ไม่รู้ | แยกแล้วมี race condition ที่ atomic เคยป้องกัน |
-
-> ⚠️ ไม่ควร Separate Query from Modifier เมื่อ:
-> - operation นั้น atomic โดยเจตนา เช่น `compare-and-swap`, `pop`, `dequeue`
-> - การคำนวณ query ซ้ำมี cost สูงและ caching ซับซ้อน
-> - แยกแล้วเปิดช่องให้ caller เรียก query แต่ลืมเรียก command ทำให้ data ไม่สอดคล้อง
-
 <Callout title="Command-Query Separation">
-การรีแฟกเตอร์นี้คือรูปแบบเชิงปฏิบัติของหลักการ Command-Query Separation: method หนึ่งควรเปลี่ยนสถานะหรือคืนผลลัพธ์อย่างใดอย่างหนึ่ง แต่ไม่ใช่ทั้งสองอย่าง เมื่อคุณเชื่อใจได้ว่า query ปราศจากผลข้างเคียง คุณก็อ่าน code ได้โดยไม่ต้องกลัวว่าการเหลือบมองจะไปกระตุ้นการเปลี่ยนแปลง
+การรีแฟกเตอร์นี้คือรูปแบบเชิงปฏิบัติของหลักการ Command-Query Separation ของ Bertrand Meyer (*Object-Oriented Software Construction*, 1988): method หนึ่งควรเปลี่ยนสถานะหรือคืนผลลัพธ์อย่างใดอย่างหนึ่ง แต่ไม่ใช่ทั้งสองอย่าง เมื่อคุณเชื่อใจได้ว่า query ปราศจากผลข้างเคียง คุณก็อ่าน code ได้โดยไม่ต้องกลัวว่าการเหลือบมองจะไปกระตุ้นการเปลี่ยนแปลง
 </Callout>
 
 export const quizSeparate = [

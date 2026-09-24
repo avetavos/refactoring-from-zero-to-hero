@@ -155,17 +155,6 @@ export const flagDiagram = `flowchart LR
 - [Decompose Conditional](/refactoring/th/simplifying-conditionals/decompose-conditional/)
 - [Consolidate Conditional Expression](/refactoring/th/simplifying-conditionals/consolidate-conditional/)
 
-| ใช้ Replace Control Flag with Break/Return เมื่อ | หลีกเลี่ยงเมื่อ |
-|---|---|
-| boolean มีไว้เพื่อควบคุม loop เท่านั้น | flag ยังถูกใช้หลัง loop เพื่อรายงานผล |
-| `while (!found)` อ่านยากกว่า `return true` ตรงจุด | การแทนที่ทำให้มี break/return หลายจุดในซ้อนที่ลึก |
-| loop สามารถเปลี่ยนเป็น built-in (`any`, `find`) ได้ | team มีนโยบาย single exit point ต่อ function |
-
-> ⚠️ ไม่ควร Replace Control Flag with Break/Return เมื่อ:
-> - flag ทำสองหน้าที่: หยุด loop และบันทึกผล — ต้องแยกออกก่อน
-> - การลบ flag ทำให้มี `break`/`return` กระจายในซ้อนที่ลึกมาก — ให้ flatten loop ด้วย guard clauses ก่อน
-> - ภาษา/style guide ของ team บังคับ single return point
-
 <Callout title="หนึ่ง flag หนึ่งงาน">
 control flag ที่ถูกอ่านหลัง loop ด้วย กำลังทำสองงานพร้อมกัน คือจบ loop และรายงานผล ให้แยกสองงานนี้ออกจากกัน ปล่อยให้ loop ออกด้วย break หรือ return แล้วคำนวณค่าที่จะรายงานจากผลของ loop ไม่ใช่จากตัวแปรที่คุณคอย mutate ไปเรื่อย ๆ
 </Callout>

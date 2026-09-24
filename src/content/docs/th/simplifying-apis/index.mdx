@@ -31,13 +31,13 @@ export const overviewDiagram = `flowchart TD
 
 โดยทั่วไปคุณจะรู้สึกได้ถึง interface ที่ไม่ดีตรงจุดเรียกใช้ คุณหรี่ตามองรายการ argument แล้วจำไม่ได้ว่า `true` ตัวไหนหมายถึงอะไร คุณเจอ function สองตัวที่เหมือนกันเก้าสิบเปอร์เซ็นต์และต่างกันแค่ตัวเลขที่ฝังไว้ตายตัว คุณส่งค่าสามตัวเดิมไปด้วยกันเรื่อย ๆ ในลำดับเดิม ให้กับทุก function ในโมดูล สิ่งเหล่านี้ไม่ใช่บั๊ก เพราะ code ก็ทำงานได้ แต่แต่ละอย่างเก็บภาษีจากทุกคนที่อ่านจุดเรียกใช้
 
-| Code Smell | อาการที่บ่งชี้ | ท่าที่แนะนำ |
+| Smell (Fowler บทที่ 3) | อาการที่บ่งชี้ | ท่าที่แนะนำ |
 |---|---|---|
 | Long Parameter List | parameter เกิน 3-4 ตัว หรือชุดเดิมปรากฏในหลาย function | Introduce Parameter Object |
 | Flag Argument | boolean ที่ call site — `true` ตัวนี้หมายถึงอะไรกันแน่? | Remove Flag Argument |
 | Duplicated Code | function สองตัวที่ต่างกันแค่ค่า literal เดียว | Parameterize Function |
 | Feature Envy | caller แกะหลาย field จาก object เพียงเพื่อส่งต่อ | Preserve Whole Object |
-| Misleading Name | ต้องเปิด implementation เพื่อรู้ว่า function ทำอะไร | Rename Function |
+| Mysterious Name | ต้องเปิด implementation เพื่อรู้ว่า function ทำอะไร | Rename Function |
 
 <Mermaid code={overviewDiagram} title="เลือกท่า simplifying-APIs จากสิ่งที่ทำให้การเรียกใช้ดูเก้กัง" />
 

@@ -155,17 +155,6 @@ parameter ตัวหนึ่งถูกส่งมาแบบเดิม�
 - [Preserve Whole Object](/refactoring/th/simplifying-apis/preserve-whole-object/)
 - [Introduce Parameter Object](/refactoring/th/simplifying-apis/introduce-parameter-object/)
 
-| ใช้ Replace Parameter with Query เมื่อ | หลีกเลี่ยงเมื่อ |
-|---|---|
-| ทุก caller คำนวณ argument แบบเดียวกัน | การคำนวณนั้นเข้าถึง global state หรือ clock |
-| ค่านั้นกำหนดได้ทั้งหมดจากข้อมูลที่ function มีอยู่ | caller แต่ละรายมี logic ต่างกัน |
-| ต้องการลดโอกาสที่ caller จะส่งค่าไม่สอดคล้อง | ต้องการ inject dependency ผ่าน parameter เพื่อ test |
-
-> ⚠️ ไม่ควร Replace Parameter with Query เมื่อ:
-> - การคำนวณข้างใน function ซ่อน dependency (global, clock, DB) — ทำให้ test ยาก
-> - บางครั้งต้องการ override ค่าที่คำนวณได้ — เช่น test ที่ inject ค่าเฉพาะ
-> - parameter นั้นคือ seam ที่ทำให้เขียน unit test ได้ — อย่าลบ
-
 <Callout title="สองทิศทาง หนึ่งการตัดสินใจ">
 Replace Parameter with Query หด interface ให้เล็กลง; Replace Query with Parameter เปิดเผย dependency ไม่มีอันไหนถูกต้องเสมอ เลือก query เมื่อค่าคำนวณได้ล้วน ๆ จากข้อมูลที่มีอยู่แล้ว; เลือก parameter เมื่อการคำนวณเอื้อมเข้าไปใน state ที่แชร์หรือเปลี่ยนได้ ซึ่งคุณอยากทดสอบผ่านประตูหน้ามากกว่า
 </Callout>

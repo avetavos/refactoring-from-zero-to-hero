@@ -25,20 +25,20 @@ You now know *how* to refactor safely. The missing piece is knowing *what* to re
 
 ## A catalog overview
 
-Here are the smells you will meet most often, each paired with the refactorings this course teaches to address it. Treat this as your map: when something feels wrong, name the smell, then look up the move.
+Here are the smells you will meet most often, each paired with the refactorings this course teaches to address it. The names come from the catalogue in Fowler's *Refactoring* (2nd ed., 2018), chapter 3, "Bad Smells in Code", written with Kent Beck. Treat this as your map: when something feels wrong, name the smell, then look up the move.
 
 | Smell | What you notice | Where this course addresses it |
 | --- | --- | --- |
 | **Long Function** | A function that scrolls off the screen and does many things | [Composing Methods](/refactoring/en/composing-methods/) — [Extract Function](/refactoring/en/composing-methods/extract-function/) |
 | **Duplicated Code** | The same fragment appears in two or more places | [Extract Function](/refactoring/en/composing-methods/extract-function/) and [Moving Features](/refactoring/en/moving-features/) |
-| **Mysterious Name** | A variable or function whose name hides its purpose | [Extract Variable](/refactoring/en/composing-methods/extract-variable/) |
+| **Mysterious Name** | A variable, function or field whose name hides its purpose | [Rename Function/Variable](/refactoring/en/simplifying-apis/rename-function/), [Rename Field](/refactoring/en/organizing-data/rename-field/), [Extract Variable](/refactoring/en/composing-methods/extract-variable/) |
 | **Large Class** | A class hoarding too many fields and responsibilities | [Moving Features](/refactoring/en/moving-features/) |
 | **Long Parameter List** | A call with so many arguments you lose track | [Simplifying APIs](/refactoring/en/simplifying-apis/) |
 | **Feature Envy** | A method more interested in another object's data than its own | [Moving Features](/refactoring/en/moving-features/) |
 | **Primitive Obsession** | Bare strings and numbers standing in for real concepts | [Organizing Data](/refactoring/en/organizing-data/) |
 | **Shotgun Surgery** | One small change forces edits scattered across many files | [Moving Features](/refactoring/en/moving-features/) |
-| **Tangled Conditionals** | Deeply nested or repeated branching that hides the logic | [Simplifying Conditionals](/refactoring/en/simplifying-conditionals/) |
-| **Temporary Field / Inheritance Misuse** | State used only sometimes, or hierarchies that fight you | [Generalization & Inheritance](/refactoring/en/generalization-and-inheritance/) |
+| **Repeated Switches** | The same switch or nested branching repeated until it hides the logic | [Simplifying Conditionals](/refactoring/en/simplifying-conditionals/) |
+| **Refused Bequest / Temporary Field** | A subclass that disowns what it inherits, or state used only sometimes | [Generalization & Inheritance](/refactoring/en/generalization-and-inheritance/) |
 
 ## A short example smell
 

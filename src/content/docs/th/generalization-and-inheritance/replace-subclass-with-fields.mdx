@@ -34,7 +34,7 @@ export const fieldsDiagram = `classDiagram
 
 ## Code Smell
 
-คุณเจอ subclass ที่ทุก override เป็นบรรทัดเดียวคืนค่า literal: `isMale() { return true; }`, `code() { return "M"; }` subclass นั้นไม่เพิ่ม logic ใด ไม่ถือ state ต่อ instance และไม่เคยเปลี่ยนคำตอบ ทั้ง type — พร้อมไฟล์ของตัวเอง constructor ของตัวเอง ช่องของตัวเองในลำดับชั้น — มีอยู่เพียงเพื่อ hard-code ค่าคงที่สองค่า นั่นคือ **Lazy Class** ที่แต่งตัวเป็น subtype และทำให้ความแตกต่างระหว่าง variant มองเห็นได้ยากกว่าการเขียน field เรียงกันเป็นแถว
+คุณเจอ subclass ที่ทุก override เป็นบรรทัดเดียวคืนค่า literal: `isMale() { return true; }`, `code() { return "M"; }` subclass นั้นไม่เพิ่ม logic ใด ไม่ถือ state ต่อ instance และไม่เคยเปลี่ยนคำตอบ ทั้ง type — พร้อมไฟล์ของตัวเอง constructor ของตัวเอง ช่องของตัวเองในลำดับชั้น — มีอยู่เพียงเพื่อ hard-code ค่าคงที่สองค่า นั่นคือ **Lazy Element** ที่แต่งตัวเป็น subtype และทำให้ความแตกต่างระหว่าง variant มองเห็นได้ยากกว่าการเขียน field เรียงกันเป็นแถว
 
 ## ก่อน → หลัง
 
@@ -192,17 +192,6 @@ export const fieldsDiagram = `classDiagram
 - [Collapse Hierarchy](/refactoring/th/generalization-and-inheritance/collapse-hierarchy/)
 - [Replace Subclass with Delegation](/refactoring/th/generalization-and-inheritance/replace-subclass-with-delegation/)
 - [Pull Up & Push Down](/refactoring/th/generalization-and-inheritance/pull-up-and-push-down/)
-
-| ใช้ Replace Subclass with Fields เมื่อ | หลีกเลี่ยงเมื่อ |
-|---|---|
-| subclass ต่างกันแค่ค่า constant ไม่มี behavior ต่างกัน | subclass มี behavior ที่แตกต่างกัน — ต้องการ subclass จริง ๆ |
-| hierarchy ที่ลึกสำหรับแค่ data variation | field เพิ่มแล้วจะทำให้ superclass มี conditional มากขึ้น |
-| ต้องการ simplify class ที่มี subclass แค่ override constant | client ต้อง instanceof check ซึ่ง defeat วัตถุประสงค์ |
-
-> ⚠️ ไม่ควร Replace Subclass with Fields เมื่อ:
-> - subclass มี method ที่ต่างกัน แม้แค่บางส่วน
-> - field เพิ่มแล้วทำให้ต้องมี switch statement แทน polymorphism
-> - จำนวน variant มีมากและน่าจะเพิ่มขึ้น
 
 <Callout title="subclass ควรเพิ่ม behavior ไม่ใช่เพียงค่าคงที่">
 ถ้าคุณอธิบายความแตกต่างระหว่าง subclass สองตัวได้ครบถ้วนว่า "ตัวนี้คืน M ตัวนั้นคืน F" แสดงว่าคุณกำลังใช้ระบบ type มาเก็บข้อมูล ข้อมูลควรอยู่ใน field เก็บ subclass ไว้สำหรับกรณีที่ *สิ่งที่ object ทำ* แตกต่างกัน — ไม่ใช่เพียงแค่สิ่งที่ตอบ

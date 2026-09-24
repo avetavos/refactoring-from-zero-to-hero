@@ -243,17 +243,6 @@ export const extractDiagram = `classDiagram
 - [Replace Inheritance with Delegation](/refactoring/th/generalization-and-inheritance/replace-inheritance-with-delegation/)
 - [Collapse Hierarchy](/refactoring/th/generalization-and-inheritance/collapse-hierarchy/)
 
-| ใช้ Extract Superclass / Interface เมื่อ | หลีกเลี่ยงเมื่อ |
-|---|---|
-| หลาย class มี method/field ที่ซ้ำกันและควรใช้ร่วมกัน | class มีความซ้ำซ้อนน้อยมาก — ยังเร็วเกินไป |
-| ต้องการ polymorphism โดยไม่ต้อง duplicate code | superclass จะกลาย God Class ที่รวมทุกอย่าง |
-| client code ควร depend on abstraction ไม่ใช่ implementation | inheritance ไม่เหมาะ — ใช้ composition แทน |
-
-> ⚠️ ไม่ควร Extract Superclass / Interface เมื่อ:
-> - class ที่คล้ายกันมีความแตกต่างที่ลึกกว่าความเหมือน
-> - สร้าง abstraction ก่อนที่จะมี 3 concrete class — "Rule of Three"
-> - inheritance จะ couple classes ที่ควรเป็นอิสระจากกัน
-
 <Callout title="superclass สำหรับข้อมูลที่ใช้ร่วมกัน, interface สำหรับรูปร่างที่ใช้ร่วมกัน">
 ถ้าสอง class ใช้ state และ logic ร่วมกัน ซึ่งไม่อย่างนั้นคุณต้องดูแลซ้ำสองรอบ superclass ก็คุ้มที่จะมี แต่ถ้าทั้งคู่แค่ต้องการให้ caller *ใช้งานได้แบบเดียวกัน* ให้หยิบ interface หรือ trait มาใช้ เพราะจับ contract ไว้ได้โดยไม่มัดคุณเข้ากับลำดับชั้นข้อมูลที่อาจต้องเสียใจทีหลัง และ Go กับ Rust ก็ทำให้เส้นทาง interface เป็นทางที่มีแรงต้านน้อยที่สุดอยู่แล้ว
 </Callout>

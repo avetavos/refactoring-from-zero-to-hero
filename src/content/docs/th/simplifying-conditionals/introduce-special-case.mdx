@@ -177,17 +177,6 @@ code แสดงผลอ่านชื่อและแพลนของล
 - [Replace Conditional with Polymorphism](/refactoring/th/simplifying-conditionals/replace-conditional-with-polymorphism/)
 - [Consolidate Conditional Expression](/refactoring/th/simplifying-conditionals/consolidate-conditional/)
 
-| ใช้ Introduce Special Case เมื่อ | หลีกเลี่ยงเมื่อ |
-|---|---|
-| null check เดิมซ้ำในหลายจุดด้วย default เดียวกัน | "หายไป" หมายความต่างกันในแต่ละจุดที่ใช้ |
-| ต้องการรวมศูนย์ default value ไว้ที่เดียว | มีแค่ 1-2 จุดที่ check — guard clause ง่ายกว่า |
-| object พิเศษให้ต้องการ behavior เฉพาะที่ implement ได้ | default ต่างกันในแต่ละ caller — object เดียวรองรับไม่ได้ |
-
-> ⚠️ ไม่ควร Introduce Special Case เมื่อ:
-> - การขาดหายไปของค่านั้นหมายถึง error จริง ๆ — ใช้ exception หรือ Result แทน
-> - default value ในแต่ละ caller แตกต่างกัน — special case จะซ่อนความต่างที่สำคัญ
-> - pattern ที่ใช้อยู่คือ `Optional` หรือ `Result` อยู่แล้ว — null object จะซ้ำซ้อน
-
 <Callout title="null object ตอบกลับได้ ไม่ระเบิดใส่">
 หัวใจของ object special-case คือ caller ปฏิบัติกับ object นั้นเหมือนค่าปกติได้เลย จะถามชื่อ ถาม plan ก็ได้ แล้วได้ค่า default ที่สมเหตุสมผลกลับมา แทนที่จะ crash หรือต้องแตก branch แต่ถ้าค่า default ต่างกันในแต่ละจุดที่เรียก แปลว่ากรณีที่หายไปยังไม่สม่ำเสมอพอจะยุบเป็น object เดียว กรณีนั้นก็เก็บ check แบบชัดแจ้งไว้ตรงนั้นดีกว่า
 </Callout>

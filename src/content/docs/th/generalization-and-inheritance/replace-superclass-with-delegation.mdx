@@ -29,7 +29,7 @@ export const delegationDiagram = `classDiagram
 
 ## จุดประสงค์
 
-**Replace Superclass with Delegation** เปลี่ยนความสัมพันธ์แบบ inheritance ให้เป็นแบบ *has-a* แทนที่จะเขียน `Stack extends List` ก็ให้ stack *ถือ* list ไว้ใน field private แล้วเรียกเข้าไปเฉพาะงานไม่กี่อย่างที่ต้องใช้จริง subclass ยังได้ behavior ที่ต้องพึ่งครบ แต่ไม่โดนบังคับให้ inherit และเปิดเผยสมาชิกทุกตัวของ superclass ที่ไม่เคยอยากได้
+**Replace Superclass with Delegation** (Fowler พิมพ์ครั้งที่ 2: *Replace Superclass with Delegate*; พิมพ์ครั้งแรก: *Replace Inheritance with Delegation*) เปลี่ยนความสัมพันธ์แบบ inheritance ให้เป็นแบบ *has-a* แทนที่จะเขียน `Stack extends List` ก็ให้ stack *ถือ* list ไว้ใน field private แล้วเรียกเข้าไปเฉพาะงานไม่กี่อย่างที่ต้องใช้จริง subclass ยังได้ behavior ที่ต้องพึ่งครบ แต่ไม่โดนบังคับให้ inherit และเปิดเผยสมาชิกทุกตัวของ superclass ที่ไม่เคยอยากได้
 
 ## Code Smell
 
@@ -50,14 +50,21 @@ class หนึ่ง extends อีก class เพียงเพื่อใ�
         const i = this.items.indexOf(item);
         if (i >= 0) this.items.splice(i, 1);
       }
+      removeAt(index: number): void { this.items.splice(index, 1); }
       get(index: number): T { return this.items[index]; }
       size(): number { return this.items.length; }
     }
 
-    // A Stack should not expose remove(item) or get(index)!
+    // A Stack should not expose remove(item), removeAt(index) or get(index)!
     class Stack<T> extends List<T> {
       push(item: T): void { this.add(item); }
-      pop(): T | undefined { return undefined; /* awkward */ }
+      pop(): T | undefined {
+        const n = this.size();
+        if (n === 0) return undefined;
+        const top = this.get(n - 1);
+        this.removeAt(n - 1);
+        return top;
+      }
     }
 
     // After — Stack holds a List and delegates only what it needs
@@ -70,7 +77,7 @@ class หนึ่ง extends อีก class เพียงเพื่อใ�
         const n = this.storage.size();
         if (n === 0) return undefined;
         const top = this.storage.get(n - 1);
-        this.storage.remove(top);
+        this.storage.removeAt(n - 1);
         return top;
       }
 
@@ -91,16 +98,27 @@ class หนึ่ง extends อีก class เพียงเพื่อใ�
         def remove(self, item):
             self._items.remove(item)
 
+        def remove_at(self, index):
+            del self._items[index]
+
         def get(self, index):
             return self._items[index]
 
         def size(self):
             return len(self._items)
 
-    # A Stack should not expose remove(item) or get(index)!
+    # A Stack should not expose remove(item), remove_at(index) or get(index)!
     class Stack(CustomList):
         def push(self, item):
             self.add(item)
+
+        def pop(self):
+            n = self.size()
+            if n == 0:
+                return None
+            top = self.get(n - 1)
+            self.remove_at(n - 1)
+            return top
 
     # After — Stack holds a list and delegates only what it needs
     class Stack:
@@ -115,7 +133,7 @@ class หนึ่ง extends อีก class เพียงเพื่อใ�
             if n == 0:
                 return None
             top = self._storage.get(n - 1)
-            self._storage.remove(top)
+            self._storage.remove_at(n - 1)
             return top
 
         def size(self):
@@ -224,17 +242,6 @@ class หนึ่ง extends อีก class เพียงเพื่อใ�
 - [Replace Inheritance with Delegation](/refactoring/th/generalization-and-inheritance/replace-inheritance-with-delegation/)
 - [Replace Subclass with Delegation](/refactoring/th/generalization-and-inheritance/replace-subclass-with-delegation/)
 - [Extract Superclass & Interface](/refactoring/th/generalization-and-inheritance/extract-superclass-and-interface/)
-
-| ใช้ Replace Superclass with Delegation เมื่อ | หลีกเลี่ยงเมื่อ |
-|---|---|
-| subclass ใช้แค่บางส่วนของ superclass และต้องการซ่อนส่วนที่เหลือ | class นั้น IS-A superclass จริง ๆ ทุก method เหมาะสม |
-| subclass ต้องการ inherit จาก class อื่นด้วย (multiple inheritance) | ต้องการ polymorphism — caller ต้องการ treat เป็น superclass type |
-| IS-A relationship ไม่เป็นจริงในทุก context | delegation จะทำให้ต้อง forward ทุก method ที่ต้องการ |
-
-> ⚠️ ไม่ควร Replace Superclass with Delegation เมื่อ:
-> - relationship นั้น IS-A ที่ถูกต้องจริง ๆ — อย่า delegate โดยไม่จำเป็น
-> - caller ใช้ polymorphism กับ type นี้ — delegation ทำลาย type hierarchy
-> - delegation จะเพิ่ม boilerplate มากกว่า complexity ที่แก้ได้
 
 <Callout title="inherit ทั้ง interface หรือไม่เอาเลย">
 คำถามชี้ขาดง่ายมาก คือ subclass ต้องการ *ทุกอย่าง* ที่ superclass ให้หรือเปล่า ถ้าใช่ inheritance ก็ซื่อสัตย์และถูก แต่ถ้าต้องการแค่เสี้ยวเดียว แล้วอายกับส่วนที่เหลือ ก็ถือ superclass ไว้เป็น field แล้ว forward เฉพาะเสี้ยวนั้นพอ Go กับ Rust บังคับแนวคิดนี้ไว้ในภาษาเลย เพราะ inherit แค่บางส่วนไม่ได้ คุณจึงต้องใช้ composition ซึ่งก็คือปลายทางที่ refactoring นี้พาไปพอดี

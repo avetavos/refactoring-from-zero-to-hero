@@ -183,17 +183,6 @@ export const paramObjectDiagram = `flowchart LR
 - [Parameterize Function](/refactoring/th/simplifying-apis/parameterize-function/)
 - [Rename Function/Variable](/refactoring/th/simplifying-apis/rename-function/)
 
-| ใช้ Introduce Parameter Object เมื่อ | หลีกเลี่ยงเมื่อ |
-|---|---|
-| parameter กลุ่มเดียวกันปรากฏในหลาย function | parameter ที่จะรวมไม่มี cohesion จริง ๆ |
-| function มี parameter เกิน 3-4 ตัว | object ใหม่จะมีแค่ data ไม่มี behavior |
-| parameter แต่ละตัวมีความสัมพันธ์กัน (date range, point) | มีแค่ 2 parameter และมักเปลี่ยนแยกกัน |
-
-> ⚠️ ไม่ควร Introduce Parameter Object เมื่อ:
-> - parameter ที่รวมกันไม่ได้ปรากฏพร้อมกันเสมอ
-> - object ใหม่จะไม่มี behavior ที่เกี่ยวข้อง — แค่ data bag
-> - function นั้นเป็น one-off ที่ไม่ถูกเรียกจากหลายที่
-
 <Callout title="กลุ่มของข้อมูลคือแนวคิดที่รอชื่อ">
 เมื่อค่าสองตัวถูกส่งไปด้วยกันตลอด นั่นไม่ใช่ของสองชิ้น แต่คือของชิ้นเดียวที่ code ยังไม่ได้ตั้งชื่อ การตั้งชื่อให้ (เป็น `Range`, `Location` หรือ `Trip`) ได้มากกว่าแค่ทำให้จุดเรียกสั้นลง เพราะเป็นการให้ที่อยู่กับแนวคิดนั้น เป็นที่ที่ validate และ helper ของตัวเองจะย้ายมาอยู่ในภายหลัง
 </Callout>

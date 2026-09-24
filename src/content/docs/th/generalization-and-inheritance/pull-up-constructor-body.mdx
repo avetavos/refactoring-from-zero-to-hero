@@ -219,17 +219,6 @@ export const ctorDiagram = `classDiagram
 - [Extract Superclass & Interface](/refactoring/th/generalization-and-inheritance/extract-superclass-and-interface/)
 - [Replace Superclass with Delegation](/refactoring/th/generalization-and-inheritance/replace-superclass-with-delegation/)
 
-| ใช้ Pull Up Constructor Body เมื่อ | หลีกเลี่ยงเมื่อ |
-|---|---|
-| subclass constructor มี initialization logic เหมือนกัน | แต่ละ subclass ต้องการ init sequence ที่ต่างกัน |
-| ต้องการ enforce invariant ใน base class constructor | superclass constructor จะซับซ้อนเกินไปจาก variation |
-| จะ add validation ที่ทุก subclass ต้องผ่าน | subclass ต้องการ call `super()` ในลำดับที่ต่างกัน |
-
-> ⚠️ ไม่ควร Pull Up Constructor Body เมื่อ:
-> - initialization logic ต่างกันในแต่ละ subclass อย่างมีนัยสำคัญ
-> - การ pull up จะทำให้ base class constructor มี parameter มากเกินไป
-> - ภาษากำหนด constraint ที่ทำให้ constructor sharing ซับซ้อน
-
 <Callout title="constructor คือ method ที่มีกฎเพิ่ม">
 การดึง method ธรรมดาขึ้นเป็นเรื่องปกติ การดึง constructor body ขึ้นเพิ่มข้อจำกัดหนึ่ง — พ่อแม่ต้องถูก initialize ก่อนที่ลูกจะรัน ทำให้การเรียกขึ้นไปเป็น statement แรกเสมอ และถ้า subclass เดิมทำงานที่ใช้ร่วมกันที่จุดต่าง ๆ กัน ให้แก้ลำดับนั้นก่อนจะดึงอะไรขึ้น ใน Go และ Rust วินัยเดียวกันนี้ปรากฏเป็น "สร้าง struct ที่ embed/ฐานก่อน"
 </Callout>

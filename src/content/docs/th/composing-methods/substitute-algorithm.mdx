@@ -129,17 +129,6 @@ Substitute Algorithm คุ้มค่าเมื่อมีวิธีท�
 - [Replace Loop with Pipeline](/refactoring/th/composing-methods/replace-loop-with-pipeline/)
 - [Replace Temp with Query](/refactoring/th/composing-methods/replace-temp-with-query/)
 
-| ใช้ Substitute Algorithm เมื่อ | หลีกเลี่ยงเมื่อ |
-|---|---|
-| algorithm ใหม่ชัดเจน ทดสอบได้ และมี test รองรับ | algorithm เดิมซับซ้อนและยังไม่มี test ครอบคลุม |
-| library มี built-in ที่ทำสิ่งเดียวกันได้ดีกว่า | กำลังเปลี่ยนเพราะ "ดูดีกว่า" ไม่ใช่เพราะแก้ปัญหาจริง |
-| algorithm เดิม bug-prone และเข้าใจยาก | algorithm ใหม่ยังไม่ถูก benchmark ว่า performance เทียบเท่า |
-
-> ⚠️ ไม่ควร Substitute Algorithm เมื่อ:
-> - ยังไม่มี test ที่ครอบคลุม behavior เดิมทั้งหมด
-> - algorithm ใหม่ยังไม่ได้รับการพิสูจน์ว่าถูกต้องใน edge case ทั้งหมด
-> - กำลังเปลี่ยนเพื่อ micro-optimization โดยไม่มี profiling ยืนยัน
-
 <Callout title="ผลลัพธ์เหมือนกัน ไม่งั้นก็เป็นบั๊ก">
 การแทนที่จะเป็น refactoring ก็ต่อเมื่ออัลกอริทึมใหม่คืนค่าตรงกับที่อันเก่าคืนทุกประการสำหรับทุก input ที่สำคัญ — รวมถึงอันที่เก้กังด้วย วินาทีที่ผลลัพธ์เริ่มแยกออกจากกัน คุณได้เปลี่ยน behavior แล้ว test ที่ครอบ edge case คือสิ่งที่ทำให้คุณแลกเปลี่ยนนี้ได้อย่างปลอดภัย
 </Callout>

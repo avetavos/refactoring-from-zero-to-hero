@@ -178,17 +178,6 @@ export const consolidateDiagram = `flowchart LR
 - [Replace Nested Conditional with Guard Clauses](/refactoring/th/simplifying-conditionals/replace-nested-conditional-with-guard-clauses/)
 - [Extract Function](/refactoring/th/composing-methods/extract-function/)
 
-| ใช้ Consolidate Conditional Expression เมื่อ | หลีกเลี่ยงเมื่อ |
-|---|---|
-| หลายเงื่อนไขต่างนำไปสู่ผลลัพธ์เดียวกัน | เงื่อนไขมี side effect ระหว่างกัน |
-| ต้องการ Extract Function ตั้งชื่อแนวคิดนั้น | เงื่อนไขเป็นกฎที่เป็นอิสระที่อาจแยกทางกันทีหลัง |
-| เงื่อนไขที่กระจัดกระจายซ่อนแนวคิดเดียว | การรวมทำให้ short-circuit ข้าม side effect สำคัญ |
-
-> ⚠️ ไม่ควร Consolidate Conditional Expression เมื่อ:
-> - เงื่อนไขแต่ละตัวมี side effect ที่ต้องรันทุกครั้ง — การรวมด้วย `||` จะ short-circuit ข้ามได้
-> - ผลลัพธ์เหมือนกันในวันนี้แต่เหตุผลต่างกัน — อาจแยกทางในอนาคต
-> - การรวมทำให้เงื่อนไขยาวเกินกว่าจะตั้งชื่อที่ชัดเจนได้
-
 <Callout title="รวมก็ต่อเมื่อผลลัพธ์เหมือนกันจริง ๆ เท่านั้น">
 ตัวกระตุ้นคือผลลัพธ์ที่เหมือนกัน ไม่ใช่เงื่อนไขที่หน้าตาคล้ายกัน ถ้าการตรวจสอบสองตัว return คนละค่า ก็ปล่อยให้แยกกันไว้ เพราะยัดรวมกันแล้วจะกลบความต่างที่มีอยู่จริง รวมเพื่อความชัดเจน ไม่ใช่เพื่อลดจำนวนบรรทัด
 </Callout>

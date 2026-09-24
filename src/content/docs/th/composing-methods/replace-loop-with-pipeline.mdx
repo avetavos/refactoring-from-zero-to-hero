@@ -148,17 +148,6 @@ loop ที่เดินบน collection ข้ามบางสมาชิ
 - [Substitute Algorithm](/refactoring/th/composing-methods/substitute-algorithm/)
 - [Split Phase](/refactoring/th/composing-methods/split-phase/)
 
-| ใช้ Replace Loop with Pipeline เมื่อ | หลีกเลี่ยงเมื่อ |
-|---|---|
-| loop ทำหลายขั้น: filter + transform + reduce | loop มี side effect (I/O, mutation) ใน body |
-| ต้องการ chain operation หลายตัวเป็น readable flow | ทีมไม่คุ้นกับ functional style — อ่านยากกว่า loop |
-| logic ใน loop อ่านยากเพราะมีหลาย condition | performance สำคัญมาก — pipeline สร้าง intermediate collection |
-
-> ⚠️ ไม่ควร Replace Loop with Pipeline เมื่อ:
-> - loop ต้องใช้ index ของ element (`for i, v in enumerate(...)`)
-> - loop มีการ break กลางคัน — pipeline ไม่รองรับ early exit แบบง่าย
-> - ต้องการความเร็วสูงสุด — pipeline สร้าง allocation เพิ่ม
-
 <Callout title="แต่ละขั้นทำงานเดียว">
 กำไรของ pipeline คือ filter, transform และ combine เลิกซ้อนทับกัน พออ่าน `filter(...).map(...)` คุณรู้ทันทีว่าการเลือกจบตรงไหนและการแปลงเริ่มตรงไหน ถ้าขั้นไหนเริ่มทำสองอย่าง ให้ซอยออกเป็นขั้นที่มีชื่อของตัวเอง
 </Callout>

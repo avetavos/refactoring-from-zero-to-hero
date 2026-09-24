@@ -31,7 +31,7 @@ export const hideDelegateDiagram = `flowchart LR
 
 ## The smell
 
-Hide Delegate cures **Inappropriate Intimacy** with a class's internals and is the practical face of the **Law of Demeter**: talk to your friends, not your friends' friends. A chain like `a.getB().getC().doIt()` couples the caller to two relationships it has no business knowing about. The reverse smell is the **Middle Man**: a class whose methods nearly all read "return delegate.something()" — so much forwarding that the wrapper adds nothing.
+Hide Delegate cures **Message Chains** (Fowler, ch. 3) and is the practical face of the **Law of Demeter** (Lieberherr, Holland & Riel, OOPSLA 1988): talk to your friends, not your friends' friends. A chain like `a.getB().getC().doIt()` couples the caller to two relationships it has no business knowing about. The reverse smell is the **Middle Man**: a class whose methods nearly all read "return delegate.something()" — so much forwarding that the wrapper adds nothing.
 
 ## Before → After
 

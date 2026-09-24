@@ -31,6 +31,15 @@ The **composing methods** family is about the *inside* of a function: how its st
 
 A function grows over time. It accumulates a temporary variable here, a clever one-line condition there, a loop that quietly does three jobs. Eventually nobody can read it top-to-bottom and explain it in a sentence. The cures in this module attack that directly: they pull tangled fragments apart, give the important pieces names, and let the leftover code read like a short summary of intent.
 
+| Smell (Fowler, ch. 3) | What you notice | Move |
+|---|---|---|
+| Long Function | A function you cannot summarize in one sentence | Extract Function |
+| Duplicated Code | The same logic copy-pasted into several places, bugs included | Extract Function |
+| Mysterious Name | A sub-expression whose meaning you have to decode | Extract Variable |
+| Mutable Data | A temp that pins a computed value inside one function | Replace Temp with Query |
+| Divergent Change | One function doing two unrelated jobs, so a change to one touches the other | Split Phase |
+| Loops | An imperative loop that mixes filtering, mapping and accumulating | Replace Loop with Pipeline |
+
 <Mermaid code={overviewDiagram} title="Choosing a composing-methods move by what is wrong" />
 
 ## What this module covers

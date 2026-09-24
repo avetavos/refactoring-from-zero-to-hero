@@ -153,17 +153,6 @@ export const literalDiagram = `flowchart LR
 - [Replace Primitive with Object](/refactoring/th/organizing-data/replace-primitive-with-object/)
 - [Replace Type Code with Subclasses](/refactoring/th/organizing-data/replace-type-code-with-subclasses/)
 
-| ใช้ Replace Magic Literal เมื่อ | หลีกเลี่ยงเมื่อ |
-|---|---|
-| ตัวเลข/string ปรากฏในหลายที่และต้องเปลี่ยนพร้อมกัน | ค่านั้นปรากฏครั้งเดียวและชัดเจนในบริบท (`array[0]`) |
-| ความหมายของค่าไม่ชัดโดยไม่มีบริบท (`0.07`) | constant ชื่อที่ตั้งได้ก็ไม่ได้ชัดกว่าค่าเดิม |
-| test hardcode ค่าเดียวกับ production code | ค่านั้นเป็น implementation detail ที่ไม่ควร expose |
-
-> ⚠️ ไม่ควร Replace Magic Literal เมื่อ:
-> - `0`, `1`, `-1`, `""`, `null` ที่มีความหมายในบริบทชัดเจน
-> - constant ที่ชื่อต้องการจะยาวกว่าค่าเดิมและไม่ได้ช่วยอะไร
-> - สร้าง constant เยอะเกินไปจนต้องไปหาที่ definition ทุกครั้ง
-
 <Callout title="ตั้งชื่อตามความหมาย ไม่ใช่ตามค่า">
 ค่าคงที่ชื่อ `THIRTY` ไม่ได้ดีกว่าเลข `30` เปลือย ๆ เลย แค่ย้ายความลึกลับไปไว้ที่อื่นเท่านั้น ตั้งชื่อว่า `HEAVY_THRESHOLD_KG` สิ ผู้อ่านจะได้รู้ว่า *ทำไม* เลขสามสิบถึงสำคัญ และถ้าวันหลังค่าเปลี่ยนเป็นสามสิบห้า ชื่อเดิมก็ยังใช้ได้อยู่ ซึ่งนั่นคือประเด็นทั้งหมด
 </Callout>

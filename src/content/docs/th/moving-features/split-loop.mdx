@@ -176,17 +176,6 @@ loop ตัวนี้วนพนักงานเพื่อคำนวณ
 - [Combine Functions into Class](/refactoring/th/moving-features/combine-functions-into-class/)
 - [Extract Function](/refactoring/th/composing-methods/extract-function/)
 
-| ใช้ Split Loop เมื่อ | หลีกเลี่ยงเมื่อ |
-|---|---|
-| loop ทำสองอย่างที่ไม่เกี่ยวกัน — อ่านยาก | performance สำคัญมาก — แยก loop เพิ่ม iteration |
-| ต้องการ Extract Function แต่ loop ทำหลาย accumulation | loop มีแค่หนึ่ง operation ที่ชัดเจน |
-| ต้องการ test แต่ละส่วนแยกกัน | สองส่วนนั้นต้องใช้ result ของกันและกัน |
-
-> ⚠️ ไม่ควร Split Loop เมื่อ:
-> - collection ใหญ่มากและ performance เป็น constraint หลัก
-> - สองส่วนใน loop นั้น tight-coupled กัน จนแยกไม่มีความหมาย
-> - เพิ่ม complexity โดยที่ readability ไม่ได้ดีขึ้นจริง
-
 <Callout title="ชัดเจนก่อน แล้วค่อยวัด">
 สอง loop รู้สึกเปลือง แต่ค่าใช้จ่ายเกือบทุกครั้งเป็นเพียงจินตนาการ แยกเพื่อความชัดเจน ตั้งชื่อแต่ละ loop แล้วปล่อยให้ profiler — ไม่ใช่ลางสังหรณ์ — เป็นผู้ตัดสินว่าจะมีอันไหนที่จำเป็นต้องรวมกลับเข้าด้วยกันอีกครั้งเพื่อความเร็วหรือไม่
 </Callout>

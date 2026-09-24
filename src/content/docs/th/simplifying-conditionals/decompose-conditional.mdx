@@ -183,17 +183,6 @@ function คิดค่าบริการคิดอัตราฤดู�
 - [Consolidate Conditional Expression](/refactoring/th/simplifying-conditionals/consolidate-conditional/)
 - [Replace Nested Conditional with Guard Clauses](/refactoring/th/simplifying-conditionals/replace-nested-conditional-with-guard-clauses/)
 
-| ใช้ Decompose Conditional เมื่อ | หลีกเลี่ยงเมื่อ |
-|---|---|
-| เงื่อนไขต้องแกะ logic เพื่อเข้าใจว่าถามว่าอะไร | เงื่อนไขสั้น ๆ ที่ชัดเจนอยู่แล้ว |
-| สาขา then/else เป็นการคำนวณที่ซับซ้อน | ตั้งชื่อที่ดีกว่าเดิมไม่ได้ — แสดงว่า logic ยังไม่ชัด |
-| ต้องการให้ผู้อ่านเห็น decision โดยไม่ดำดิ่งรายละเอียด | function ที่ extract ออกมาถูกใช้ที่เดียวและเพิ่ม indirection ฟรี ๆ |
-
-> ⚠️ ไม่ควร Decompose Conditional เมื่อ:
-> - เงื่อนไขนั้นง่ายและชัดเจน — เช่น `if (x > 0)` ไม่จำเป็นต้องตั้งชื่อเพิ่ม
-> - สาขาที่จะ extract มีแค่ 1-2 บรรทัดและชื่อไม่ได้อธิบายเพิ่มขึ้น
-> - ยังไม่มี test — extract โดยไม่มี safety net เพิ่มความเสี่ยง
-
 <Callout title="ตั้งชื่อการทดสอบตามคำถาม ไม่ใช่ตามการเปรียบเทียบ">
 เงื่อนไขที่ชื่อ `monthIsLessThan6OrGreaterThan9` เป็นแค่การอ่านตัวดำเนินการซ้ำอีกรอบ ตั้งชื่อว่า `notSummer` สิ แล้ว `if` จะตอบคำถามเชิงธุรกิจแทน ถ้าวันหลัง logic เรื่องปฏิทินเปลี่ยน ชื่อเดิมก็ยังใช้ได้ มีแค่ body ของ helper ที่ต้องขยับ
 </Callout>

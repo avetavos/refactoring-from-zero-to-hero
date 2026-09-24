@@ -201,17 +201,6 @@ booking ที่ราคาขึ้นกับ tier ก่อนหน้า
 - [Collapse Hierarchy](/refactoring/th/generalization-and-inheritance/collapse-hierarchy/)
 - [Extract Superclass & Interface](/refactoring/th/generalization-and-inheritance/extract-superclass-and-interface/)
 
-| ใช้ Replace Subclass with Delegation เมื่อ | หลีกเลี่ยงเมื่อ |
-|---|---|
-| object ต้องการเปลี่ยน "type" ใน runtime | subclass type คงที่ตลอด lifecycle |
-| object ต้องการเป็นหลาย type พร้อมกัน | subclass มีแค่ 2 variant และไม่น่าจะเพิ่ม |
-| inheritance hierarchy ลึกเกินไปและซับซ้อน | delegation จะเพิ่ม indirection ที่ไม่ได้ประโยชน์ |
-
-> ⚠️ ไม่ควร Replace Subclass with Delegation เมื่อ:
-> - subclass type ไม่เปลี่ยนใน runtime — inheritance เหมาะกว่า
-> - มีแค่ 2 subclass ที่ง่ายและไม่น่าจะซับซ้อนขึ้น
-> - delegation จะเพิ่ม code มากกว่าที่ inheritance ลด
-
 <Callout title="inheritance เป็นการเลือกที่ตายตัว; strategy เปลี่ยนได้">
 เหตุผลลึกที่สุดที่ควรเลือก delegate ตรงนี้คือ *เวลา*: subclass ถูกตัดสินตอน construction และถูกตรึงไว้ตลอดชีวิตของ object ส่วน strategy field สามารถถูก reassign, สลับ, หรือกระทั่งประกอบกับ strategy ตัวที่สองตามแกนที่เป็นอิสระ เมื่อ behavior ต้องผันแปรแบบ dynamic — หรือตามมิติมากกว่าหนึ่ง — composition ชนะอย่างเด็ดขาด นั่นคือเหตุผลที่ Go และ Rust ยื่นรูปแบบนี้ให้คุณเพียงอย่างเดียว
 </Callout>

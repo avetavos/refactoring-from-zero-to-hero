@@ -31,13 +31,14 @@ export const overviewDiagram = `flowchart TD
 
 function โตขึ้นตามเวลา สะสม temporary variable ไว้ตรงนี้ เงื่อนไขบรรทัดเดียวสุดฉลาดตรงนั้น แล้วก็ loop ที่แอบทำงานสามอย่างพร้อมกันเงียบ ๆ สุดท้ายก็ไม่มีใครอ่านจากบนลงล่างแล้วสรุปได้ในประโยคเดียว วิธีรักษาในโมดูลนี้จัดการปัญหานั้นตรง ๆ คือแยกชิ้นส่วนที่พันกันออกจากกัน ตั้งชื่อให้ส่วนสำคัญ แล้วปล่อยให้ code ที่เหลืออ่านได้เหมือนสรุปเจตนาสั้น ๆ
 
-| Code Smell | อาการที่บ่งชี้ | ท่าที่แนะนำ |
+| Smell (Fowler บทที่ 3) | อาการที่บ่งชี้ | ท่าที่แนะนำ |
 |---|---|---|
-| Long Method | function ยาวจนอ่านจากบนลงล่างแล้วอธิบายไม่ได้ในประโยคเดียว | Extract Function |
+| Long Function | function ยาวจนอ่านจากบนลงล่างแล้วอธิบายไม่ได้ในประโยคเดียว | Extract Function |
 | Duplicated Code | logic เดิมซ้ำในหลายจุด คัดลอก-วางมาพร้อมบั๊ก | Extract Function |
-| Cryptic Expression | sub-expression ที่อ่านแล้วไม่รู้ความหมาย | Extract Variable |
-| Temporary Variable | temporary variable ที่คำนวณค่าซับซ้อนแล้วส่งต่อ | Replace Temp with Query |
+| Mysterious Name | sub-expression ที่อ่านแล้วต้องถอดรหัสความหมาย | Extract Variable |
+| Mutable Data | temp ที่ตรึงค่าที่คำนวณไว้ใน function เดียว | Replace Temp with Query |
 | Divergent Change | function เดียวทำสองงานที่ต่างกัน แก้ที่หนึ่งกระทบอีกที่ | Split Phase |
+| Loops | loop เชิงคำสั่งที่ผสม filter map และ accumulate ไว้ด้วยกัน | Replace Loop with Pipeline |
 
 <Mermaid code={overviewDiagram} title="เลือกท่า composing-methods จากอาการที่เจอ" />
 

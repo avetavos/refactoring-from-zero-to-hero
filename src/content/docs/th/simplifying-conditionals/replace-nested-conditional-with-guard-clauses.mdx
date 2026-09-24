@@ -193,17 +193,6 @@ function เงินเดือน return จำนวนเงินที่
 - [Consolidate Conditional Expression](/refactoring/th/simplifying-conditionals/consolidate-conditional/)
 - [Introduce Special Case](/refactoring/th/simplifying-conditionals/introduce-special-case/)
 
-| ใช้ Guard Clauses เมื่อ | หลีกเลี่ยงเมื่อ |
-|---|---|
-| เส้นทางหลักฝังอยู่ใน else ที่ซ้อนลึก | สาขาทั้งหมดมีน้ำหนักเท่ากัน ไม่มีตัวใด "ข้อยกเว้น" |
-| กรณีต่าง ๆ เป็น error/edge case ที่จัดการแล้วออกไป | team บังคับ single exit point ต่อ function |
-| การซ้อนทำให้ happy path อ่านยากมาก | guard ใหม่จะทำให้มี exit points กระจายมากเกินไป |
-
-> ⚠️ ไม่ควร Replace Nested Conditional with Guard Clauses เมื่อ:
-> - สาขาล้วนเป็นทางเลือกที่เท่าเทียมกัน — guard จะสื่อว่าบางอันสำคัญน้อยกว่าโดยไม่ตั้งใจ
-> - body ของ loop ยังซับซ้อน — ให้ flatten ด้วย Extract Function ก่อน
-> - เงื่อนไขของ guard อ่านขัดเขินเมื่อกลับด้าน — ให้ Decompose Conditional ก่อน
-
 <Callout title="guard บอกว่า 'นี่ไม่ใช่เรื่องราวหลัก'">
 guard clause บอกผู้อ่านว่าเคสนี้ผิดปกติ และตอนนี้จัดการเรียบร้อยแล้ว จึงควรเก็บไว้ใช้กับข้อยกเว้นและเงื่อนไขขอบเท่านั้น ถ้าคุณเปลี่ยนทางเลือกที่เท่ากันให้กลายเป็น guard เท่ากับสื่อว่าทางหนึ่งสำคัญน้อยกว่าอีกทาง ซึ่งจะทำให้คนที่มาดูแลต่อเข้าใจผิด
 </Callout>

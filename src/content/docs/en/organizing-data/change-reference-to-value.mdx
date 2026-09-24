@@ -104,7 +104,7 @@ A `Money` object shared by reference, where mutating it leaks into every alias. 
         }
     }
 
-    // After — a Copy/Clone value compared by contents
+    // After — a Clone value compared by contents
     #[derive(Clone, PartialEq, Eq)]
     struct Money {
         amount: i64,

@@ -163,17 +163,6 @@ function ที่เริ่มต้นเป็นหน่วยเดี�
 - [Split Loop](/refactoring/th/moving-features/split-loop/)
 - [Extract Function](/refactoring/th/composing-methods/extract-function/)
 
-| ใช้ Move Statements to Callers เมื่อ | หลีกเลี่ยงเมื่อ |
-|---|---|
-| caller บางตัวต้องการ behavior ที่แตกต่างกัน | ทุก caller ต้องการ behavior เดียวกันทุกครั้ง |
-| function กำลังทำมากกว่าหนึ่งหน้าที่ | การย้ายออกไปจะทำให้ caller ทุกตัวต้องเขียนซ้ำ |
-| ต้องการแยก responsibility เพื่อ Extract Function ต่อ | statement นั้นเป็น invariant ที่ function ควรรับผิดชอบ |
-
-> ⚠️ ไม่ควร Move Statements to Callers เมื่อ:
-> - จะทำให้ Duplicate Code — caller ทุกตัวต้องเขียนเหมือนกัน
-> - statement นั้นซับซ้อนและ caller ไม่ควรรู้รายละเอียด
-> - ย้ายออกไปแล้ว function ที่เหลือไม่มีความหมายในตัวเอง
-
 <Callout title="เลือกสิ่งนี้แทน flag parameter">
 เมื่อใดก็ตามที่คุณกำลังจะเพิ่ม boolean อย่าง `includeFooter` เพื่อให้ caller รายหนึ่งทำงานต่างออกไป ให้หยุดคิด flag นั้นคือ function กำลังบอกคุณว่าทำสองงาน ย้ายคำสั่งที่แตกต่างกันไปยัง caller แล้วปล่อยให้แต่ละรายขอเฉพาะสิ่งที่ต้องการ
 </Callout>

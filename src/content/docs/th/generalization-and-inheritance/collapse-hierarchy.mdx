@@ -25,7 +25,7 @@ export const collapseDiagram = `classDiagram
 
 ## Code Smell
 
-ลำดับชั้นสึกกร่อนได้ การ refactor ดึงสมาชิกขึ้นบ้างผลักลงบ้าง จนสุดท้าย subclass แทบไม่เหลืออะไรเพิ่ม อาจมี field จิ๊บจ๊อยตัวเดียว หรือมี override ที่ตอนนี้เหมือน superclass เป๊ะ นี่คือ **Lazy Class** ในคราบ subclass คือมี type เพิ่ม ไฟล์เพิ่ม และการกระโดดเพิ่มให้ผู้อ่านทุกคน ทั้งหมดเพื่อแสดงความต่างที่หายไปเงียบ ๆ นานแล้ว เมื่อ subclass กับ superclass กลายเป็นฝาแฝดกัน ท่าที่ซื่อตรงที่สุดคือยุบรวมเป็นตัวเดียว
+ลำดับชั้นสึกกร่อนได้ การ refactor ดึงสมาชิกขึ้นบ้างผลักลงบ้าง จนสุดท้าย subclass แทบไม่เหลืออะไรเพิ่ม อาจมี field จิ๊บจ๊อยตัวเดียว หรือมี override ที่ตอนนี้เหมือน superclass เป๊ะ นี่คือ **Lazy Element** (Fowler บทที่ 3; ฉบับพิมพ์ครั้งแรกเรียก *Lazy Class*) ในคราบ subclass คือมี type เพิ่ม ไฟล์เพิ่ม และการกระโดดเพิ่มให้ผู้อ่านทุกคน ทั้งหมดเพื่อแสดงความต่างที่หายไปเงียบ ๆ นานแล้ว เมื่อ subclass กับ superclass กลายเป็นฝาแฝดกัน ท่าที่ซื่อตรงที่สุดคือยุบรวมเป็นตัวเดียว
 
 ## ก่อน → หลัง
 
@@ -174,17 +174,6 @@ subclass `Salesperson` เคยต่อยอด `Employee` อย่างม
 - [Pull Up & Push Down](/refactoring/th/generalization-and-inheritance/pull-up-and-push-down/)
 - [Replace Inheritance with Delegation](/refactoring/th/generalization-and-inheritance/replace-inheritance-with-delegation/)
 
-| ใช้ Collapse Hierarchy เมื่อ | หลีกเลี่ยงเมื่อ |
-|---|---|
-| subclass ไม่มี behavior ของตัวเองเลย — เหมือน parent ทั้งหมด | subclass มี behavior เฉพาะที่ยังใช้อยู่ |
-| subclass มีอยู่เพราะ refactoring เก่าที่ไม่ถูก clean up | การ collapse จะทำให้ class ที่เหลือใหญ่เกินไป |
-| inheritance tree ลึกเกินไปจน navigate ยาก | มี test ที่ test behavior ของ subclass โดยเฉพาะ |
-
-> ⚠️ ไม่ควร Collapse Hierarchy เมื่อ:
-> - subclass นั้นอาจถูก extend ในอนาคต — ลบไปจะต้องสร้างใหม่
-> - subclass มีชื่อที่สื่อ domain concept ชัดเจน แม้ body จะเล็ก
-> - ยังมี test ที่ test interface ของ subclass อยู่ — collapse จะ break test
-
 <Callout title="type ควรหารายได้ให้แก่การมีอยู่ของตัวเอง">
 ทุก class, struct หรือ trait ที่ผู้อ่านเจอ คือภาษีเล็ก ๆ ที่เก็บจากสมาธิของเขา subclass ที่ไม่ได้เพิ่มอะไรจริงจึงเป็นภาษีที่ไม่ได้ผลตอบแทนอะไรกลับมา ยุบทิ้งไปเลย แล้วถ้าวันหลังมีความต่างของจริงโผล่ขึ้นมา ค่อย extract type ใหม่ตอนที่แบกน้ำหนักได้จริง ส่วนใน Go และ Rust ที่ "ลำดับชั้น" เป็นแค่ wrapper struct การยุบก็คือการถอดชั้นที่ไม่เคยจำเป็นออกไปเท่านั้น
 </Callout>
@@ -207,7 +196,7 @@ export const quizCollapse = [
   },
   {
     q: 'subclass ที่แทบว่างเปล่าแสดงกลิ่นไม่ดีใด?',
-    options: ['Feature Envy', 'Lazy Class', 'Long Parameter List', 'Primitive Obsession'],
+    options: ['Feature Envy', 'Lazy Element', 'Long Parameter List', 'Primitive Obsession'],
     answer: 1,
   },
   {

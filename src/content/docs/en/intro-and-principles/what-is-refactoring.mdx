@@ -40,7 +40,7 @@ Refactoring is the safe middle path: you keep the working code and improve it gr
 
 When you sit down to edit code, you are wearing one of two hats. The **feature hat** is for adding capability: you write new code and the tests for it. The **refactor hat** is for restructuring: you change *how* the code is shaped, and the existing tests must stay green the whole time because behavior must not move.
 
-The rule is simple and strict: wear only one hat at a time. If you are halfway through extracting a function and notice a missing feature, finish the refactor, commit, *then* switch hats. Mixing the two is how a "quick cleanup" turns into an afternoon of debugging — when a test breaks, you can no longer tell whether your restructuring or your new feature caused it.
+The metaphor is Kent Beck's, as Martin Fowler records in *Refactoring* (2nd ed., 2018, ch. 2, "The Two Hats"). The rule is simple and strict: wear only one hat at a time. If you are halfway through extracting a function and notice a missing feature, finish the refactor, commit, *then* switch hats. Mixing the two is how a "quick cleanup" turns into an afternoon of debugging — when a test breaks, you can no longer tell whether your restructuring or your new feature caused it.
 
 <Mermaid code={hatsDiagram} title="The two hats: keep restructuring and feature work strictly separate" />
 

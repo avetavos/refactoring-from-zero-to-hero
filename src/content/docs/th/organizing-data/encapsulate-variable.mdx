@@ -180,17 +180,6 @@ object config ที่ field `taxRate` ถูกอ่านและกำห�
 - [Encapsulate Collection](/refactoring/th/organizing-data/encapsulate-collection/)
 - [Replace Primitive with Object](/refactoring/th/organizing-data/replace-primitive-with-object/)
 
-| ใช้ Encapsulate Variable เมื่อ | หลีกเลี่ยงเมื่อ |
-|---|---|
-| variable ถูก access จากหลายที่และต้องการ control | variable เป็น constant ที่ไม่เปลี่ยน |
-| ต้องการ add validation หรือ side effect เมื่อ set | overhead ไม่คุ้มสำหรับ variable ที่ใช้ภายใน scope เล็ก |
-| ต้องการ track การเปลี่ยนแปลง (debug, logging) | เป็น private field ใน class ที่ access จาก method เดียว |
-
-> ⚠️ ไม่ควร Encapsulate Variable เมื่อ:
-> - variable เป็น local ใน function — ไม่มีใคร access จากภายนอก
-> - ทำเพื่อ "best practice" โดยไม่มีเหตุผลที่ชัดเจน
-> - เพิ่ม getter/setter ที่ไม่มี logic — แค่ pass through
-
 <Callout title="getter คือการเตรียมพร้อมรับอนาคตของคุณ">
 ในวินาทีที่ทุกการเข้าถึงไหลผ่าน accessor คุณได้ซื้อทางเลือกหนึ่งที่อาจจะไม่เคยได้ใช้เลย — และนั่นก็ไม่เป็นไร ประเด็นไม่ได้อยู่ที่ว่าคุณ *จะ* เพิ่มการตรวจสอบความถูกต้อง แต่อยู่ที่ว่าเมื่อถึงวันที่คุณต้องทำ จะมีจุดให้เพิ่มเพียงจุดเดียวเป๊ะ แทนที่จะเป็นสี่สิบจุด
 </Callout>

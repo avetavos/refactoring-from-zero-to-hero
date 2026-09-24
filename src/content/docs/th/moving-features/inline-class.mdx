@@ -209,17 +209,6 @@ Inline class เมื่อหดเล็กลงเหลือ field เด
 - [Move Field](/refactoring/th/moving-features/move-field/)
 - [Move Function](/refactoring/th/moving-features/move-function/)
 
-| ใช้ Inline Class เมื่อ | หลีกเลี่ยงเมื่อ |
-|---|---|
-| class นั้นไม่ได้ทำอะไรมากพอที่จะมีชีวิตอยู่เอง | class นั้นมี responsibility ที่ชัดเจน แม้จะเล็ก |
-| หลัง refactoring ครั้งก่อน class กลายเป็นเปลือก | class นั้นถูกใช้โดยหลาย class — inline จะกระจาย dependency |
-| ต้องการรวม logic ก่อนจะแบ่งใหม่ด้วย Extract Class | class มี behavior ที่อาจขยายในอนาคต |
-
-> ⚠️ ไม่ควร Inline Class เมื่อ:
-> - class นั้นมี test ของตัวเอง — inline จะทำ test ซับซ้อนขึ้น
-> - ชื่อ class นั้นสื่อ intent ที่มีคุณค่า แม้ body จะเล็ก
-> - กำลัง inline เพราะ "ดูน้อยลง" ไม่ใช่เพราะลด complexity จริง
-
 <Callout title="Inline เฉพาะสิ่งที่กลวงไปแล้ว">
 Inline Class ไม่ได้ต่อต้าน class เล็ก ๆ เพราะ class เล็กที่โฟกัสคือจุดแข็ง ให้ inline เฉพาะ class ที่ *สูญเสีย* เหตุผลในการมีอยู่ไปแล้ว คือเหลือ field เดียว method นิดเดียว และไม่มีอนาคตเป็นของตัวเอง ถ้า class ยังมีงานทำอยู่ ก็ปล่อยให้ยืนต่อไป
 </Callout>

@@ -38,8 +38,6 @@ import ProgressTracker from '../../../../components/ProgressTracker.tsx';
       constructor(private _low: number, private _high: number) {}
       get low(): number { return this._low; }
       get high(): number { return this._high; }
-      set low(v: number) { this._low = v; }
-      set high(v: number) { this._high = v; }
       width(): number {
         return this.high - this.low; // routed through accessors
       }
@@ -180,17 +178,6 @@ import ProgressTracker from '../../../../components/ProgressTracker.tsx';
 - [Encapsulate Variable](/refactoring/th/organizing-data/encapsulate-variable/)
 - [Replace Type Code with Subclasses](/refactoring/th/organizing-data/replace-type-code-with-subclasses/)
 - [Replace Primitive with Object](/refactoring/th/organizing-data/replace-primitive-with-object/)
-
-| ใช้ Self-Encapsulate Field เมื่อ | หลีกเลี่ยงเมื่อ |
-|---|---|
-| subclass ต้องการ override การอ่าน/เขียน field | class เล็กและ simple — เพิ่ม indirection โดยไม่จำเป็น |
-| ต้องการ add lazy initialization หรือ caching | field เป็น constant ที่ไม่ต้องการ control |
-| validation ที่ซับซ้อนต้องทำใน setter | เพิ่ม getter/setter ที่ไม่มี logic แค่ pass through |
-
-> ⚠️ ไม่ควร Self-Encapsulate Field เมื่อ:
-> - class ไม่มี subclass และ field ไม่ต้องการ validation
-> - เพิ่ม accessor เพื่อ "ความสม่ำเสมอ" แต่ไม่มี benefit จริง
-> - ทำให้ code อ่านยากขึ้นโดยไม่ได้ให้ flexibility ที่จำเป็น
 
 <Callout title="Encapsulate Variable แต่ชี้เข้าด้านใน">
 Encapsulate Variable วางขอบเขตระหว่าง field กับโลก *ภายนอก* ส่วน Self-Encapsulate Field วางขอบเขตเดียวกันนั้นระหว่าง field กับ *ตัว class เอง* — เพื่อให้แม้แต่ method ของเจ้าของเองก็เดินผ่าน accessor ทำให้ subclass และการตรวจสอบความถูกต้องมีรอยต่อให้เกาะเกี่ยว

@@ -14,18 +14,18 @@ import ProgressTracker from '../../../../components/ProgressTracker.tsx';
 export const combineDiagram = `flowchart LR
   subgraph Before["Before"]
     D["reading data<br/>(customer, quantity, month)"]
-    F1["baseCharge(reading)"]
-    F2["taxableCharge(reading)"]
-    F3["calculateBaseCharge(reading)"]
+    F1["baseRate(month)"]
+    F2["baseCharge(reading)"]
+    F3["taxableCharge(reading)"]
     D -.-> F1
     D -.-> F2
     D -.-> F3
   end
   subgraph After["After"]
     C["Reading (class)<br/>fields: customer, quantity, month"]
-    C --> M1["baseCharge()"]
-    C --> M2["taxableCharge()"]
-    C --> M3["calculateBaseCharge()"]
+    C --> M1["baseRate"]
+    C --> M2["baseCharge"]
+    C --> M3["taxableCharge"]
   end
   Before -.->|"Combine Functions into Class"| After`;
 
@@ -35,11 +35,11 @@ When several free functions all operate on the same bundle of data — each taki
 
 ## The smell
 
-You see a group of functions that all accept the same record and pull values out of it: `baseCharge(reading)`, `taxableCharge(reading)`, `calculateBaseCharge(reading)`. The record travels from function to function as a parameter, and the functions clearly form a family around it — but nothing names that family. This is a **Data Clump** with behaviour orbiting it. Wrapping the data in a class gives the family a home, lets methods call each other without re-passing the data, and creates an obvious place for the next related function to land.
+You see a group of functions that all accept the same record and pull values out of it: `baseRate(month)`, `baseCharge(reading)`, `taxableCharge(reading)`. The record travels from function to function as a parameter, and the functions clearly form a family around it — but nothing names that family. This is a **Data Clump** with behaviour orbiting it. Wrapping the data in a class gives the family a home, lets methods call each other without re-passing the data, and creates an obvious place for the next related function to land.
 
 ## Before → After
 
-Three functions that each take a utility `reading` and compute a charge. We combine them into a `Reading` class whose fields are the reading's data.
+Three functions that all work from one utility `reading` (directly, or through its `month`) to compute a charge. We combine them into a `Reading` class whose fields are the reading's data.
 
 <Tabs syncKey="lang">
   <TabItem label="TypeScript">

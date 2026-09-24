@@ -130,17 +130,6 @@ function ตัวนี้ใช้ส่วนลดที่ต้องเ�
 - [Replace Error Code with Exception](/refactoring/th/simplifying-conditionals/replace-error-code-with-exception/)
 - [Decompose Conditional](/refactoring/th/simplifying-conditionals/decompose-conditional/)
 
-| ใช้ Introduce Assertion เมื่อ | หลีกเลี่ยงเมื่อ |
-|---|---|
-| code พึ่งพาเงื่อนไขโดยไม่กล่าวไว้ชัดเจน | input นั้นมาจาก user หรือ network — ใช้ error handling แทน |
-| ต้องการให้ violation หยุดที่ต้นตอ ไม่ใช่ propagate | assertion ที่จะ trigger ใน production flow ปกติ |
-| ข้อสมมติที่ละเมิดแล้วสร้างความเสียหายที่ห่างไกล | assertion มี side effect — จะหายไปใน optimized build |
-
-> ⚠️ ไม่ควร Introduce Assertion เมื่อ:
-> - เงื่อนไขนั้น validate input จาก user หรือ external system — ควร return error แทน
-> - assertion ทำงานบ่อย ๆ ใน normal flow — แปลว่านั่นคือ expected condition
-> - ใส่ side effect ใน assertion — behavior จะเปลี่ยนเมื่อ assertion ถูกปิด
-
 <Callout title="assert สิ่งที่เป็นไปไม่ได้ validate สิ่งที่เป็นไปได้">
 ถ้าค่าผิด ๆ เดินทางมาถึง function ของคุณได้ในการทำงานปกติ นั่นคือ *input* ให้ validate แล้ว return error ที่ caller จัดการต่อได้ เก็บ assertion ไว้ใช้กับเงื่อนไขที่จะพังก็ต่อเมื่อมีบั๊กเท่านั้น assertion ที่ทำงานคือข้อความถึง dev ไม่ใช่ถึงผู้ใช้
 </Callout>
